@@ -131,6 +131,24 @@ The library will integrate functionalities from:
 2. Identify relevant functionalities
 3. Adapt and integrate into `sc_tools`
 
+---
+
+## Next immediate steps (plan before executing)
+
+**Goal:** Replicate the same scientific outcomes as before (Phase 3–5 objectives), so the reorganized codebase is **reproducibility-equivalent**. Outputs may differ only in naming (e.g. versioned filenames from `st.pl.save_figure` / `st.data.write_h5ad`).
+
+**1. Ensure Makefile Phase 3–5 works**
+- Verify that Makefile targets for Phase III (deconvolution), Phase IV (spatial/niche analysis), and Phase V (visualization) run successfully.
+- Confirm that running these phases produces the same results as previously (same figures, same downstream inputs), with versioned filenames where applicable.
+- Fix any broken dependencies or paths so that `make phase3`, `make phase4`, `make phase5` (or equivalent) complete without error.
+
+**2. Modular scripts driven by config + sc_tools**
+- Refactor analysis scripts so they **do not rewrite shared logic**: use **config files** (e.g. dicts of arguments) and **import functions directly** from `sc_tools` (and later `sc_analysis`).
+- Scripts should be thin orchestration: load config → call `st.pl.*` / `st.tl.*` / `st.data.*` with config-driven arguments → write versioned outputs.
+- Outcome: easier to navigate, no duplicated implementations; changing behavior happens in one place (sc_tools or config), not inside each script.
+
+Execution order: complete (1) first so the pipeline is reproducible, then proceed to (2) for modularization.
+
 ## Benefits
 
 1. **Modularity**: Common code reused across scripts

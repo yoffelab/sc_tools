@@ -50,7 +50,6 @@ Conda users can still use `conda env create -f environment.yml` and then `pip in
 - **Deconvolution:** Pinpointing minimum data size and memory limits for Cell2location/DestVI; refining gene signatures and validating against HLCA/MSigDB/TCGA LUAD.
 - **Spatial:** Spatially variable genes (SVG), cell-type colocalization from deconvolution, spatial transition areas (Normal ↔ Non-Solid ↔ Solid, tumor–TLS), and macrophage state comparison across tumor types.
 - **TLS:** TLS niche extraction and lymphoid-rich neighborhood analysis.
-- **Codebase:** Optional refactor of scripts to use `st.pl.*` / `st.tl.*`; moving dev/archive scripts and completing `sc_analysis` modules; possible integration with [imc-analysis](https://github.com/ElementoLab/imc-analysis). See `REORGANIZATION_STATUS.md`.
 
 ---
 
@@ -65,7 +64,7 @@ Conda users can still use `conda env create -f environment.yml` and then `pip in
 | `results/` | Processed AnnData (e.g. `adata.img.genescores.h5ad`), CSVs |
 | `figures/` | Output plots (manuscript, spatial, TLS, process_colocalization, etc.) |
 
-Key docs: **`Mission.md`** (objectives and task list), **`Architecture.md`** (phases and data flow), **`Journal.md`** (decisions and rationale), **`skills.md`** (statistical and coding standards), **`REORGANIZATION_STATUS.md`** (library and refactor status).
+Key docs: **`Mission.md`** (objectives and task list), **`Architecture.md`** (phases and data flow), **`Journal.md`** (decisions and rationale), **`skills.md`** (statistical and coding standards).
 
 ---
 

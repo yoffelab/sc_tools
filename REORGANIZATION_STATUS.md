@@ -42,11 +42,18 @@
 - ✅ `colocalization.py` - pearson_correlation, morans_i, morans_i_batch, neighborhood_enrichment (squidpy)
 - ✅ `io` - write_h5ad (versioned by default)
 
-## 🚧 In Progress
+## 🚧 In Progress — Next immediate steps
 
-- (Optional) Refactor existing scripts to use `st.pl.spatial`, `st.pl.heatmaps`, `st.pl.save_figure`
+**1. Ensure Makefile Phase 3–5 works**
+- [ ] Verify Makefile targets for Phase III (deconvolution), Phase IV (spatial/niche), Phase V (visualization) run successfully.
+- [ ] Confirm outputs match previous results (versioned filenames acceptable).
+- [ ] Fix any broken targets or paths.
 
-## 📋 To Do
+**2. Modular scripts: config + sc_tools imports**
+- [ ] Refactor scripts to use config files (dicts of arguments) and import from `sc_tools` directly.
+- [ ] No duplicated logic in scripts; thin orchestration only (config → st.pl / st.tl / st.data → versioned outputs).
+
+## 📋 To Do (later)
 
 ### 5. Project-Specific Modules (`sc_analysis/`)
 - [ ] `spatial/tls.py` - TLS-specific analysis
@@ -82,11 +89,9 @@
 - `scripts/dev/` scripts are temporary and should be cleaned up regularly
 - `scripts/archive/` is read-only for reference only
 
-## 🔄 Next Steps
+## 🔄 Next Steps (after immediate steps)
 
-1. (Optional) Refactor scripts to use `st.pl.spatial`, `st.pl.heatmaps`, `st.pl.save_figure` where applicable
-2. Review and integrate imc-analysis functionalities
-3. Move test scripts to `scripts/dev/`
-4. Update existing scripts to use new API: `st.pl.*`, `st.tl.*`
-5. Update `Architecture.md`
-6. Project-specific modules (`sc_analysis/`) and script organization (phase folders, archive)
+1. Move test scripts to `scripts/dev/`, archive to `scripts/archive/`
+2. Project-specific modules (`sc_analysis/`) and script organization by phase
+3. Review and integrate imc-analysis functionalities
+4. Update `Architecture.md` and add API documentation

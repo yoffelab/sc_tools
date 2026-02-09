@@ -1,0 +1,27 @@
+name: ggo_visium
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scipy
+  - tqdm
+  - dask
+  - pillow
+  - tifffile
+  - scikit-learn
+  - pip
+  - pip:
+    - scanpy
+    - squidpy
+    - anndata
+    - tangram-sc
+    - scvi-tools
+    # Note: sthd may be a custom package - install separately if needed
+    # pip install sthd  # or however it's installed
+

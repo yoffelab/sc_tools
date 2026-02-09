@@ -1,0 +1,24 @@
+#!/bin/sh
+# Reject any staged file larger than 1MB (1048576 bytes).
+# Install: git config core.hooksPath .githooks
+
+MAX_BYTES=1048576
+violators=""
+
+for file in $(git diff --cached --name-only --diff-filter=ACMR); do
+  if [ -f "$file" ]; then
+    size=$(wc -c < "$file" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$MAX_BYTES" ]; then
+      violators="$violators\n  $file (${size} bytes)"
+    fi
+  fi
+done
+
+if [ -n "$violators" ]; then
+  echo "Commit rejected: the following staged files exceed 1MB:"
+  printf "%b\n" "$violators"
+  echo ""
+  echo "Unstage them (e.g. git reset HEAD -- <file>) or add to .gitignore."
+  exit 1
+fi
+exit 0

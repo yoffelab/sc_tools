@@ -1,0 +1,97 @@
+# ---------------------------------------------------------------------------
+# sc_tools project .gitignore
+# Note: Git cannot ignore by file size. Use the pre-commit hook to block
+#       files > 1MB (see .githooks/README.md).
+# ---------------------------------------------------------------------------
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---------------------------------------------------------------------------
+# Large or generated data (often > 1MB) — keep out of repo
+# ---------------------------------------------------------------------------
+# AnnData / Seurat
+*.h5ad
+*.h5Seurat
+*.rds
+*.h5
+
+# Figures (PDF/PNG can be large)
+figures/
+output/
+
+# Results and caches
+results/
+*.pickle
+*.pkl
+*.cache
+
+# Documentation binaries
+*.pptx
+*.docx
+*.xlsx
+*.pdf
+
+# Whole-slide / images
+*.svs
+*.tiff
+*.tif
+*.ndpi
+
+# Compressed
+*.zip
+*.tar
+*.tar.gz
+*.gz
+*.7z
+
+# Logs and temp
+*.log
+*.tmp
+temp/
+tmp/
+logs/
+
+# Optional: uncomment to ignore metadata large CSVs
+# metadata/*.csv

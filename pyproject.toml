@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sc-tools"
+version = "0.1.0"
+description = "Scientific analysis tools for spatial and single-cell multiomics"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Junbum Kim" },
+]
+keywords = [
+    "spatial-transcriptomics",
+    "single-cell",
+    "multiomics",
+    "scanpy",
+    "anndata",
+    "deconvolution",
+    "colocalization",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+    "scanpy>=1.9",
+    "squidpy>=1.3",
+    "anndata>=0.10",
+    "tqdm>=4.65",
+    "Pillow>=10.0",
+    "tifffile>=2023.1.0",
+    "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+# Full pipeline: integration and deconvolution
+deconvolution = [
+    "scvi-tools>=1.0",
+    "tangram-sc>=1.0",
+]
+# Extra for large-scale / GPU workflows
+gpu = [
+    "torch",
+]
+# Development and testing
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Repository = "https://github.com/yoffelab/sc_tools"
+Documentation = "https://github.com/yoffelab/sc_tools#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sc_tools*"]

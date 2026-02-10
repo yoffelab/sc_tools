@@ -1,131 +1,137 @@
-# Mission: Lung Tumor Evolution and TLS Transcriptomics
+# Mission: sc_tools Toolkit and Pipeline
 
-**Current Status:** Phase III-IV (Cell Type Deconvolution, Spatial Structures & Niche Analysis)
-**Author:** Junbum Kim
-**Last Updated:** 2025-01-20
+**Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
----
-
-## 1. Objective
-Identify transcriptional and spatial differences across the lung tumor progression spectrum (Normal, Non-Solid, and Solid tumors) with a specific focus on the heterogeneity of Tertiary Lymphoid Structures (TLS).
+**Last Updated:** 2025-02-09
 
 ---
 
-## 2. Completed Tasks
-- [x] **Data Ingestion:** Converted raw Visium/scRNA-seq data into AnnData containers (`results/adata_filtered.h5ad`).
-- [x] **Latent Modeling:** Trained scVI models to generate integrated latent spaces for batch-corrected analysis (`results/scvi.h5ad`).
-- [x] **Gene Scoring:** Calculated LUAD-related scores using Seurat-based method (Scanpy `score_genes`) from established signatures (`results/adata.img.genescores.h5ad`, using `metadata/gene_signatures.json`).
-- [x] **Initial Visualization:** Generated per-sample QC and EMT spatial distribution plots.
-- [x] **Grouping:** Categorized samples by pathology (Normal, Non-Solid, Solid) in `adata.obs`.
-- [x] **Differential Program Analysis:** Performed 1-vs-all statistical testing on tumor and immune programs across tumor types with boxplots and significance annotations (`scripts/tumor_differences.py`).
-- [x] **Macrophage Localization:** Analyzed macrophage colocalization with proliferative program, stratified by tumor type (`scripts/macrophage_localization.py`).
-- [x] **Spot Process Colocalization Analysis:** Implemented modular analysis pipeline for spatial co-occurrence patterns of processes (`scripts/process_colocalization.py`).
-- [x] **Signature Heatmaps:** Created comprehensive heatmap and clustermap visualizations of gene signature scores with patient and solidity annotations (`scripts/signature_heatmap.py`).
----
+## 1. Toolkit and Pipeline (General)
 
-## 3. Active Tasks (Roadmap)
-### Phase III: Cell Type Deconvolution
-- [x] **Deconvolution Pipeline:** Implemented modular deconvolution pipeline with memory optimization (`scripts/celltype_deconvolution_phase3.py`). *critical* - still need to identify minimum required unit for the method to work, and the size of data that causes things to fail. 
-    - [x] `tangram`: Implemented with batch processing per library_id to handle memory constraints.
-    - [ ] `cell2location`: Test implementation with batch processing to identify memory breaking points.
-    - [ ] `DestVI`: Test implementation with batch processing.
-    - [x] **Fallback Strategy:** Implemented method fallback (DestVI → Cell2location → Tangram) with error handling.
-
-- [ ] **Gene Signature Refinement:** Update `metadata/gene_signatures.json` to contain specific and accurate gene lists for associated processes.
-    - [ ] Add relevant processes (e.g., Hallmark gene sets).
-    - [ ] Update gene lists to be robust, specific, and accurate.
-    - [ ] Validate against external databases (HLCA, MSigDB, TCGA LUAD).
-
-### Phase IV: Comparative Tumor Analysis
-- [x] **Differential Program Analysis:** (`scripts/tumor_differences.py`)
-    - Performed 1-vs-all statistical testing on tumor programs (EMT, Hypoxia, Proliferative) across tumor types.
-    - Performed 1-vs-all statistical testing on immune programs (Immune_Lymphoid, Innate_Other, Processes:TLS_Formation, Liron signatures) across tumor types.
-    - Generated boxplots with significance asterisks, adjusted p-values, and comparison text annotations.
-- [ ] **Spatially Variable Genes (SVG):** (`scripts/spatial_analysis.py`)
-    - Identify genes that characterize the transition from Non-Solid to Solid tumors using Moran's I or `squidpy.gr.spatial_autocorr`.
-    - Generate spatial plots highlighting SVG patterns.
-- [x] **Spot Process Colocalization Analysis:** (`scripts/process_colocalization.py`)
-    - **Objective:** Analyze spatial co-occurrence patterns of processes across spots.
-    - **Methods Implemented:**
-        - [x] Pearson correlation of processes across spots (using `DataFrame.corr()`).
-        - [x] Moran's I for spatial autocorrelation of processes (manual computation via spatial neighbors graph).
-        - [ ] Thresholded neighborhood enrichment using `squidpy.gr.nhood_enrichment` after thresholding processes by low / high (-1, +1) (implemented, disabled by default).
-        - [x] Volcano plots for Normal vs Non-Solid vs Solid comparisons with statistical testing and annotations (faceted plot with 3 subplots).
-        - [x] Signature filtering: Include/exclude parameters for selecting which signatures to plot.
-    - **Output:** 
-        - Correlation heatmap and clustermap identifying colocalized (positive) and anti-colocalized (negative) process pairs.
-        - Moran's I heatmap showing spatial autocorrelation for each process.
-        - Faceted volcano plots with annotated significant processes for each tumor type comparison.
-        - CSV files with all statistical results.
-- [x] **Signature Heatmap Visualization:** (`scripts/signature_heatmap.py`)
-    - **Objective:** Create comprehensive heatmap and clustermap visualizations of gene signature scores across spots.
-    - **Features:**
-        - Rows: Spots (sorted by patient and solidity)
-        - Columns: Gene signatures (hierarchically clustered in clustermaps)
-        - Annotations: Patient (library_id) and solidity (tumor_type) color bars
-        - 3-level hierarchy: Macro grouping (patient/solidity), secondary grouping, fine clustering within groups
-    - **Output:**
-        - 4 figures total: 2 heatmaps (patient→solidity, solidity→patient) and 2 clustermaps (same sorting)
-        - Solidity legend in top right corner
-        - All figures saved to `figures/manuscript/signature_heatmaps/`
-- [ ] **Cell Type Colocalization Analysis:**
-    - **Objective:** Analyze spatial co-occurrence patterns of cell type proportions (from deconvolution) across spots.
-    - **Methods:**
-        - [ ] Pearson correlation of cell type proportions across spots.
-        - [ ] Moran's I for spatial autocorrelation of cell type proportions.
-        - [ ] Thresholded neighborhood enrichment using `squidpy.gr.nhood_enrichment`.
-        - [ ] Tensor decomposition (MEFISTO) for spatiotemporal patterns (if applicable).
-    - **Output:** Identify cell type pairs that are colocalized (positive association) or anti-colocalized (mutual exclusion).
-- [ ] **Spatial Gene Expression Patterns:**
-    - **Objective:** Identify gene signatures that up/down-regulate as a result of spatial proximity between cell types.
-    - **Approach:** Explore graph-based methods where:
-        - Nodes represent spots with cell type proportions.
-        - Edges represent spatial proximity with associated gene signature scores.
-    - **Implementation:** Research existing methods (e.g., spatial graph neural networks) or develop algorithm for expected/observed transcriptional programs.
-- [ ] **Spatial Transition Areas:**
-    - Identify transcriptional upregulation/downregulation in transition areas:
-        - Between Normal, Non-Solid, and Solid tumor regions.
-        - Between tumor cores and TLS.
-    - Use spatial distance metrics and differential expression analysis.
-- [ ] **Macrophage State Comparison:**
-    - Compare macrophage subpopulations across tumor types:
-        - Alveolar macrophages Merad
-        - Monocyte-derived macrophages (M1/M2 polarization)
-        - M2 subpopulations: `Mac.2 MoMac M2-like`, `Mac.6 MoMAc M2-like`
-    - Perform 1-vs-all statistical testing on macrophage signatures across tumor types.
-    - Generate boxplots with significance annotations.
-- [ ] **Differential Cell Type Proportions:**
-    - Perform 1-vs-all statistical testing on cell type proportions (from deconvolution) across tumor types.
-    - Generate boxplots with significance asterisks and adjusted p-values.
-    
-### Phase V: TLS-Specific Transcriptomics
-- [ ] **TLS Niche Extraction:** (`scripts/tls_analysis.py`)
-    - Subset the `tls_clustered.h5ad` object to focus on lymphoid-rich neighborhoods.
-    - Generate spatial plots of TLS distribution across samples.
-- [x] **B-cell/T-cell State Comparison:** (`scripts/tls_analysis.py`)
-    - Analyzed ratios of Naive vs. Memory B-cells and Exhausted vs. Effector T-cells within TLS across tumor stages.
-    - Performed 1-vs-all statistical testing with significance annotations.
-- [x] **Ligand-Receptor Crosstalk:** (`scripts/tls_analysis.py`)
-    - Used `squidpy.gr.ligrec` to infer signaling between tumor-adjacent TLS and tumor cells in Non-Solid vs. Solid samples.
-- [x] **Macrophage Localization:** (`scripts/macrophage_localization.py`)
-    - Measured extent of macrophage colocalization with proliferative program.
-    - Stratified by normal, non-solid, and solid tumors.
-    - Generated scatterplots with tumor proliferation score (x-axis) vs. macrophage scores (y-axis).
-    - Annotated Pearson correlation per condition.
-    - Generated correlation heatmap and clustermap for macrophage-proliferation correlations across tumor types.
----
-
-## 4. Blockers and Sanity Checks
-- **Sanity Check:** Ensure that low-count Non-Solid (GGO) spots are not being over-filtered during comparative QC.
-- **Statistical Correction:** All differential expression and multiple comparison results must use Benjamini-Hochberg (FDR) adjustment.
-- **Memory Management:** Deconvolution scripts must use batch processing per library_id to prevent segmentation faults.
+- **Pipeline phases (1–7):** Non-linear workflow with human-in-loop steps. See `WORKFLOW.md` for the diagram.
+- **sc_tools:** Reusable package (`sc_tools.pl`, `sc_tools.tl`, `sc_tools.qc`, etc.) for QC, plotting, testing, colocalization, I/O. Keep generic; project-specific logic stays in project scripts.
+- **Reproducibility:** Makefile is project-aware (`PROJECT ?= projects/visium/ggo_visium`). Each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/` under `projects/<platform>/<project_name>/`.
+- **Standards:** All projects follow `skills.md` (statistics, significance bars, FDR). Documentation avoids apostrophes.
 
 ---
 
-## 5. Technical Decision Log (Reference @Journal.md)
-- **scVI Latent Dimensions:** Selected n=30 latent dimensions for integration (see Journal.md).
-- **Comparison Mode:** Default to 1-vs-all (1-vs-rest) comparisons for tumor types to highlight stage-specific programs.
-- **Gene Signature Scoring:** Transitioned from simple mean to Seurat-based method (Scanpy `score_genes`) for robust scoring that controls for technical variation.
-- **Deconvolution Strategy:** Implemented modular pipeline with fallback (DestVI → Cell2location → Tangram) and batch processing per library_id for memory efficiency.
-- **Process Colocalization:** Implemented modular analysis pipeline with Pearson correlation (DataFrame.corr), Moran's I (manual computation), and faceted volcano plots for identifying colocalized and anti-colocalized process pairs across tumor types. Includes signature filtering (include/exclude) for selective visualization.
-- **Signature Heatmaps:** Created comprehensive visualization pipeline with 3-level hierarchical sorting (patient/solidity grouping, mean score clustering, fine clustering) for both heatmaps and clustermaps. Maintains consistent solidity ordering (Normal → Non-Solid → Solid) and patient clustering by mean signature scores.
+## 2. General Analysis — To-Do and Implementation Status
+
+All paths below are project-specific: `projects/<platform>/<project_name>/...`. Nothing lives at repo root for `metadata/`, `results/`, or `figures/`.
+
+### Phase 1: Data Ingestion & QC
+
+#### Ingestion (Platform-Specific)
+- [ ] **Visium / Visium HD:** fastq + H&E images + Cytassist images → Space Ranger → cloupe. Convert cloupe to AnnData. Keep H&E images when concatenating.
+- [ ] **IMC:** mcd, txt files → segmentation and concatenation → h5ad.
+- [ ] **Xenium:** Assume preprocessed; load into AnnData.
+- [ ] **Required annotations:** `adata.obs['sample']` (sample of origin), `adata.obs['raw_data_dir']` (backup path for original data). Spatial coords in `adata.obsm['spatial']`.
+
+#### QC Metrics (sc_tools.qc)
+- [ ] Implement `calculate_qc_metrics` (wrap scanpy `pp.calculate_qc_metrics`).
+- [ ] Implement `filter_cells`, `filter_genes` (wrap scanpy).
+- [ ] Implement `highly_variable_genes` (wrap scanpy).
+- [ ] Implement `spatially_variable_genes` (wrap squidpy). Sample-specific QC on spots/cells and genes/proteins.
+- [ ] Two QC versions: pre-normalization and post-normalization.
+
+#### QC Plots
+- [ ] 2x2 grid: total_count (total expression), gene/protein expression histogram, log1p version (all platforms).
+- [ ] Spatial transcriptomics: % mt, % hb per spot.
+- [ ] Multipage spatial plot per sample: total_count, log1p, %mt (1x3 subplot) as QC report.
+- [ ] Save under `projects/<platform>/<project>/figures/QC/raw/` (pre) and `figures/QC/post/` (post).
+- [ ] **Future:** MA plots (per gene/protein across samples).
+
+---
+
+### Phase 2: Metadata Attachment (Human-in-Loop)
+
+- [ ] **Bypass file:** `projects/<platform>/<project>/metadata/sample_metadata.csv` or `.xlsx` mapping `sample` → clinical columns. sc_tools guides the join when provided.
+- [ ] Without file: human prepares map; cannot skip via automatic pipelining.
+- [ ] Must be done as early as possible in the project cycle.
+- [ ] Preprocessed projects may skip to Phase 3 or 4 if already annotated.
+
+---
+
+### Phase 3: Preprocessing
+
+- [ ] **Before any modification:** Backup `adata.raw`.
+- [ ] Filter cells, genes, proteins, samples failing QC (project-specific thresholds).
+- [ ] Normalize, batch correct (e.g. scVI), run automated clustering.
+- [ ] Automated cell typing: non-transformer and transformer models.
+- [ ] Post-normalization QC report → `figures/QC/post/`.
+
+---
+
+### Phase 3.5: Demographics (Branching)
+
+- [ ] **sc_tools helpers:** piechart, histogram, violinplot, kdeplot, barplot, stacked barplot, scatterplot, correlogram, heatmap.
+- [ ] Figure 1 for population-based studies describing the cohort.
+
+---
+
+### Phase 4: Manual Cell Typing (Human-in-Loop, Iterative)
+
+- [ ] **sc_tools workflow:** Extract `cluster_id` from `adata.obs`; provide JSON template.
+- [ ] **JSON format:** `{cluster_id: {celltype_name: "...", total_obs_count: N}}`. Include counts per cluster for user guidance.
+- [ ] **cluster_id type:** Match `adata.obs` (string vs int; handle categorical with care to avoid NaN/errors).
+- [ ] **Two mappings:** `cluster_id → celltype` (full, e.g. `Epithelial (Ki67/MKI67+)`), `cluster_id → celltype_broad` (without parenthesis, e.g. `Epithelial`).
+- [ ] **Per iteration:** matrixplot, UMAP (celltype, celltype_broad, clusters), scatter plots (raw/normalized, gene), signature genes per celltype.
+- [ ] Repeat until satisfactory. Save `celltype_map.json` under `projects/<platform>/<project>/metadata/`.
+
+---
+
+### Phase 5: Downstream Biology
+
+- [ ] Gene scoring, gene set analysis.
+- [ ] Statistical comparison (1-vs-rest, pairwise per `skills.md`).
+- [ ] Celltype deconvolution (Tangram, Cell2location, DestVI; batch per library/sample).
+- [ ] Spatial/process analysis: colocalization, Moran's I, neighborhood enrichment, ligand-receptor.
+- [ ] Visualization: publication-ready figures under project `figures/`.
+
+---
+
+### Phase 6–7: Meta Analysis (Optional)
+
+- [ ] **Phase 6:** Aggregate to ROI level and patient level (mean expression, celltype counts).
+- [ ] **Phase 7:** Downstream analysis on aggregated ROI/patient data.
+
+---
+
+## 3. Project-Specific Missions
+
+- **GGO Visium:** `projects/visium/ggo_visium/Mission.md`.
+- **Other projects:** Add `Mission.md` and `Journal.md` via `./projects/create_project.sh <project_name> <data_type>`.
+- **Entry points:** Preprocessed projects may start at Phase 3 or 4.
+
+---
+
+## 4. Workflow Diagram
+
+See **[WORKFLOW.md](WORKFLOW.md)** for the Mermaid diagram and phase summary.
+
+---
+
+## 5. Testing Strategy
+
+Two-layer testing ensures code compiles, passes tests, and the pipeline runs correctly before and during sc_tools implementation.
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Package tests** | `sc_tools/tests/` | Unit tests for sc_tools APIs (pl, tl, qc, etc.) with synthetic fixtures. |
+| **Project tests** | `projects/<platform>/<project>/tests/` | Integration/smoke tests for the project pipeline (Makefile, scripts, data flow). |
+
+**Implementation order:**
+1. **Project unit tests (ggo_visium)** — Establish baseline; validate Makefile and scripts (Phases 1–5) run with fixtures.
+2. **sc_tools unit tests** — Ensure guaranteed behavior of sc_tools functions before use in scripts.
+3. **Implement functions** — Refactor scripts to use sc_tools; new code must compile and pass both test layers.
+
+All new code must compile and pass tests. Project scripts that use sc_tools should import from `sc_tools` and live under `projects/<platform>/<project>/scripts/`.
+
+---
+
+## 6. Reference
+
+- **WORKFLOW.md** — Non-linear pipeline, human-in-loop, file requirements.
+- **Architecture.md** — Directory layout, phase details, project-specific paths, testing structure.
+- **skills.md** — Coding and statistical standards.
+- **Per-project:** `projects/<data_type>/<project_name>/Mission.md` and `Journal.md`.

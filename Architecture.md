@@ -1,85 +1,193 @@
-# Project Architecture: Spatial Omics Analysis
+# Project Architecture: Scalable Spatial Omics Analysis
 
-This document outlines the directory structure and data flow for the computational oncology pipeline. All agentic operations must adhere to this roadmap to maintain project integrity and reproducibility.
+This document outlines the directory structure, data flow, and script inventory. The layout is **scalable across projects and data types** (Visium, Visium HD, Xenium, IMC). All **metadata**, **results**, and **figures** are **project-specific** under `projects/<platform>/<project_name>/`. There is no repo-root `metadata/`, `results/`, or `figures/`. The pipeline is non-linear; see `WORKFLOW.md` for the diagram.
 
 ## 1. Directory Overview
 
 ```text
 .
-├── Architecture.md      # System roadmap (this file)
-├── skills.md            # Mandatory coding and statistical standards
-├── Mission.md           # Active task tracking
-├── Journal.md           # Technical and scientific decision log
-├── environment.yml      # Conda environment configuration
-├── data/                # Raw sequencing and imaging data (unprocessed)
-├── metadata/            # Biological context (gene signatures, external obs)
-├── results/             # Processed AnnData (.h5ad) and Seurat objects
-├── scripts/             # Modular Python/R scripts for analysis
-│   └── old code/        # Archived/Legacy script versions (Read-only)
-├── figures/             # Output visualizations
-│   ├── manuscript/      # Publication-ready plots (Strict statistical rules)
-│   ├── spatial/         # Intermediate spatial plots of tissue slides
-│   └── tls_spatial/     # Tertiary Lymphoid Structure specific analysis
-├── outs/                # Platform-specific raw outputs (e.g., Visium/Xenium)
-└── output/              # Intermediate tool outputs (e.g., Tangram batches)
+├── Architecture.md         # System roadmap (this file)
+├── Mission.md              # Toolkit and pipeline (general); project-specific in projects/<type>/<name>/Mission.md
+├── WORKFLOW.md             # Non-linear pipeline diagram (Mermaid) and phase summary
+├── Journal.md              # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
+├── skills.md               # Mandatory coding and statistical standards
+├── pyproject.toml          # Package build (sc_tools installable)
+├── environment.yml         # Conda environment
+├── requirements.txt        # pip dependencies
+├── Makefile                # Pipeline orchestration (project-aware; default PROJECT=projects/visium/ggo_visium)
+├── ENVIRONMENT_SETUP.md    # Environment setup notes
+│
+├── sc_tools/               # Reusable Python package (scanpy-style API) — NOT project-specific
+│   ├── pl/                  # Plotting: spatial, heatmaps, statistical, volcano, save
+│   ├── tl/                  # Tools: testing, colocalization, deconvolution, io
+│   ├── qc/                  # QC: calculate_qc_metrics, filter_cells, filter_genes, highly_variable_genes, spatially_variable_genes
+│   ├── memory/              # Profiling, GPU
+│   ├── utils/               # Signatures, versioned save helpers
+│   └── tests/               # Package unit tests (pytest)
+│
+├── scripts/                # Shared/legacy scripts; project scripts live under projects/<platform>/<project>/scripts/
+│
+├── projects/               # All project-specific content lives here
+│   ├── create_project.sh   # Create new project: ./projects/create_project.sh <project_name> <data_type>
+│   ├── README.md           # How to create projects and use Mission/Journal
+│   ├── visium/
+│   │   └── ggo_visium/     # Example project
+│   │       ├── data/       # Raw sequencing and imaging
+│   │       ├── figures/    # QC/raw, QC/post, manuscript/, etc.
+│   │       ├── metadata/   # gene_signatures.json, sample_metadata.csv, celltype_map.json, obs.csv
+│   │       ├── scripts/    # Project-specific analysis scripts
+│   │       ├── results/    # AnnData (.h5ad), CSVs
+│   │       ├── outputs/    # Intermediate outputs (deconvolution logs, etc.)
+│   │       ├── tests/      # Project integration tests (pytest)
+│   │       ├── Mission.md
+│   │       └── Journal.md
+│   ├── visium_hd/
+│   ├── xenium/
+│   └── imc/
+└── .gitignore, .githooks/
 ```
 
----
-
-## 2. Data Flow and Dependencies
-
-The analysis follows a linear progression from data ingestion to high-level spatial statistics:
-
-### Phase I: Ingestion & Preprocessing
-* **Scripts:** `loupe2adata.py`, `annotation2mask_img.py`
-* **Process:** Convert raw spatial formats to standardized `AnnData` or `SpatialData` containers. Clean up and store clinical variables such as solidity and architecture. Second script saves all images / masks within the anndata.
-* **Output:** `results/results/adata.annotation.masks.h5ad`
-
-### Phase II: QC, Integration & Generative Modeling
-* **Scripts:** `preprocessing.py`
-* **Process:** Preprocessing performs QC, cell / gene filtration, and data normalization. Mt, rb, and hb content is calculated, and hvg, svg are filtered at the end. Data is subsequently ran through **scVI** model on raw counts to learn latent representations and perform batch correction.
-* **Output:** `results/scvi.h5ad`
-
-### Phase III: Mapping & Deconvolution
-* **Scripts:** `celltype_deconvolution_tangram.py`
-* **Strategy:** Map single-cell reference data onto spatial coordinates using **Tangram** or **Cell2location**.
-* **Output:** `results/adata.img.genescores.h5ad`
-
-### Phase IV: Spatial Structures & Niche Analysis
-* **Scripts:** `create_tls_anndata.py`, `tls_analysis.py`, `spot_deg.py`, `tumor_differences.py`, `macrophage_localization.py`, `process_colocalization.py`
-* **Focus:** Identification of Tertiary Lymphoid Structures (TLS), EMT scoring, spatially variable gene (SVG) discovery, differential program analysis, macrophage colocalization, and process colocalization patterns.
-* **Output:** `results/tls_clustered.h5ad`, `figures/manuscript/tumor_differences/`, `figures/manuscript/macrophage_localization/`, `figures/process_colocalization/`
-
-### Phase V: Visualization & Figures
-* **Scripts:** `manuscript_spatial_plots.py`, `score_gene_signatures.py`, `signature_heatmap.py`
-* **Output:** `/figures/manuscript/`
-* **Standard:** All plots must follow the statistical annotation rules (bars and asterisks) defined in `skills.md`.
-* **Signature Heatmaps:** Comprehensive visualization of gene signature scores across spots with patient and solidity annotations, including both standard heatmaps and hierarchically clustered clustermaps.
+**Creating a new project:** Run `./projects/create_project.sh <project_name> <data_type>`. Valid `data_type`: `visium` | `visium_hd` | `xenium` | `imc`.
 
 ---
 
-## 3. Key Data Objects
+## 2. Project-Specific Paths (Explicit)
 
-| File Path | Description |
-| :--- | :--- |
-| `results/scvi.h5ad` | The primary integrated atlas with batch-corrected latent space. |
-| `metadata/gene_signatures.json` | JSON dictionary of markers for Tumor, Stromal, and Immune programs. |
-| `results/adata.annotation.masked.h5ad` | Final annotated object with specific cell-type masks. |
-| `results/adata.img.genescores.h5ad` | AnnData with all gene signature scores (z-scored) for visualization and analysis. |
-| `results/tls_clustered.h5ad` | Aggregation of TLS from all the tissue slides. |
+All of the following live under `projects/<platform>/<project_name>/`:
+
+| Path | Description |
+|------|-------------|
+| `metadata/sample_metadata.csv` or `.xlsx` | Sample→clinical metadata map. Enables Phase 2 bypass. |
+| `metadata/celltype_map.json` | cluster_id→celltype mapping for Phase 4. |
+| `metadata/gene_signatures.json` | Gene signatures for scoring. |
+| `results/adata.raw.h5ad` | Raw unnormalized AnnData after Phase 1. |
+| `results/adata.annotation.masked.h5ad` | AnnData with masks (project-specific). |
+| `results/scvi.h5ad`, `results/scvi.leiden.h5ad` | Batch-corrected, clustered AnnData. |
+| `results/scvi.leiden.phenotyped.h5ad` | Clustered + celltype annotated. |
+| `results/adata.img.genescores.h5ad` | Gene signature scores. |
+| `results/adata.deconvolution.h5ad` | Cell-type proportions (optional). |
+| `figures/QC/raw/` | Pre-normalization QC reports. |
+| `figures/QC/post/` | Post-normalization QC reports. |
+| `figures/manuscript/` | Publication figures. |
+
+**Makefile:** Use `$(PROJECT)` for all project paths, e.g. `$(PROJECT)/metadata/gene_signatures.json`, `$(PROJECT)/results/adata.raw.h5ad`.
 
 ---
 
-## 4. Operational Rules for Agents
+## 3. Phase Details and Data Flow
 
-1. **Strict File Placement:** Never save plots in the root or `scripts/`. Always use the appropriate subfolder in `figures/`.
-2. **Naming Convention:** New results should follow the format `adata.[step_description].h5ad` to maintain a clear audit trail.
-3. **Statistical Rigor:** When generating boxplots or violin plots, apply Benjamini-Hochberg correction and draw significance asterisks as per `skills.md`. Numerical adjusted p-values must be included in the figure.
-4. **Code Maintenance:** Do not modify `scripts/old code/`. If a legacy function is needed, refactor it into a new modular script.
-5. **No Apostrophes:** Ensure all machine-generated documentation and emails avoid the use of apostrophes.
+### Phase 1: Data Ingestion & QC
+
+**Platform-specific ingestion:**
+- **Visium / Visium HD:** fastq, H&E, Cytassist → Space Ranger → cloupe → AnnData. Keep H&E when concatenating.
+- **IMC:** mcd, txt → segmentation + concatenation → h5ad.
+- **Xenium:** Assume preprocessed.
+
+**Required annotations:** `adata.obs['sample']`, `adata.obs['raw_data_dir']`, `adata.obsm['spatial']`.
+
+**QC (sc_tools.qc):** scanpy `calculate_qc_metrics`, `filter_cells`, `filter_genes`, `highly_variable_genes`; squidpy spatially variable genes. 2x2 grid, % mt/% hb for spatial, multipage spatial (total_count, log1p, %mt). Pre → `figures/QC/raw/`; post → `figures/QC/post/`.
+
+**Outputs:** `$(PROJECT)/results/adata.raw.h5ad`, `$(PROJECT)/figures/QC/raw/*`.
 
 ---
 
-## 5. Development Environment
-- **Environment:** Defined in `environment.yml` and `requirements.txt`.
-- **Core Libraries:** `scvi-tools`, `spatialdata`, `squidpy`, `scanpy`, `statannotations`, `pinguoin`.
+### Phase 2: Metadata Attachment (Human-in-Loop)
+
+**Bypass:** Provide `$(PROJECT)/metadata/sample_metadata.csv` or `.xlsx`.
+
+**Without file:** Human prepares map; cannot skip automatically.
+
+---
+
+### Phase 3: Preprocessing
+
+Backup `adata.raw`; filter; normalize; batch correct; cluster; automated cell typing. Post-QC → `$(PROJECT)/figures/QC/post/`.
+
+---
+
+### Phase 3.5: Demographics (Branching)
+
+sc_tools helpers: piechart, histogram, violinplot, barplot, stacked barplot, scatterplot, correlogram, heatmap. Figure 1 for cohort description.
+
+---
+
+### Phase 4: Manual Cell Typing (Human-in-Loop)
+
+JSON format `{cluster_id: {celltype_name, total_obs_count}}`; match cluster_id type; produce celltype and celltype_broad. Iterative until satisfactory. Save to `$(PROJECT)/metadata/celltype_map.json`.
+
+---
+
+### Phase 5: Downstream Biology
+
+Gene scoring, deconvolution, spatial/process analysis, colocalization, neighborhood enrichment.
+
+---
+
+### Phase 6–7: Meta Analysis (Optional)
+
+Aggregate ROI/patient; downstream on aggregated data.
+
+---
+
+## 4. sc_tools vs Project-Specific
+
+| Belongs to | Examples |
+|------------|----------|
+| **sc_tools** (generic) | `sc_tools.pl`, `sc_tools.tl`, `sc_tools.qc`, `sc_tools.memory`, `sc_tools.utils` |
+| **Project-specific** | `metadata/`, `results/`, `figures/`, `data/`, `outputs/`, project scripts |
+
+---
+
+## 5. Script Sanity Check
+
+Scripts should use `$(PROJECT)` or equivalent for paths. Example: `$(PROJECT)/metadata/gene_signatures.json`, not `metadata/gene_signatures.json`.
+
+### Active (in Makefile dependency chain)
+| Script | Phase | Primary output |
+|--------|-------|----------------|
+| Platform-specific ingestion | 1 | $(PROJECT)/results/adata.raw.h5ad |
+| QC script (or sc_tools.qc) | 1 | $(PROJECT)/figures/QC/raw/ |
+| Metadata join script | 2 | AnnData with clinical metadata |
+| preprocessing, clustering, celltyping | 3 | $(PROJECT)/results/scvi.leiden.phenotyped.h5ad |
+| score_gene_signatures, deconvolution | 5 | $(PROJECT)/results/adata.img.genescores.h5ad |
+| tumor_differences, process_colocalization, etc. | 5 | $(PROJECT)/figures/manuscript/ |
+| Aggregation scripts | 6–7 | ROI/patient aggregated data |
+
+### Legacy (read-only)
+- **`scripts/old_code/`**: Reference only.
+
+---
+
+## 6. Operational Rules
+
+1. **File placement:** All project outputs under `projects/<platform>/<project_name>/` (figures, results, metadata, data, outputs). No root-level metadata, results, or figures.
+2. **Paths:** Scripts use `$(PROJECT)` or `PROJECT` variable for project paths.
+3. **Statistics:** Benjamini–Hochberg (FDR); significance bars per `skills.md`.
+4. **Legacy:** Do not modify `scripts/old_code/`.
+5. **Documentation:** Avoid apostrophes in generated text.
+6. **Entry points:** Preprocessed projects may start at Phase 3 or 4.
+
+---
+
+## 7. Testing
+
+| Location | Scope | Fixtures |
+|----------|-------|----------|
+| `sc_tools/tests/` | Unit tests for sc_tools (pl, tl, qc, etc.) | Synthetic AnnData, in-memory |
+| `projects/<platform>/<project>/tests/` | Integration/smoke tests for pipeline | Project fixtures, minimal data |
+
+**Run tests:**
+```bash
+pytest sc_tools/tests/ -v
+pytest projects/visium/ggo_visium/tests/ -v
+# Or both: pytest sc_tools/tests/ projects/visium/ggo_visium/tests/ -v
+```
+
+**Implementation order:** (1) ggo_visium project tests, (2) sc_tools unit tests, (3) implement functions. All new code must compile and pass tests.
+
+---
+
+## 8. Development Environment
+
+- **Environment:** `environment.yml` (conda), `requirements.txt` (pip). Package: `pip install -e ".[deconvolution]"`.
+- **Libraries:** scanpy, squidpy, anndata, scvi-tools, tangram-sc; statannotations, pinguoin for figures.

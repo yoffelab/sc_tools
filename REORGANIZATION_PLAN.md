@@ -37,35 +37,21 @@ The library follows scanpy's API structure:
 │       ├── profiling.py             # Memory tracking, cleanup
 │       └── gpu.py                   # GPU detection and management
 │
-├── sc_analysis/                     # Project-specific analysis modules
-│   ├── __init__.py
-│   ├── spatial/                     # Spatial analysis specific to GGO
-│   │   ├── __init__.py
-│   │   ├── tls.py                   # TLS-specific analysis
-│   │   ├── tumor_regions.py         # Tumor region analysis
-│   │   └── macrophage.py            # Macrophage localization
-│   ├── signatures/                  # Gene signature analysis
-│   │   ├── __init__.py
-│   │   ├── scoring.py               # Signature scoring
-│   │   └── colocalization.py       # Process colocalization
-│   └── deconvolution/               # Deconvolution workflows
-│       ├── __init__.py
-│       └── workflows.py            # Cell2location, Tangram workflows
+├── projects/                        # All projects by data type (replaces top-level sc_analysis + scripts/metadata)
+│   ├── visium/                      # 10x Visium
+│   │   └── <project_name>/          # e.g. ggo_visium (create via ./create_project.sh)
+│   │       ├── data/
+│   │       ├── figures/
+│   │       ├── metadata/
+│   │       ├── scripts/             # Analysis scripts; may include old_code/
+│   │       ├── results/
+│   │       └── outputs/
+│   ├── visium_hd/
+│   ├── xenium/
+│   └── imc/
 │
-├── scripts/                         # Clean, reproducible analysis scripts
-│   ├── phase1_ingestion/           # Phase I: Data ingestion
-│   ├── phase2_preprocessing/       # Phase II: QC and integration
-│   ├── phase3_deconvolution/        # Phase III: Deconvolution
-│   ├── phase4_spatial/              # Phase IV: Spatial analysis
-│   └── phase5_visualization/        # Phase V: Visualization
-│
-├── scripts/dev/                     # Active development/testing scripts
-│   ├── test_*.py                   # Testing scripts
-│   └── experimental_*.py           # Experimental code
-│
-└── scripts/archive/                 # Legacy/archived code (read-only)
-    ├── old_code/                    # From scripts/old code/
-    └── deprecated/                  # Deprecated functions
+├── scripts/dev/                     # (Optional) repo-level dev scripts
+└── scripts/archive/                 # (Optional) repo-level legacy
 ```
 
 ## API Usage Examples
@@ -115,16 +101,16 @@ The library will integrate functionalities from:
 1. Extract Mann-Whitney, FDR → `sc_tools/tl/testing.py`
 2. Extract colocalization methods → `sc_tools/tl/colocalization.py`
 
-### Phase 4: Organize Scripts
-1. Move test scripts → `scripts/dev/`
-2. Move old_code → `scripts/archive/old_code/`
-3. Organize production scripts by phase
-4. Update imports in all scripts
+### Phase 4: Organize Scripts (scalable layout)
+1. **Done:** Projects live under `projects/<data_type>/<project_name>/` (visium, visium_hd, xenium, imc).
+2. **Done:** Each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
+3. **Done:** Create new projects via `./create_project.sh <project_name> <data_type>`.
+4. Move test scripts → `scripts/dev/` (repo-level) or keep inside project `scripts/` as needed.
+5. Update imports in all scripts to use `sc_tools` and project-relative paths.
 
 ### Phase 5: Project-Specific Modules
-1. Extract TLS analysis → `sc_analysis/spatial/tls.py`
-2. Extract macrophage analysis → `sc_analysis/spatial/macrophage.py`
-3. Extract signature scoring → `sc_analysis/signatures/scoring.py`
+1. Project-specific analysis can live inside a project (e.g. `projects/visium/ggo_visium/scripts/`) or be extracted into shared modules under `sc_tools` where generic.
+2. TLS, macrophage, signature scoring logic can remain in scripts or move to `sc_tools` if reused across data types.
 
 ### Phase 6: Integrate imc-analysis Features
 1. Review imc-analysis library structure

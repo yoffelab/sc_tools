@@ -2,6 +2,8 @@
 # sc_tools project .gitignore
 # Note: Git cannot ignore by file size. Use the pre-commit hook to block
 #       files > 1MB (see .githooks/README.md).
+# Layout: root scripts/, sc_tools/; projects/<type>/<name>/ with data, figures,
+#         metadata, results, outputs. No root metadata/, results/, figures/.
 # ---------------------------------------------------------------------------
 
 # Python
@@ -57,12 +59,33 @@ env/
 *.rds
 *.h5
 
-# Figures (PDF/PNG can be large)
-figures/
-output/
+# Project layout: projects/<data_type>/<project_name>/{data,figures,results,outputs}
+projects/visium/*/data/
+projects/visium_hd/*/data/
+projects/xenium/*/data/
+projects/imc/*/data/
+projects/visium/*/figures/
+projects/visium_hd/*/figures/
+projects/xenium/*/figures/
+projects/imc/*/figures/
+projects/visium/*/results/
+projects/visium_hd/*/results/
+projects/xenium/*/results/
+projects/imc/*/results/
+projects/visium/*/outputs/
+projects/visium_hd/*/outputs/
+projects/xenium/*/outputs/
+projects/imc/*/outputs/
 
-# Results and caches
-results/
+# Legacy root-level paths (all project-specific now under projects/)
+/figures/
+/metadata/
+/output/
+/outputs/
+/results/
+/data/
+
+# Caches and pickles
 *.pickle
 *.pkl
 *.cache
@@ -93,5 +116,11 @@ temp/
 tmp/
 logs/
 
-# Optional: uncomment to ignore metadata large CSVs
-# metadata/*.csv
+# Generated / tooling
+repomix-output.xml
+
+# Optional: uncomment to ignore large metadata CSVs inside projects
+# projects/visium/*/metadata/*.csv
+# projects/visium_hd/*/metadata/*.csv
+# projects/xenium/*/metadata/*.csv
+# projects/imc/*/metadata/*.csv

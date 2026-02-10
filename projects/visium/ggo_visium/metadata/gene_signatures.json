@@ -1,0 +1,165 @@
+{
+  "Tumor_Cells": {
+    "Lung Adenocarcinoma": [
+      "SFTPA1", "SFTPA2", "SFTPB", "SFTPC", "SFTPD", "ABCA3", "CLDN18", "KRT8", "KRT18", "NKX2-1",
+      "NAPSA", "CD74", "CEACAM6", "MUC1", "CYP2B6", "SLC34A2", "LAMP3", "PGC", "SCGB3A2", "WFDC2",
+      "SLPI", "BPIFB1", "LYZ", "CD24", "KRT7", "KRT19", "MUC5B", "TFF3", "GSTA1", "GPX2"
+    ],
+    "Alveolar_Type2_Tumor": [
+      "SFTPA1", "SFTPA2", "SFTPB", "SFTPC", "SFTPD", "ABCA3", "CLDN18", "KRT8", "KRT18", "NKX2-1",
+      "LAMP3", "PGC", "ETV5", "LPCAT1", "SLC34A2", "NAPSA", "HCFC1R1", "NAPSA", "CSF2RB", "CRB3",
+      "HHEX", "SFTPA1", "SFTPB", "SFTPA2", "LST1", "LIPA", "ABCA3", "LPCAT1", "LRRK2", "FASN"
+    ],
+    "Alveolar_Type1_Tumor": [
+      "AGER", "CAV1", "CAV2", "EMP2", "KRT19", "CLIC5", "HOPX", "PDPN", "RTKN2", "AKAP5",
+      "AQP5", "COL4A3", "COL4A4", "GPM6A", "FXYD2", "SPOCK2", "TNS1", "SVEP1", "EPAS1", "ADIRF"
+    ],
+    "Proliferative_Tumor": [
+      "MKI67", "TOP2A", "PCNA", "MCM2", "MCM4", "MCM6", "CCNB1", "CDK1", "PTN1", "BUB1",
+      "ASPM", "AURKA", "CENPF", "TYMS", "CENPE", "UBE2C", "BIRC5", "CDC20", "NUSAP1", "CCNA2",
+      "CDC6", "CDK2", "CDK4", "E2F1", "FEN1", "KIF2C", "KIF11", "PLK1", "RRM2", "STMN1"
+    ],
+    "EMT_Tumor": [
+      "VIM", "ZEB1", "ZEB2", "SNAI1", "SNAI2", "TWIST1", "FN1", "ITGA5", "MMP2", "MMP9",
+      "CDH2", "COL1A1", "TNC", "AXL", "CDH11", "FBN1", "TGFBI", "VCAN", "SERPINE1", "GNG11",
+      "COL3A1", "COL5A1", "COL5A2", "COL6A2", "COL6A3", "SPARC", "POSTN", "LUM", "DCN", "BGN"
+    ],
+    "Hypoxia_Tumor": [
+      "HIF1A", "SLC2A1", "LDHA", "CA9", "ENO1", "PGK1", "VEGFA", "PDK1", "BNIP3", "ALDOA",
+      "GAPDH", "HK2", "ADM", "ANGPTL4", "DDIT4", "PFKP", "LOX", "NDRG1", "STC2", "AK4",
+      "FAM115C", "ERO1A", "P4HA1", "P4HA2", "SLC2A3", "TPI1", "MAFF", "MXI1", "GYS1", "UPP1"
+    ],
+    "Oxidative_Stress_Tumor_NRF2": [
+      "NFE2L2", "KEAP1", "GCLC", "GCLM", "NQO1", "TXNRD1", "SRXN1", "HMOX1", "ME1", "GPX2",
+      "FTH1", "AKR1C1", "AKR1C2", "AKR1C3", "AKR1B10", "TALDO1", "TKT", "G6PD", "PGD", "TXN",
+      "PRDX1", "GSTP1", "ABCC1", "MRP1", "SOD1", "CAT", "GSR", "MGST1", "SQSTM1", "SLC7A11"
+    ],
+    "KRAS_MAPK_Tumor": [
+      "KRAS", "DUSP6", "FOS", "JUN", "ETV4", "ETV5", "EGR1", "SPRY2", "SPRY4", "PHLDA1",
+      "PHLDA2", "MYC", "MAPK1", "MAPK3", "BRAF", "RAF1", "MET", "PEA15", "DUSP4", "CCND1"
+    ],
+    "EGFR_Tumor": [
+      "EGFR", "AREG", "EREG", "TGFA", "BTC", "GRB2", "SOS1", "GAB1", "GAB2", "SHC1",
+      "ERRFI1", "HBEGF", "EGF", "ELK1", "STAT3", "JAK1", "PIK3CA", "AKT1", "MTOR", "EIF4EBP1"
+    ]
+  },
+
+  "Stromal": {
+    "Fibroblast": [
+      "COL1A1", "COL1A2", "COL3A1", "DCN", "LUM", "COL6A1", "COL6A2", "PDGFRA", "VIM", "FAP",
+      "THY1", "MFAP5", "FBN1", "COL6A3", "COL14A1", "POSTN", "SPARC", "S100A4", "TCF21", "PDGFRB"
+    ],
+    "Myofibroblast": [
+      "ACTA2", "TAGLN", "CALD1", "MYH11", "MYL9", "TPM1", "TPM2", "PLN", "ACTG2", "CNN1"
+    ],
+    "CAF_myCAF": [
+      "ACTA2", "TAGLN", "MYL9", "COL1A1", "COL1A2", "TPM1", "TPM2", "HOPX", "POSTN", "PALLD"
+    ],
+    "CAF_iCAF": [
+      "IL6", "CXCL12", "HAS1", "HAS2", "PTGS2", "CFD", "DPT", "APOD", "COL14A1", "CCL2"
+    ],
+    "CAF_apCAF": [
+      "CD74", "HLA-DRA", "HLA-DRB1", "CTSS", "HLA-DPA1", "HLA-DPB1", "HLA-DQA1", "HLA-DQB1", "CD80", "CD86"
+    ],
+    "Endothelial_Tip": [
+      "KDR", "ESM1", "ANGPT2", "NRP1", "PGF", "APLN", "CD34", "FLT4", "ADM", "COL4A1"
+    ],
+    "Endothelial_Stalk": [
+      "PECAM1", "CDH5", "ENG", "VWF", "NOS3", "ACVRL1", "ROBO4", "CLDN5", "BMX", "ICAM2"
+    ],
+    "Lymphatic_Endothelial": [
+      "PROX1", "LYVE1", "PDPN", "FLT4", "CCL21", "MMRN1", "TFF3", "NR2F2", "RELN", "FABP4"
+    ],
+    "Pericytes": [
+      "PDGFRB", "RGS5", "ACTA2", "MYH11", "CSPG4", "VTN", "KCNJ8", "ABCC9", "HIGD1B", "COX4I2"
+    ]
+  },
+
+  "Immune_Myeloid": {
+    "Classical_Monocyte": [
+      "LYZ", "S100A8", "S100A9", "CTSS", "FCGR3A", "CD14", "FCN1", "VCAN", "MAFB", "SELL"
+    ],
+    "NonClassical_Monocyte": [
+      "FCGR3A", "MS4A7", "LST1", "SIGLEC10", "CX3CR1", "HMOX1", "RHOC", "IFITM3", "C1QA"
+    ],
+    "Alveolar_Macrophage": [
+      "MARCO", "MRC1", "SIGLEC1", "PPARG", "FABP4", "SLC2A5", "C1QA", "C1QB", "C1QC", "APOE",
+      "PBP", "INHBA", "MME", "FHL1", "CD163", "MSR1", "GPNMB", "TREM2", "FABP5", "LPL"
+    ],
+    "MonoDerived_Macrophage": [
+      "IL1B", "CXCL8", "PTGS2", "TNF", "NFKB1", "NFKBIA", "CD14", "LYZ", "VCAN", "FCN1",
+      "S100A12", "EREG", "NLRP3", "CCL3", "CCL4", "CCL2", "THBS1", "ID2", "NR4A1", "CD68"
+    ],
+    "M1_Macrophage": [
+      "IL1B", "TNF", "CXCL9", "CXCL10", "CXCL11", "IDO1", "STAT1", "IRF1", "CD86", "NOS2",
+      "SOCS3", "IL6", "IL12B", "IL23A", "NFKB1", "RELA", "KYNU", "WARS", "GBP1", "GBP5"
+    ],
+    "M2_Macrophage": [
+      "MRC1", "MSR1", "CD163", "IL10", "CCL18", "PPARG", "TGFB1", "ARG1", "RETNLA", "CHIA",
+      "CCL13", "CCL17", "CCL22", "SELENEOP", "FOLR2", "GPNMB", "MS4A4A", "STAB1", "CD209", "CLEC10A"
+    ],
+    "cDC1": [
+      "XCR1", "CLEC9A", "BATF3", "IRF8", "WDFY4", "CPNE3", "CLNK", "SNX22", "CADM1"
+    ],
+    "cDC2": [
+      "FCER1A", "CD1C", "CLEC10A", "SIRPA", "CD1E", "HLA-DQA1", "PKIB", "GSN", "ZEB2"
+    ],
+    "mregDC": [
+      "LAMP3", "CCR7", "IL15", "CD200", "CCL19", "CCL22", "FSCN1", "BIRC3", "CD40", "CD80"
+    ]
+  },
+
+  "Immune_Lymphoid": {
+    "Exhausted_CD8_T": [
+      "PDCD1", "CTLA4", "LAG3", "HAVCR2", "TIGIT", "TOX", "CXCL13", "LAYN", "ENTPD1", "CD244",
+      "EOMES", "PRDM1", "IKZF2", "CD39", "SIRPG", "MIR155HG", "VCAM1", "GZMB", "PRF1", "IFNG"
+    ],
+    "Treg": [
+      "FOXP3", "IL2RA", "IKZF2", "CTLA4", "TNFRSF18", "TNFRSF4", "BATF", "CCR4", "TIGIT", "IL10",
+      "LAIR2", "FCRL3", "RTKN2", "IL32", "S100A4", "ENTPD1", "CD177", "CD58", "STAM", "BIRC3"
+    ],
+    "B_Naive": [
+      "MS4A1", "CD79A", "CD19", "CD22", "CD24", "BANK1", "BACH2", "CD72", "IGHD", "IGHM"
+    ],
+    "Plasma_Cell": [
+      "MZB1", "SDC1", "IGHG1", "IGHG2", "IGHG3", "IGHG4", "IGHA1", "IGHA2", "JCHAIN", "XBP1",
+      "PRDM1", "IRF4", "CD27", "CD38", "SLAMF7", "FKBP11", "TNFRSF17", "DERL3", "SSR4", "CREB3L2"
+    ]
+  },
+
+  "Processes": {
+    "Wound_Healing": [
+      "VEGFA", "IL1B", "TGFB1", "MMP9", "SERPINE1", "FN1", "COL1A1", "LOXL2", "PLAU", "PLAUR",
+      "F3", "PLAT", "CTGF", "CYR61", "WNT5A", "PDGFA", "PDGFB", "FGF2", "HGF", "EGFR"
+    ],
+    "IFN_Response": [
+      "STAT1", "IRF1", "CXCL9", "CXCL10", "CXCL11", "GBP1", "ISG15", "IFIT1", "IFI6", "IFIT2",
+      "IFIT3", "MX1", "MX2", "OAS1", "OAS2", "OAS3", "OASL", "IRF7", "ADAR", "IFI44", "IFI44L"
+    ],
+    "TNF_NFkB": [
+      "TNF", "NFKB1", "NFKBIA", "RELA", "CXCL8", "IL6", "TNFAIP3", "BIRC3", "CD40", "ICAM1",
+      "CCL2", "PTGS2", "IER3", "JUNB", "FOSL1", "MAP3K8", "RIPK1", "TRAF2", "TRAF6", "NOD2"
+    ],
+    "Angiogenesis": [
+      "VEGFA", "VEGFB", "VEGFC", "KDR", "FLT1", "FLT4", "ESM1", "ANGPT2", "ANGPT1", "TEK",
+      "CDH5", "PECAM1", "NRP1", "NRP2", "PGF", "FGFR1", "HIF1A", "NOS3", "THBS1", "COL4A1"
+    ]
+  },
+  
+  "Liron":{
+    "T cell exhaustion": ["LAG3", "PDCD1", "CTLA4", "HAVCR2", "TIGIT", "TOX", "LAYN", "CXCL13"],
+    "CD8.4 TRM pre-exhausted": ["ZNF683", "KLRC1", "ITGA1", "CAPG", "CKLF", "LGALS3", "CXCR6", "JAML", "CD2", "VIM", "RBPJ", "XCL1", "RGS1", "ALOX5AP", "SRGAP3", "COTL1", "CD63", "CD3D", "SPRY1", "CD7", "LINC02446", "OXNAD1", "CISH", "ANKRD28", "ITGAE", "STK17B", "LINC01871", "LINC00892", "PTMS"],
+    "CD8.1 GZMK pre-exhausted": ["GZMK", "CD27", "CD74", "TRAT1", "RGS1", "SH2D1A", "ITM2C", "COTL1", "SRSF7", "DTHD1", "DUSP2", "CLDND1", "EOMES", "DNAJB1", "FAM102A"],
+    "T cell cytotoxicity": ["PRF1", "GZMA", "GZMB", "GZMH", "GZMK", "GNLY", "IFNG", "IL2", "NKG7", "FGFBP2", "CX3CR1", "KLRD1", "FCGR3A", "KLRG1"],
+    "Tregs": ["FOXP3", "IKZF2", "IL32", "TIGIT", "IL2RA", "IL10RA", "TNFRSF1B", "RTKN2", "LAIR2", "FCRL3", "SHMT2", "CTLA4", "STAM", "HLA-DRB1", "GBP5", "HLA-A", "S100A4", "HLA-DQB1", "FANK1", "S100A10", "IL2RB", "NCF4", "BIRC3", "CCR4", "LGALS3", "HLA-DRA", "UBC", "ANXA2", "RNF214", "HACD1", "SELL", "ISG20", "EZR", "ITGB1", "NIBAN1", "HLA-DRB5", "CLIC1", "YWHAB", "ENTPD1", "USP15", "ARID5B", "CYTOR", "CPNE2", "GAPDH", "SELPLG", "PTPRC", "LSP1", "ARHGDIB", "FCER1G", "FAS", "SKAP1", "PYHIN1", "F5", "ID3", "HPGD", "GBP2", "HLA-DPB1", "FCMR", "SMCHD1", "ANXA5", "CD74", "CLDND1", "HLA-DPA1", "PRDM1", "JAKMIP1", "ATP2B1", "CARD16", "SAMHD1", "ANTKMT", "CD58", "MIR4435-2HG", "MAT2B", "HLA-DQA1", "JAK1", "OPTN", "DOK2", "PRDX1", "CCM2", "CTSA", "LMNA", "TTN", "EPB41", "PI16", "HSPA1A", "HERPUD1", "CCR6", "CD53", "HCLS1", "AHNAK", "RCSD1", "TOX", "CDKN1B", "TPR", "TRIM14", "CBLL1", "TNFRSF4", "CCNDBP1", "CD27", "BATF", "TTC39C", "KLF6", "PBXIP1", "ELOVL5", "PTGER2", "TBC1D4", "NT5C", "SYNE2", "GATA3", "GLRX", "NSD3", "CRIP2", "TRIM22", "DYNLL1", "SAT1", "SLFN5", "NEAT1", "TRAV9-2"],
+    "Suppressive Tregs": ["CTLA4", "TIGIT", "PDCD1", "HAVCR2", "CD28", "ICOS", "IL2RA", "IKZF2", "TNFRSF18", "TNFRSF4", "IL10", "FOXP3"],
+    "M2-macrophages": ["IL4R", "CCL4", "CCL13", "CCL20", "CCL17", "CCL18", "CCL22", "CCL24", "LYVE1", "VEGFA", "VEGFB", "VEGFC", "VEGFD", "EGF", "CTSA", "CTSB", "CTSC", "CTSD", "TGFB1", "TGFB2", "TGFB3", "MMP14", "MMP19", "MMP9", "CLEC7A", "WNT7B", "FASLG", "TNFSF12", "TNFSF8", "CD276", "VTCN1", "MSR1", "FN1", "IRF4", "IL10", "CD163", "CSF1R", "MRC1"],
+    "MoMacs Merad": ["SPP1", "SELENOP", "CHI3L1", "CHIT1", "PTGDS", "CCL2", "RNASE1", "MMP9", "CCL13", "MMP12", "PLA2G7", "CXCL9", "SLC40A1", "LGMN", "RARRES1", "SDS", "FOLR2", "CTSK", "A2M", "RGS1", "CXCL10", "FCGR2B", "PLTP", "IL4I1", "MMP7", "TMEM176B", "HAMP", "CCL8", "TMEM176A", "APOE", "MARCKS", "CD84", "SERPINF1", "LILRB4", "C15orf48", "OTOA", "ADAMDEC1", "ABCA1", "IGLC3", "FPR3", "CPM", "C1orf54", "PMP22", "HS3ST2", "F13A1", "CLEC10A", "SLAMF7", "ARL4C", "CCL7", "STAB1"],
+    "Alveolar macrophages Merad": ["FABP4", "HP", "GPD1", "INHBA", "FOLR3", "MME", "FHL1", "IGFBP2", "DEFB1", "CAMP", "RND3", "PCOLCE2", "AKR1C3", "MCEMP1", "PPBP", "RBP4", "CES1", "CPE", "PDLIM1", "RP5-839B4.8", "PHLDA3", "PPIC", "GLDN", "S100A13", "LINC02154", "OASL", "AQP3", "PPARG", "PLAAT3", "AGRP", "FAM89A", "ALOX5AP", "LGALS3BP", "MLPH", "RP11-598F7.3", "SVIL", "LSAMP", "STMN1", "RETN", "AOC3", "PRSS21", "NMB", "MACC1", "CXCL5", "CD52", "TREM1", "ADTRP", "PNPLA6", "HPGD", "AMIGO2"],
+    "Mac.2 MoMac M2-like": ["CHIT1", "SELENOP", "SLC40A1", "RNASE1", "CCL13", "LGMN", "FOLR2", "APOE", "CCL18", "PLTP", "A2M", "MARCKS", "F13A1", "GPNMB", "MS4A6A", "PLA2G7", "PLD3", "CPM", "LIPA", "TMEM176B", "CD84", "CEBPD", "FUCA1", "CD14", "RARRES1", "MAF", "PMP22", "CTSB", "ABCA1", "MAFB", "TMEM176A", "NPL", "HMOX1", "ZFP36L1", "PSAP", "STAB1", "CTSZ", "PDK4", "DAB2", "FCGR2B", "TREM2", "ARL4C", "RGS1", "LILRB5", "NPC2", "CCL2", "BLVRB", "HS3ST2", "LILRB4", "RASSF4", "FYB1", "CMKLR1", "OTOA", "FPR3", "BMP2K", "SDC3", "IGSF6", "BASP1", "CREG1", "RAP2B", "SLC1A3", "GPR34", "HLA-DMB", "KCNMA1", "TSPAN4", "RNASE6", "SERPINF1", "APOC1", "FGL2", "GPR183", "PRCP", "MFSD1", "LHFPL2", "AP2A2", "TTYH3", "GM2A", "GADD45B", "TMIGD3", "IDH1", "ENPP2", "SGK1", "IQGAP2", "RBP1", "MERTK", "ADAP2", "AP1S2", "CTSK", "AP1B1", "CD163", "PLXNC1", "HAMP", "CD59", "RGL1", "CTSD", "FRMD4B", "NUPR1", "FNIP2", "FCHO2", "SDS", "CPVL", "CALM3", "KCTD12", "SLCO2B1", "CFD", "CSF1R", "PLPP3", "IL2RA", "NINJ1"],
+    "Mac.6 MoMAc M2-like": ["SPP1", "CHI3L1", "MMP9", "CCL2", "RNASE1", "RGS1", "MARCKS", "C15orf48", "PLA2G7", "CTSB", "CD14", "PLTP", "A2M", "CD84", "CCL13", "LGMN", "GAPDH", "IL4I1", "GPR183", "TIMP3", "LILRB4", "EMP1", "CORO1A", "MIF", "CLEC5A", "ZFP36L1", "IER3", "ITGB2", "HM13", "LIMS1", "FCGBP", "CAMK1", "PLEKHO1", "SDC2", "ALCAM", "TREM2", "LGALS1", "CHIT1", "HIF1A", "STAB1", "FCGR2B", "ABCA1", "MATK", "MFSD12", "CALM3", "CSF1R", "SGK1", "CEBPD", "LHFPL2", "ENO1", "GPNMB", "TMEM176B", "BCAT1", "F13A1", "ATF5", "MAFB", "C3", "PMP22", "FAM20C", "SOD2", "CALR", "BASP1", "FNIP2", "PEA15", "TYMP", "TTYH3", "ARL4C", "FGL2", "MEF2C", "TPI1", "CD48", "FPR3", "APOE", "IGSF6", "SLC43A3", "NPC2", "RGS2", "GALM", "TM4SF19", "PLXNC1", "HTRA1", "RALA", "HMGA1", "GSN", "PDIA6", "SDS", "TNFRSF1B", "DDIT4", "CSTB", "LSP1", "TGFBI", "SLC2A3", "GM2A", "CTSK", "CTSL", "VCAN", "TIMP1", "IL1RN", "HIST1H4C"],
+    "LCs": ["FCGBP", "S100B", "LTB", "CD1A", "HLA-DQB2", "CD207", "TACSTD2", "IL22RA2", "FCER1A", "PLEK2", "PPM1N", "HPGDS", "NDRG2", "LST1", "PKIB", "CLDN1", "VASP", "GNA15", "C15orf48", "GSN", "CKLF", "SLC18A2", "NAALADL1", "CA2", "MSI2", "NRN1", "FFAR4", "DSP", "MYL12A", "LPAR3", "CBR3", "BCO2", "GTF2IRD1", "CD1E", "GAS2L3", "IL18", "GPR82", "RUNX3", "GDI2", "CD59", "CD52", "AIF1", "GNAO1", "TRPM4", "PAK1", "TMEM14C", "RXRA", "HIP1", "HLA-DQA2", "SH2D4A", "PTMS", "FLT1", "LCP1", "ACOX1", "TUBA1B", "ABI3", "KCNMB1", "CSF1R", "ALOX5", "SUCNR1", "RHOC", "SUSD3", "PTPN6", "RGS16", "ALOX5AP", "PRKAR2B", "GLRX", "GLIPR1", "CTNND1", "HCK", "TNF", "SLC38A1", "ENTPD1", "ERCC1", "MMP9", "APOC2", "CCND2", "AKR1A1", "SERPINF1", "PRDX1"],
+    "Immature neutrophil GM77": ["AZU1", "BPI", "CAMP", "CD24", "CD24L4", "CEACAM6", "CEACAM8", "CTSG", "CYP4F22", "DEFA1", "DEFA1B", "DEFA3", "DEFA4", "ELANE", "LCN2", "LTF", "MPO", "MS4A3", "OLFM4", "OLR1", "PI3", "RETN", "SLC2A5", "SLPI", "TNC1"],
+    "Immature neutrophil ImNeu": ["AZU1", "BPI", "CEACAM8", "CTSG", "DEFA1", "DEFA1B", "DEFA3", "DEFA4", "EEF1E1", "ELANE", "HP", "HPR", "IGLL1", "KIAA0101", "KIF11", "LCN2", "MMP8", "MPO", "MS4A3", "NKG7", "PRG2", "RNASE3", "SLC2A5", "TARP", "TMEM106C", "TRGC1", "TRGV9"]
+  }
+}

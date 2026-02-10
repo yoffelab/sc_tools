@@ -19,10 +19,13 @@
   - ✅ `memory/` - Memory management utilities
     - ✅ `profiling.py` - Memory tracking, cleanup
     - ✅ `gpu.py` - GPU detection and management
-- ✅ `sc_analysis/` - Project-specific analysis (renamed from ggo_analysis)
-- ✅ `scripts/dev/` - Development/testing scripts
-- ✅ `scripts/archive/` - Legacy code
-- ✅ `scripts/phase*/` - Organized by analysis phase
+  - ✅ `qc/` - QC module (placeholder; planned: metrics, spatial, plots per WORKFLOW.md)
+- ✅ `projects/` - Scalable project layout (replaces top-level sc_analysis and root scripts/metadata)
+  - ✅ `projects/visium/`, `visium_hd/`, `xenium/`, `imc/` - Data-type folders
+  - ✅ `projects/visium/ggo_visium/` - Example project with data/, figures/, metadata/, scripts/, results/, outputs/
+  - ✅ `create_project.sh` - Creates new project dirs; usage: `./create_project.sh <project_name> <data_type>`
+  - ✅ `migrate_to_ggo_visium.sh` - One-time move of root scripts/metadata into projects/visium/ggo_visium/
+- ✅ Makefile project-aware: `PROJECT ?= projects/visium/ggo_visium`; all paths use `$(PROJECT)/...`
 
 ### 2. API Structure
 - ✅ Main package `__init__.py` imports `pl`, `tl`, `data`, `memory`
@@ -44,8 +47,17 @@
 
 ## 🚧 In Progress — Next immediate steps
 
-**1. Ensure Makefile Phase 3–5 works**
-- [ ] Verify Makefile targets for Phase III (deconvolution), Phase IV (spatial/niche), Phase V (visualization) run successfully.
+**0. Testing (implementation order: 1st ggo_visium, 2nd sc_tools, 3rd functions)**
+- [ ] **ggo_visium project tests:** Create `projects/visium/ggo_visium/tests/`. Integration/smoke tests for Makefile and scripts. Phases 1–3 not fully tested; Phases 4–5 should work (or with few fixes).
+- [ ] **sc_tools package tests:** Create `sc_tools/tests/`. Unit tests for pl, tl, qc with synthetic fixtures.
+- [ ] All new code must compile and pass tests before merge.
+
+**1. Align Makefile with new 7-phase workflow**
+- [ ] Update Makefile targets to match Phases 1–7 (WORKFLOW.md).
+- [ ] Verify Phase 3–5 (preprocessing, downstream) run successfully.
+
+**1b. Script path migration (metadata move)**
+- [ ] Update scripts to use $(PROJECT)/metadata/ instead of metadata/. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
 - [ ] Confirm outputs match previous results (versioned filenames acceptable).
 - [ ] Fix any broken targets or paths.
 
@@ -55,18 +67,14 @@
 
 ## 📋 To Do (later)
 
-### 5. Project-Specific Modules (`sc_analysis/`)
-- [ ] `spatial/tls.py` - TLS-specific analysis
-- [ ] `spatial/tumor_regions.py` - Tumor region analysis
-- [ ] `spatial/macrophage.py` - Macrophage localization
-- [ ] `signatures/scoring.py` - Signature scoring
-- [ ] `signatures/colocalization.py` - Process colocalization
-- [ ] `deconvolution/workflows.py` - Cell2location, Tangram workflows
+### 5. Project-Specific Modules
+- Project-specific code lives under `projects/<data_type>/<project_name>/scripts/`.
+- [ ] Optional: Extract shared logic (TLS, macrophage, signatures) into `sc_tools` when reused across data types.
 
 ### 6. Script Organization
-- [ ] Move test scripts → `scripts/dev/`
-- [ ] Move `scripts/old_code/` → `scripts/archive/old_code/`
-- [ ] Organize production scripts by phase
+- [x] Scalable layout: `projects/visium|visium_hd|xenium|imc/<name>/` with data, figures, metadata, scripts, results, outputs.
+- [x] Single legacy folder per project: `scripts/old_code/` inside each project.
+- [ ] Organize production scripts by phase within project if desired.
 - [ ] Update imports in all scripts to use `sc_tools.pl.*`, `sc_tools.tl.*`
 
 ### 7. Integration with imc-analysis
@@ -74,7 +82,11 @@
 - [ ] Identify relevant functionalities
 - [ ] Adapt and integrate into `sc_tools`
 
-### 8. Documentation
+### 8. Testing
+- [ ] Add pytest to requirements / pyproject.toml
+- [ ] Document test run commands in README / Architecture
+
+### 9. Documentation
 - [ ] Update `Architecture.md` with new structure
 - [ ] Create migration guide for updating existing scripts
 - [ ] Add comprehensive docstrings to all `sc_tools/` modules
@@ -86,8 +98,8 @@
 - API follows scanpy pattern: `st.pl.*` for plotting, `st.tl.*` for tools
 - All `sc_tools/` code should be generic and well-documented
 - Scripts should import from `sc_tools.pl.*`, `sc_tools.tl.*`, etc.
-- `scripts/dev/` scripts are temporary and should be cleaned up regularly
-- `scripts/archive/` is read-only for reference only
+- New projects: `./create_project.sh <project_name> visium|visium_hd|xenium|imc`. Run make with `PROJECT=projects/<type>/<name>` or use default `projects/visium/ggo_visium`.
+- Legacy: `scripts/old_code/` inside each project is read-only for reference.
 
 ## 🔄 Next Steps (after immediate steps)
 

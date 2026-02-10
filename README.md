@@ -27,7 +27,7 @@ Conda users can still use `conda env create -f environment.yml` and then `pip in
 
 ## What this project does
 
-- **Data:** Converts raw Visium and scRNA-seq into standardized AnnData; integrates with **scVI** for batch-corrected latent space; scores gene signatures (Seurat-based via Scanpy) from `metadata/gene_signatures.json`.
+- **Data:** Converts raw Visium and scRNA-seq into standardized AnnData; integrates with **scVI** for batch-corrected latent space; scores gene signatures (Seurat-based via Scanpy) from project `metadata/gene_signatures.json` (e.g. `projects/visium/ggo_visium/metadata/`).
 - **Spatial analysis:** Compares tumor and immune programs across tumor types (1-vs-rest); analyzes **process colocalization** (Pearson, Moran’s I, neighborhood enrichment); visualizes signature heatmaps and volcano plots; studies **macrophage–proliferation** colocalization and TLS B-cell/T-cell states.
 - **Deconvolution:** Estimates cell-type proportions in spots via **Tangram** (with optional Cell2location/DestVI fallback), in batches per `library_id` for memory efficiency.
 - **Outputs:** Processed AnnData objects (`results/`), manuscript-ready figures (`figures/manuscript/`), and CSV statistics. All comparisons use **FDR (Benjamini–Hochberg)** and follow the statistical and plotting rules in `skills.md`.
@@ -36,10 +36,11 @@ Conda users can still use `conda env create -f environment.yml` and then `pip in
 
 ## What’s important
 
-- **Phased pipeline:** Ingestion → QC & scVI integration → Gene scoring → Deconvolution → Spatial & TLS analysis → Visualization. See `Architecture.md` for data flow and script roles.
+- **Phased pipeline (non-linear):** Phase 1 (Ingestion & QC) → Phase 2 (Metadata, human-in-loop) → Phase 3 (Preprocessing) → Phase 3.5 (Demographics) → Phase 4 (Manual cell typing, human-in-loop) → Phase 5 (Downstream biology) → Phase 6–7 (Meta analysis, optional). See `WORKFLOW.md` for the diagram and `Architecture.md` for data flow and script roles.
 - **Reusable library:** The **`sc_tools`** Python package (scanpy-style API) provides generic plotting and tools so analysis scripts stay thin and reproducible:
   - **`st.pl`** — spatial plots, heatmaps/clustermaps, statistical annotations, volcano plots, versioned figure saving (PDF+PNG, dpi=300).
   - **`st.tl`** — Mann–Whitney, FDR, colocalization (Pearson, Moran’s I, neighborhood enrichment), deconvolution helpers, versioned `write_h5ad`.
+  - **`st.qc`** — QC metrics, filters, spatially variable genes, QC report plotting (planned).
   - **`st.data`** — caching, I/O. **`st.memory`** — profiling, GPU detection.
 - **Standards:** Statistical rigor (significance bars, asterisks, adjusted p-values), no over-filtering of low-count GGO spots, and batch processing for deconvolution are mandatory. See `skills.md` and `Mission.md`.
 
@@ -57,14 +58,15 @@ Conda users can still use `conda env create -f environment.yml` and then `pip in
 
 | Path | Purpose |
 |------|--------|
-| `sc_tools/` | Reusable Python package (pl, tl, data, memory, utils) |
-| `sc_analysis/` | Project-specific analysis modules (placeholder) |
-| `scripts/` | Analysis scripts (preprocessing, deconvolution, spatial, figures) |
-| `metadata/` | Gene signatures (JSON), sample metadata |
-| `results/` | Processed AnnData (e.g. `adata.img.genescores.h5ad`), CSVs |
-| `figures/` | Output plots (manuscript, spatial, TLS, process_colocalization, etc.) |
+| `sc_tools/` | Reusable Python package (pl, tl, qc, data, memory, utils) |
+| `WORKFLOW.md` | Non-linear pipeline diagram (Mermaid) and phase summary |
+| `scripts/` | Analysis scripts (preprocessing, deconvolution, spatial, figures); includes `old_code/` |
+| `projects/<platform>/<project>/metadata/` | Gene signatures (JSON), sample metadata (project-specific) |
+| `projects/` | Projects by data type (visium, visium_hd, xenium, imc); each can have Mission.md, Journal.md |
+| `projects/create_project.sh` | Create a new project: `./projects/create_project.sh <project_name> <data_type>` |
+| `projects/visium/ggo_visium/` | GGO Visium project (Mission.md, Journal.md for study-specific goals and log) |
 
-Key docs: **`Mission.md`** (objectives and task list), **`Architecture.md`** (phases and data flow), **`Journal.md`** (decisions and rationale), **`skills.md`** (statistical and coding standards).
+Processed outputs (e.g. `results/`, `figures/`) live at root or under a project when using the project layout. Key docs: **`WORKFLOW.md`** (non-linear pipeline diagram), **`Mission.md`** (toolkit objectives, testing strategy), **`Architecture.md`** (phases, data flow, testing structure), **`Journal.md`** (repo-level decisions), **`skills.md`** (statistical and coding standards). Per-project Mission and Journal live under `projects/<data_type>/<project_name>/`.
 
 ---
 

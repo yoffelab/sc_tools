@@ -5,7 +5,7 @@
 **Author:** Junbum Kim  
 **Last Updated:** 2025-02-09
 
-This file holds **project-specific** goals. Repository-level pipeline and phase definitions are in the root `Mission.md` and `WORKFLOW.md`.
+This file holds **project-specific** goals. Repository-level pipeline and phase definitions are in the root `Mission.md` and `README.md` (Pipeline Workflow).
 
 ---
 

@@ -20,7 +20,7 @@ Root `Mission.md` and `Journal.md` are for the toolkit and repo structure; proje
 
 ## Pipeline Phases (Non-Linear)
 
-The workflow has **human-in-the-loop** steps. See `WORKFLOW.md` for the full diagram.
+The workflow has **human-in-the-loop** steps. See `README.md` (Pipeline Workflow section) for the full diagram.
 
 | Phase | Name | Human-in-Loop? |
 |-------|------|----------------|

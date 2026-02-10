@@ -1,6 +1,6 @@
 # Project Architecture: Scalable Spatial Omics Analysis
 
-This document outlines the directory structure, data flow, and script inventory. The layout is **scalable across projects and data types** (Visium, Visium HD, Xenium, IMC). All **metadata**, **results**, and **figures** are **project-specific** under `projects/<platform>/<project_name>/`. There is no repo-root `metadata/`, `results/`, or `figures/`. The pipeline is non-linear; see `WORKFLOW.md` for the diagram.
+This document outlines the directory structure, data flow, and script inventory. The layout is **scalable across projects and data types** (Visium, Visium HD, Xenium, IMC). All **metadata**, **results**, and **figures** are **project-specific** under `projects/<platform>/<project_name>/`. There is no repo-root `metadata/`, `results/`, or `figures/`. The pipeline is non-linear; see `README.md` (Pipeline Workflow section) for the diagram.
 
 ## 1. Directory Overview
 
@@ -8,7 +8,6 @@ This document outlines the directory structure, data flow, and script inventory.
 .
 ├── Architecture.md         # System roadmap (this file)
 ├── Mission.md              # Toolkit and pipeline (general); project-specific in projects/<type>/<name>/Mission.md
-├── WORKFLOW.md             # Non-linear pipeline diagram (Mermaid) and phase summary
 ├── Journal.md              # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
 ├── skills.md               # Mandatory coding and statistical standards
 ├── pyproject.toml          # Package build (sc_tools installable)

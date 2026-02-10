@@ -8,7 +8,7 @@
 
 ## 1. Toolkit and Pipeline (General)
 
-- **Pipeline phases (1–7):** Non-linear workflow with human-in-loop steps. See `WORKFLOW.md` for the diagram.
+- **Pipeline phases (1–7):** Non-linear workflow with human-in-loop steps. See `README.md` for the diagram and phase summary.
 - **sc_tools:** Reusable package (`sc_tools.pl`, `sc_tools.tl`, `sc_tools.qc`, etc.) for QC, plotting, testing, colocalization, I/O. Keep generic; project-specific logic stays in project scripts.
 - **Reproducibility:** Makefile is project-aware (`PROJECT ?= projects/visium/ggo_visium`). Each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/` under `projects/<platform>/<project_name>/`.
 - **Standards:** All projects follow `skills.md` (statistics, significance bars, FDR). Documentation avoids apostrophes.
@@ -107,7 +107,7 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ## 4. Workflow Diagram
 
-See **[WORKFLOW.md](WORKFLOW.md)** for the Mermaid diagram and phase summary.
+See **README.md** (Pipeline Workflow section) for the Mermaid diagram and phase summary.
 
 ---
 
@@ -148,7 +148,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - [ ] Add pytest to pyproject.toml / requirements.
 
 **Makefile & scripts**
-- [ ] Align Makefile targets with Phases 1–7 (WORKFLOW.md).
+- [ ] Align Makefile targets with Phases 1–7 (see README Pipeline Workflow).
 - [ ] Update scripts to use `$(PROJECT)/metadata/` instead of `metadata/`. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
 - [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
 
@@ -169,7 +169,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 ## 7. Reference
 
-- **WORKFLOW.md** — Non-linear pipeline, human-in-loop, file requirements.
+- **README.md** — Pipeline workflow diagram, phase summary.
 - **Architecture.md** — Directory layout, phase details, project-specific paths, testing structure.
 - **skills.md** — Coding and statistical standards.
 - **Per-project:** `projects/<data_type>/<project_name>/Mission.md` and `Journal.md`.

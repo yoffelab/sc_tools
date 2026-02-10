@@ -129,7 +129,45 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 ---
 
-## 6. Reference
+## 6. Reorganization & Implementation Status
+
+### Completed
+
+- **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
+- **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
+- **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.
+- **Makefile project-aware:** `PROJECT ?= projects/visium/ggo_visium`; paths use `$(PROJECT)/...`.
+- **Metadata moved:** Root `metadata/` moved to `projects/visium/ggo_visium/metadata/`.
+- **Legacy merged:** `scripts/old_code/` (read-only reference).
+
+### In Progress — Next immediate steps
+
+**Testing (order: 1st ggo_visium, 2nd sc_tools, 3rd functions)**
+- [ ] ggo_visium project tests: `projects/visium/ggo_visium/tests/`. Integration/smoke tests for Makefile and scripts.
+- [ ] sc_tools package tests: `sc_tools/tests/`. Unit tests for pl, tl, qc with synthetic fixtures.
+- [ ] Add pytest to pyproject.toml / requirements.
+
+**Makefile & scripts**
+- [ ] Align Makefile targets with Phases 1–7 (WORKFLOW.md).
+- [ ] Update scripts to use `$(PROJECT)/metadata/` instead of `metadata/`. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
+- [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
+
+### To Do (later)
+
+- [ ] Organize production scripts by phase within project.
+- [ ] Update imports to use `sc_tools.pl.*`, `sc_tools.tl.*` everywhere.
+- [ ] imc-analysis: review, identify functionalities, integrate into `sc_tools`.
+- [ ] Documentation: migration guide, docstrings, API docs.
+
+### Operational notes
+
+- **API:** `st.pl.*`, `st.tl.*`, `st.qc.*`, `st.memory.*` (scanpy-style).
+- **New project:** `./projects/create_project.sh <project_name> visium|visium_hd|xenium|imc`. Run make with `PROJECT=projects/<type>/<name>`.
+- **Legacy:** `scripts/old_code/` is read-only. Do not modify; refactor into new scripts or `sc_tools` if needed.
+
+---
+
+## 7. Reference
 
 - **WORKFLOW.md** — Non-linear pipeline, human-in-loop, file requirements.
 - **Architecture.md** — Directory layout, phase details, project-specific paths, testing structure.

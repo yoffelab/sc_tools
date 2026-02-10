@@ -198,7 +198,7 @@ def plot_program_boxplot(adata, program_col, group_col='tumor_type', stats_df=No
         plot_data.append(values.values)
     
     # Create boxplot
-    bp = ax.boxplot(plot_data, labels=groups, patch_artist=True, 
+    bp = ax.boxplot(plot_data, tick_labels=groups, patch_artist=True, 
                     showfliers=False, widths=0.6)
     
     # Color boxes

@@ -72,14 +72,20 @@ flowchart LR
         direction TB
         C1[Backup adata.raw] --> C2[Filter QC failures]
         C2 --> C3[Normalize, batch correct, cluster]
-        C3 --> C4[Automated cell typing]
-        C4 --> C5["QC report: figures/QC/post/"]
+        C3 --> C5["QC report: figures/QC/post/"]
     end
 
     subgraph P35["Phase 3.5: Demographics"]
         direction TB
         D1[Cohort stats]
         D2[Figure 1]
+    end
+
+    subgraph P35b["Phase 3.5b: Gene Scoring, Cell Typing, Deconvolution"]
+        direction TB
+        D3[Hallmark + project sigs in obsm]
+        D4[Automated cell typing]
+        D5[Cell-type deconvolution optional]
     end
 
     subgraph P4["Phase 4: Manual Cell Typing"]
@@ -91,30 +97,35 @@ flowchart LR
         E4 --> E5[Matrixplot, UMAP, signatures]
     end
 
-    subgraph P5["Phase 5: Downstream Biology"]
+    subgraph P5P67["Phase 5 & 6–7"]
         direction TB
-        F1[Gene scoring, deconvolution]
-        F2[Spatial/process analysis]
-        F3[Colocalization, Moran's I]
-    end
-
-    subgraph P67["Phase 6–7: Meta Analysis"]
-        direction TB
-        G1[Phase 6: Aggregate ROI/patient]
-        G2[Phase 7: Downstream on aggregated]
+        subgraph P5["Phase 5: Downstream Biology"]
+            direction TB
+            F1[Spatial/process analysis]
+            F2[Colocalization, Moran's I]
+            F3[Publication figures]
+        end
+        subgraph P67["Phase 6–7: Meta Analysis"]
+            direction TB
+            G1[Phase 6: Aggregate ROI/patient]
+            G2[Phase 7: Downstream on aggregated]
+        end
     end
 
     P1 --> P2 --> P3
     P3 --> P35
-    P3 --> P4 --> P5 --> P67
-    P3 -.-> |"Skip Phase 4"| P5
-    P2 -.-> |"START here"| P3
-    P3 -.-> |"START here"| P4
+    P3 --> P35b
+    P35b --> P4 --> P5P67
+    P35b -.-> |"Skip Phase 4 if automated typing adequate"| P5P67
+    P2 -.-> |"START HERE: preprocessed AnnData available"| P3
+    P3 -.-> |"START HERE: clustered AnnData available"| P35b
+    P35b -.-> |"START HERE: phenotyped AnnData available"| P4
 
     style P1 fill:#e3f2fd
     style P2 fill:#fff3e0
     style P3 fill:#e8f5e9
     style P35 fill:#e1f5fe
+    style P35b fill:#e8eaf6
     style P4 fill:#fff3e0
     style P5 fill:#f3e5f5
     style P67 fill:#fafafa
@@ -124,10 +135,11 @@ flowchart LR
 |-------|------|----------------|----------------|--------|
 | **1** | Data Ingestion & QC | No | Platform raw data | Raw AnnData, `$(PROJECT)/figures/QC/raw/` |
 | **2** | Metadata Attachment | Yes (unless map provided) | `$(PROJECT)/metadata/sample_metadata.csv` or `.xlsx` | AnnData with clinical metadata |
-| **3** | Preprocessing | No | — | Filtered, normalized, clustered AnnData; `$(PROJECT)/figures/QC/post/` |
+| **3** | Preprocessing | No | — | Filtered, normalized, clustered AnnData; `$(PROJECT)/figures/QC/post/` (no cell typing) |
 | **3.5** | Demographics | Project-specific | — | Figure 1, cohort stats |
-| **4** | Manual Cell Typing | Yes (iterative) | JSON: `cluster_id→celltype` | Phenotyped AnnData |
-| **5** | Downstream Biology | No | — | Gene scores, spatial analysis, figures |
+| **3.5b** | Gene scoring, automated cell typing, deconvolution | No | Hallmark + `metadata/{name}.json`; ref (deconv) | `adata.obsm['sig:...']`; phenotyped AnnData; optional deconvolution |
+| **4** | Manual Cell Typing | Yes (iterative); skippable if automated adequate | JSON: `cluster_id→celltype` | Phenotyped AnnData |
+| **5** | Downstream Biology | No | Phase 3.5b outputs | Spatial analysis, figures |
 | **6–7** | Meta Analysis | No | — | ROI/patient aggregated results |
 
 ---
@@ -147,7 +159,7 @@ flowchart LR
 | `sc_tools/` | Reusable Python package (pl, tl, qc, data, memory, utils) |
 | `scripts/` | Analysis scripts (preprocessing, deconvolution, spatial, figures); includes `old_code/` |
 | `projects/<platform>/<project>/metadata/` | Gene signatures (JSON), sample metadata (project-specific) |
-| `projects/` | Projects by data type (visium, visium_hd, xenium, imc); each can have Mission.md, Journal.md |
+| `projects/` | Projects by data type (visium, visium_hd, xenium, imc, cosmx); each can have Mission.md, Journal.md |
 | `projects/create_project.sh` | Create a new project: `./projects/create_project.sh <project_name> <data_type>` |
 | `projects/visium/ggo_visium/` | GGO Visium project (Mission.md, Journal.md for study-specific goals and log) |
 

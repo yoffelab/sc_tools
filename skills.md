@@ -140,6 +140,23 @@ For all statistical comparisons (boxplots, violin plots, strip plots), the follo
 
 ---
 
+## 11.5. Categorical Variables and Colors in AnnData (Scanpy Convention)
+
+### Rule
+For any categorical column `{name}` in `adata.obs`, use the same color convention as Scanpy for all figures:
+
+- **Storage:** Colors are stored in `adata.uns[f'{name}_colors']` as a **list of hex strings** (e.g. `['#FFFFFF', '#66c2a5', ...]`) with **length equal to the number of categories**, in **category order** (same order as `adata.obs[name].cat.categories`).
+- **Usage:** When producing a figure that colors by a categorical obs column:
+  - If `adata.uns[f'{name}_colors']` **already exists** and has the correct length, **use those colors** and do not overwrite.
+  - If it **does not exist** (or length does not match), **create** a default palette (e.g. qualitative colormap), assign one color per category in order, **save** the hex list to `adata.uns[f'{name}_colors']`, and use those colors for the figure.
+- **Consistency:** This ensures the same categorical variable is colored identically across all plots and scripts. Prefer setting `adata.uns[f'{name}_colors']` explicitly in project code when a specific palette is desired (e.g. tumor type: Normal / Non-Solid / Solid).
+
+### Implementation
+- In `sc_tools.pl.heatmaps`, use `get_obs_category_colors(adata, obs_col, store_if_missing=True)` to obtain a mapping from category value to RGB; it reads or creates `adata.uns[f'{obs_col}_colors']` as above.
+- Apply this pattern in any plotting code that colors by a categorical obs column (heatmaps, scatter, legends).
+
+---
+
 ## 12. Metadata and Data Sharing
 
 ### Core Skills

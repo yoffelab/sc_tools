@@ -12,15 +12,17 @@
 #   ... phase3, phase4, phase5
 #   make clean            - Remove intermediate results (use with caution)
 #
-# Dependencies: Python 3.x, conda environment (see environment.yml)
+# Dependencies: Python 3.x, conda environment. Activate before running:
+#   conda activate robin
 # ============================================================================
 
 PROJECT ?= projects/visium/ggo_visium
+CONDA_ENV ?= robin
 
-.PHONY: all phase1 phase2 phase3 phase4 phase5 clean help
+.PHONY: all phase1 phase2 phase3 phase3.5b phase4 phase5 phase4-direct phase5-direct signature_heatmaps_versioned clean help
 
 # Default target: run entire pipeline
-all: phase1 phase2 phase3 phase4 phase5
+all: phase1 phase2 phase3.5b phase4 phase5
 	@echo "=========================================="
 	@echo "✅ Complete pipeline finished successfully"
 	@echo "=========================================="
@@ -94,8 +96,8 @@ $(PROJECT)/results/scvi.h5ad: $(PROJECT)/results/adata.annotation.masked.h5ad $(
 # Purpose: Perform Leiden clustering on scVI latent space
 # Input:  results/scvi.h5ad
 # Output: results/scvi.leiden.h5ad
-# Notes:  Clusters spots in the batch-corrected latent space for
-#         downstream cell type annotation
+# Notes:  Clusters spots in the batch-corrected latent space.
+#         Automated cell typing is in Phase 3.5b.
 # ----------------------------------------------------------------------------
 $(PROJECT)/results/scvi.leiden.h5ad: $(PROJECT)/results/scvi.h5ad $(PROJECT)/scripts/clustering.py
 	@echo "=========================================="
@@ -104,9 +106,18 @@ $(PROJECT)/results/scvi.leiden.h5ad: $(PROJECT)/results/scvi.h5ad $(PROJECT)/scr
 	cd $(PROJECT) && python scripts/clustering.py
 	@echo "✅ Created: $(PROJECT)/results/scvi.leiden.h5ad"
 
+# Phase II target (preprocessing + clustering only; no cell typing)
+phase2: $(PROJECT)/results/scvi.leiden.h5ad
+	@echo "✅ Phase II complete: Preprocessing and clustering"
+
+# ============================================================================
+# Phase 3.5b: Gene Signature Scoring, Automated Cell Typing, Deconvolution
+# ============================================================================
+# Separate branch from Phase 3; connects to Phase 4 (Phase 4 skippable if adequate).
+
 # ----------------------------------------------------------------------------
 # Script: celltyping.py
-# Purpose: Annotate clusters with cell type labels
+# Purpose: Annotate clusters with cell type labels (automated)
 # Input:  results/scvi.leiden.h5ad
 # Output: results/scvi.leiden.phenotyped.h5ad
 # Notes:  Adds cell type annotations to clusters based on marker genes
@@ -114,19 +125,10 @@ $(PROJECT)/results/scvi.leiden.h5ad: $(PROJECT)/results/scvi.h5ad $(PROJECT)/scr
 # ----------------------------------------------------------------------------
 $(PROJECT)/results/scvi.leiden.phenotyped.h5ad: $(PROJECT)/results/scvi.leiden.h5ad $(PROJECT)/scripts/celltyping.py
 	@echo "=========================================="
-	@echo "Phase II.3: Cell type annotation"
+	@echo "Phase 3.5b.0: Automated cell typing"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/celltyping.py
 	@echo "✅ Created: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad"
-
-# Phase II target
-phase2: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad
-	@echo "✅ Phase II complete: Preprocessing and clustering"
-
-# ============================================================================
-# Phase III: Gene Signature Scoring & Cell Type Deconvolution
-# ============================================================================
-# Scores gene signatures and performs cell type deconvolution.
 
 # ----------------------------------------------------------------------------
 # Script: score_gene_signatures.py
@@ -143,7 +145,7 @@ phase2: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad
 # ----------------------------------------------------------------------------
 $(PROJECT)/results/adata.img.genescores.h5ad: $(PROJECT)/results/adata.annotation.masked.h5ad $(PROJECT)/metadata/gene_signatures.json $(PROJECT)/scripts/score_gene_signatures.py
 	@echo "=========================================="
-	@echo "Phase III.1: Gene signature scoring"
+	@echo "Phase 3.5b.1: Gene signature scoring"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/score_gene_signatures.py
 	@echo "✅ Created: $(PROJECT)/results/adata.img.genescores.h5ad"
@@ -162,14 +164,17 @@ $(PROJECT)/results/adata.img.genescores.h5ad: $(PROJECT)/results/adata.annotatio
 # ----------------------------------------------------------------------------
 $(PROJECT)/results/adata.deconvolution.h5ad: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/results/seurat_object.h5ad $(PROJECT)/scripts/celltype_deconvolution_phase3.py
 	@echo "=========================================="
-	@echo "Phase III.2: Cell type deconvolution"
+	@echo "Phase 3.5b.2: Cell type deconvolution"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/celltype_deconvolution_phase3.py
 	@echo "✅ Created: $(PROJECT)/results/adata.deconvolution.h5ad"
 
-# Phase III target
-phase3: $(PROJECT)/results/adata.img.genescores.h5ad
-	@echo "✅ Phase III complete: Gene scoring (deconvolution optional)"
+# Phase 3.5b target (automated cell typing + gene scoring required; deconvolution optional)
+phase3.5b: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad $(PROJECT)/results/adata.img.genescores.h5ad
+	@echo "✅ Phase 3.5b complete: Cell typing + gene scoring (deconvolution optional)"
+
+# Backward compatibility: phase3 runs phase 3.5b
+phase3: phase3.5b
 
 # ============================================================================
 # Phase IV: Analysis & Statistical Testing
@@ -298,6 +303,18 @@ $(PROJECT)/figures/process_colocalization: $(PROJECT)/results/adata.img.genescor
 phase4: $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/process_colocalization
 	@echo "✅ Phase IV complete: Analysis and statistical testing"
 
+# Phase IV direct: run phase 4 scripts only (assumes adata.img.genescores.h5ad exists).
+# Use when phase 1-3 results exist and you want to skip dependency checks.
+phase4-direct:
+	@echo "=========================================="
+	@echo "Phase IV (direct): Running analysis scripts"
+	@echo "=========================================="
+	cd $(PROJECT) && python scripts/tumor_differences.py
+	cd $(PROJECT) && python scripts/macrophage_localization.py
+	cd $(PROJECT) && python scripts/process_colocalization.py
+	@mkdir -p $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/process_colocalization $(PROJECT)/results/process_colocalization
+	@echo "✅ Phase IV (direct) complete"
+
 # ============================================================================
 # Phase V: Visualization & Publication Figures
 # ============================================================================
@@ -321,28 +338,44 @@ $(PROJECT)/figures/manuscript/spatial_plots: $(PROJECT)/results/adata.img.genesc
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/spatial_plots/"
 
 # ----------------------------------------------------------------------------
-# Script: signature_heatmap.py
-# Purpose: Generate comprehensive heatmap and clustermap visualizations
-# Input:  results/adata.img.genescores.h5ad
-# Output: figures/manuscript/signature_heatmaps/ (4 figures total)
-# Notes:  - Rows: Spots (sorted by patient and solidity)
-#         - Columns: Gene signatures (clustered in clustermaps)
-#         - Annotations: Patient and solidity color bars
-#         - 3-level hierarchy: Macro grouping, secondary grouping, fine clustering
-#         - 4 figures: 2 heatmaps (patient→solidity, solidity→patient) and 2 clustermaps
-#         - Solidity legend in top right corner
+# Script: signature_heatmap.py (legacy)
+# Purpose: Generate heatmap/clustermap visualizations (no datetime stamp)
 # ----------------------------------------------------------------------------
 $(PROJECT)/figures/manuscript/signature_heatmaps: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/signature_heatmap.py
 	@echo "=========================================="
-	@echo "Phase V.2: Signature heatmap visualization"
+	@echo "Phase V.2: Signature heatmap visualization (legacy)"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/signature_heatmap.py
 	@mkdir -p $(PROJECT)/figures/manuscript/signature_heatmaps
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/signature_heatmaps/"
 
+# ----------------------------------------------------------------------------
+# Script: signature_heatmap_versioned.py (preferred: sc_tools + datetime stamp)
+# Purpose: Same heatmaps/clustermaps using sc_tools.pl; outputs versioned PDF/PNG
+# Output: figures/manuscript/signature_heatmaps/pdf/YYDDMM.hh.mm.<basename>.pdf
+#         figures/manuscript/signature_heatmaps/png/YYDDMM.hh.mm.<basename>.png
+# ----------------------------------------------------------------------------
+signature_heatmaps_versioned:
+	@echo "=========================================="
+	@echo "Signature heatmaps (versioned, sc_tools)"
+	@echo "=========================================="
+	cd $(PROJECT) && python scripts/signature_heatmap_versioned.py
+	@echo "✅ Versioned heatmaps in $(PROJECT)/figures/manuscript/signature_heatmaps/pdf and .../png"
+
 # Phase V target
 phase5: $(PROJECT)/figures/manuscript/spatial_plots $(PROJECT)/figures/manuscript/signature_heatmaps
 	@echo "✅ Phase V complete: Visualization"
+
+# Phase V direct: run phase 5 scripts only (assumes adata.img.genescores.h5ad exists).
+# Uses versioned signature heatmap script (datetime-stamped figures).
+phase5-direct:
+	@echo "=========================================="
+	@echo "Phase V (direct): Running visualization scripts"
+	@echo "=========================================="
+	cd $(PROJECT) && python scripts/manuscript_spatial_plots.py
+	cd $(PROJECT) && python scripts/signature_heatmap_versioned.py
+	@mkdir -p $(PROJECT)/figures/manuscript/spatial_plots $(PROJECT)/figures/manuscript/signature_heatmaps
+	@echo "✅ Phase V (direct) complete"
 
 # ============================================================================
 # Utility Targets
@@ -356,23 +389,27 @@ help:
 	@echo "  make all              - Run entire pipeline (Phases I-V)"
 	@echo "  make phase1           - Phase I: Data ingestion and annotation"
 	@echo "  make phase2           - Phase II: Preprocessing and clustering"
-	@echo "  make phase3           - Phase III: Gene scoring and deconvolution"
+	@echo "  make phase3.5b        - Phase 3.5b: Gene scoring and deconvolution"
+	@echo "  make phase3           - Alias for phase3.5b"
 	@echo "  make phase4           - Phase IV: Analysis and statistics"
 	@echo "  make phase5           - Phase V: Visualization"
+	@echo "  make phase4-direct    - Phase IV only (assumes genescores exist; use conda activate $(CONDA_ENV))"
+	@echo "  make phase5-direct    - Phase V only (versioned heatmap output)"
+	@echo "  make signature_heatmaps_versioned - Signature heatmaps only (datetime-stamped pdf/png)"
 	@echo "  make clean            - Remove intermediate results (CAUTION)"
 	@echo "  make help             - Show this help message"
 	@echo ""
 	@echo "Current PROJECT: $(PROJECT)"
 	@echo "Individual script targets (paths under PROJECT):"
 	@echo "  results/adata.annotation.masked.h5ad       - Data ingestion"
-	@echo "  results/scvi.leiden.phenotyped.h5ad        - Preprocessing"
-	@echo "  results/adata.img.genescores.h5ad           - Gene scoring"
+	@echo "  results/scvi.leiden.phenotyped.h5ad        - Phase 3.5b (automated cell typing)"
+	@echo "  results/adata.img.genescores.h5ad           - Gene scoring (Phase 3.5b)"
 	@echo "  results/adata.deconvolution.h5ad          - Deconvolution"
 	@echo "  results/tls_clustered.h5ad                 - TLS extraction"
 	@echo "  figures/manuscript/tumor_differences       - Tumor analysis"
 	@echo "  figures/manuscript/macrophage_localization - Macrophage analysis"
 	@echo "  figures/process_colocalization             - Process colocalization"
-	@echo "  figures/manuscript/signature_heatmaps     - Signature heatmaps"
+	@echo "  figures/manuscript/signature_heatmaps     - Signature heatmaps (versioned: pdf/ and png/ with YYDDMM.hh.mm prefix)"
 
 # Clean target (use with caution - removes intermediate files)
 clean:

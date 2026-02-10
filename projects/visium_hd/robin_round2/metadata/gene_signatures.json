@@ -1,0 +1,92 @@
+{
+    "Myeloid": {
+        "Macrophage_Core": ["CD68", "CD14", "CSF1R", "LYZ", "ADGRE1"],
+        "Macrophage_M1": ["NOS2", "IL1B", "IL6", "TNF", "CXCL9", "CXCL10", "CD80", "CD86", "IRF5", "STAT1"],
+        "Macrophage_M2": ["MRC1", "CD163", "ARG1", "MSR1", "IL10", "TGFB1", "CCL18", "CCL22", "PPARG", "STAT6"],
+        "Macrophage_Repair": ["VEGFA", "PDGFB", "MMP9", "MMP12", "FN1", "IL10", "TGFB1", "ARG1", "MSR1"],
+        "Dendritic_cDC1": ["CLEC9A", "XCR1", "BATF3", "IRF8"],
+        "Dendritic_cDC2": ["CD1C", "FCER1A", "IRF4"],
+        "Dendritic_pDC": ["LILRA4", "CLEC4C", "TCF4", "IRF7"],
+        "Dendritic_Migratory_LN": ["CCR7", "CD83", "CCL19", "CCL21"],
+        "Dendritic_Tolerogenic_Tumor": ["IDO1", "CD274", "IL10", "TGFB1"],
+        "Neutrophil_Core": ["MPO", "ELANE", "S100A8", "S100A9", "CXCR2", "CXCL8"]
+    },
+
+    "Lymphoid": {
+        "CD4_Naive": ["CD4", "CCR7", "SELL", "IL7R", "TCF7", "LEF1"],
+        "CD4_Th1": ["CD4", "TBX21", "IFNG", "STAT4", "CXCR3"],
+        "CD4_Th2": ["CD4", "GATA3", "IL4", "IL5", "IL13"],
+        "CD4_Th17_Gut": ["CD4", "RORC", "IL17A", "IL17F", "IL23R"],
+        "CD4_Treg": ["CD4", "FOXP3", "IL2RA", "CTLA4", "IKZF2", "IL10", "TGFB1"],
+        "CD4_Exhausted": ["CD4", "PDCD1", "LAG3", "HAVCR2", "TIGIT", "TOX"],
+
+        "CD8_Naive": ["CD8A", "CD8B", "CCR7", "SELL", "LEF1"],
+        "CD8_Effector": ["CD8A", "GZMB", "PRF1", "GNLY", "NKG7", "IFNG"],
+        "CD8_Exhausted": ["CD8A", "PDCD1", "LAG3", "HAVCR2", "TIGIT", "TOX"],
+        "CD8_TRM": ["CD8A", "ITGAE", "ZNF683", "CXCR6"],
+        "CD8_Effector_KIR": [ "GNLY", "GZMB", "GZMH", "ZNF683", "PRSS23", "KLRC3", "KIR3DL1", "KLRC2", "TYROBP", "LGALS1", "ASCL2", "NKG7", "PRF1", "KIR2DL3", "CCL5", "FGFBP2", "KLRD1", "ITGB1", "TBX21", "CST7", "FCRL6", "HOPX", "PLEK", "EFHD2", "LTB", "S1PR5", "FGR", "CCL4", "IL7R", "CX3CR1", "FCGR3A", "ZEB2", "TTC38", "TRGC2", "CD27", "C12orf75", "SPON2", "DSTN", "ANXA2", "NCR1", "ADAM8", "APOBEC3G", "KLRF1", "TCF7", "GZMA", "IKZF2", "C1orf21", "PTMS", "CD63", "FLNA", "MATK", "CD300A", "CCR7", "AHNAK", "DOK2", "NOSIP", "COTL1", "MYO1F", "CAST", "NCR3", "GLUL", "TPST2", "F2R", "CHST12", "ATP2B4", "TSPAN2", "LYN", "CST3", "ANXA4", "MTSS1", "NELL2", "PIK3IP1", "PTGDR", "KIR3DL2", "PLA2G16", "LEPROTL1", "CD320", "EIF3E", "CLIC3", "CMKLR1", "MYC", "RGS10", "CD247", "PLEKHF1", "SYTL2", "MAL", "TMEM123", "RHOC", "SPN", "ITGAM", "IL2RB", "LDLRAP1", "GNPTAB", "OSBPL5", "ACTN1", "LEF1", "AOAH", "THEMIS", "CAMK4", "CES1", "RASSF1", "APOBEC3C", "RRAS2", "RCAN3", "SNHG8", "APMAP", "OXNAD1", "SIRPG", "AIF1", "GLIPR2", "CEP78", "ITGAL", "CD244", "SPINT2", "AQP3", "SIT1", "LPCAT1", "RPS6KA1", "ACTN4", "PDLIM1", "TRABD2A", "ITGB7", "SAMD3", "PASK", "EIF2S3", "SH3YL1", "PPA1", "FOXP1", "FUT11", "TPM4", "GZMK", "CD69", "RCBTB2", "DGKA", "CD5", "EIF3L", "SATB1", "RAB37", "CNN2", "ATF7IP2", "TMEM204", "PXN", "DNAJB1", "SERP1", "A1BG", "JAZF1", "C6orf48", "GRAMD1A", "PCED1B", "ABLIM1", "CD6", "ABHD17A", "FLT3LG", "RGCC", "KLRB1", "SERINC5", "RSL1D1", "DUSP2", "TRAT1", "CXCR4", "BEX2", "DNPH1", "NCF1", "TESPA1", "ALOX5AP", "INPP4B", "SERPINB6", "PLAC8", "SYNE1", "RHOH", "UBASH3A", "S100B", "RIC3", "STARD3NL", "MGAT4A", "CMC1", "TRBV28"],
+
+        "NK_Cytotoxic": ["NCAM1", "KLRD1", "KLRK1", "NCR1", "PRF1", "GZMB", "GNLY"],
+        "NK_Regulatory": ["NCAM1", "KLRD1", "IL10", "TGFB1", "CD96"],
+        "NKT": ["CD3D", "TRAV10", "TRBV25-1", "NCAM1", "ZBTB16"],
+        "ILC2_Repair": ["IL1RL1", "IL5", "IL13", "GATA3", "AREG"],
+        "ILC3_Mucosal": ["RORC", "IL22", "IL17A", "KIT", "IL23R"],
+
+        "B_Core": ["CD19", "MS4A1", "CD79A", "CD79B", "BANK1", "BLK"],
+        "B_Memory": ["CD27"],
+        "B_Naive": ["IGHD", "FCER2", "TCL1A", "IGHM"],
+        "B_GerminalCenter": ["GCSAM", "LRMP", "AICDA", "AC023590.1", "SUSD3"],
+        "Plasma_Core": [
+            "MZB1", "DERL3", "JSRP1", "TNFRSF17", "SLAMF7",
+            "IGHG2", "IGHGP", "IGLV3-1", "IGLV6-57", "IGHA2",
+            "IGKV4-1", "IGKV1-12", "IGLC7", "IGLL5"
+        ],
+        "Plasma_IgA": ["MZB1", "SDC1", "JCHAIN", "IGHA1", "IGHA2"],
+        "Plasma_IgG": ["IGHG1", "IGHG2", "IGHG3"],
+        "Plasma_IgM_IgD": ["IGHM", "IGHD"],
+        "Plasmablast": ["CD27", "TNFSF13B", "MKI67", "CDK1", "TOP2A", "MZB1"]
+    },
+
+    "Stromal": {
+        "Fibroblast_Myofibroblast": ["ACTA2", "COL1A1", "COL3A1", "FN1", "LOXL2", "CTGF", "TGFB1"],
+        "CAF_CRC": ["FAP", "PDPN", "COL11A1", "THBS2", "POSTN", "TNC", "MMP11"],
+        "Endothelial_Core": ["PECAM1", "CDH5", "VWF"],
+        "Epithelial_Repair": ["KRT14", "KRT17", "KRT19", "IL24", "EGFR", "AREG"],
+        "Epithelial_EMT": ["VIM", "SNAI1", "SNAI2", "ZEB1", "ZEB2", "TWIST1", "FN1", "MMP2", "MMP9"]
+    },
+
+    "Processes": {
+        "Angiogenesis": ["VEGFA", "PDGFB", "ANGPT1", "ANGPT2", "FLT1", "KDR"],
+        "ECM_Remodeling": ["MMP2", "MMP9", "MMP12", "TIMP1", "TIMP2", "FN1", "LOXL2", "CTGF"],
+        "Inflammation_Start": ["IL1B", "IL6", "TNF", "PTGS2", "TLR2", "TLR4", "NFKB1"],
+        "Resolution_Repair": ["IL10", "TGFB1", "MRC1", "CD163"]
+    },
+
+    "CRC_Tumor": {
+        "Epithelial_Core": ["EPCAM", "KRT8", "KRT18", "KRT19", "KRT20", "CDH1", "CLDN3", "CLDN4", "MUC1"],
+        "Stem_WNT_MYC": ["LGR5", "ASCL2", "AXIN2", "MYC", "CCND1", "SP5", "RNF43", "DKK1"],
+        "KRAS_MAPK_EGFR": ["EREG", "AREG", "DUSP6", "FOS", "JUN", "ETV4", "SPRY2", "EGR1"],
+        "TGFb_EMT_Invasion": ["TGFB1", "TGFB2", "SMAD3", "SERPINE1", "VIM", "SNAI1", "ZEB1", "ITGA5", "ITGB1", "MMP2", "MMP9"],
+        "Enterocyte_Diff": ["ALPI", "FABP1", "KRT20", "CEACAM5", "PIGR", "EPCAM", "KLF4"],
+        "Mucinous_Goblet": ["MUC2", "TFF3", "AGR2", "SPDEF", "REG4", "KLF4"],
+        "MSI_Immune_HLAII": ["HLA-DRA", "HLA-DRB1", "CD74", "CIITA", "STAT1", "CXCL9", "CXCL10", "CXCL13"],
+        "HLA_ClassI_Antigen": ["B2M", "HLA-A", "HLA-B", "HLA-C", "TAP1", "TAP2", "PSMB9", "NLRC5"],
+        "CIN_Mitotic": ["MKI67", "BUB1", "AURKA", "PLK1", "MAD2L1", "CENPE", "NDC80", "KIF11"],
+        "Hypoxia_Glycolysis": ["HIF1A", "SLC2A1", "LDHA", "ENO1", "GPI", "PGK1", "CA9", "VEGFA"],
+        "OxPhos_Mito": ["NDUFA10", "UQCRC2", "COX5B", "ATP5F1A", "SDHB", "CKMT1A", "TOMM20"],
+        "IFNg_Response": ["STAT1", "IRF1", "CXCL9", "CXCL10", "GBP1", "HLA-A", "HLA-B", "ICAM1"]
+    },
+
+    "Proliferation": {
+        "Cell_Cycle": ["MKI67", "TOP2A", "PCNA", "MCM2", "MCM4", "MCM6", "CCNB1", "CDK1", "TK1", "UBE2C"],
+        "S_Phase": ["MCM2", "MCM3", "MCM4", "MCM5", "MCM6", "MCM7", "TYMS", "RRM2", "PCNA"],
+        "G2M_Phase": ["CCNB1", "CCNB2", "CDK1", "TOP2A", "UBE2C", "NUSAP1", "KIF11", "AURKA"]
+    },
+
+    "LymphNode": {
+        "Sinus_Macrophage": ["SIGLEC1", "MARCO", "FCN1", "C1QA", "C1QB", "C1QC"],
+        "Migratory_DC_CCR7": ["CCR7", "CD83", "CCL19", "CCL21"],
+        "GC_B_Tfh_Axis": ["AICDA", "BCL6", "CXCR5", "IL21", "PDCD1"]
+    }
+
+}

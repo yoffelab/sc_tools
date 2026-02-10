@@ -10,7 +10,7 @@
 #   -> creates ./projects/visium/ggo_visium/ with data/, figures/, metadata/,
 #      scripts/, results/, outputs/, Mission.md, Journal.md
 #
-# Valid data_type: visium | visium_hd | xenium | imc
+# Valid data_type: visium | visium_hd | xenium | imc | cosmx
 # =============================================================================
 
 set -e
@@ -25,7 +25,7 @@ fi
 PROJECT_NAME="${1:?Usage: $0 <project_name> <data_type>}"
 DATA_TYPE="${2:?Usage: $0 <project_name> <data_type>}"
 
-VALID_TYPES=(visium visium_hd xenium imc)
+VALID_TYPES=(visium visium_hd xenium imc cosmx)
 if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
   echo "Error: data_type must be one of: ${VALID_TYPES[*]}" >&2
   exit 1

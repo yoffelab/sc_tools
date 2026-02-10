@@ -119,6 +119,13 @@ logs/
 # Generated / tooling
 repomix-output.xml
 
+# Model weights and large QC/generated (>1MB) — pre-commit blocks size; keep ignored
+*.pt
+*web_summary.html
+projects/visium_hd/*/models/
+projects/visium_hd/*/metadata/qc/
+**/old code/*.ipynb
+
 # Optional: uncomment to ignore large metadata CSVs inside projects
 # projects/visium/*/metadata/*.csv
 # projects/visium_hd/*/metadata/*.csv

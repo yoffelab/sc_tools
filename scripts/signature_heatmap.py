@@ -110,7 +110,7 @@ def prepare_tumor_type(adata):
     adata_sub = adata[adata.obs[TUMOR_TYPE_COL].isin(valid_types)].copy()
     
     # Only remove unused categories if it's a categorical
-    if pd.api.types.is_categorical_dtype(adata_sub.obs[TUMOR_TYPE_COL]):
+    if isinstance(adata_sub.obs[TUMOR_TYPE_COL].dtype, pd.CategoricalDtype):
         adata_sub.obs[TUMOR_TYPE_COL] = adata_sub.obs[TUMOR_TYPE_COL].cat.remove_unused_categories()
     
     return adata_sub

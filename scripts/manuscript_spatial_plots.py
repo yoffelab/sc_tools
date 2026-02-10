@@ -1,8 +1,10 @@
 import scanpy as sc
 import json
+import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+from tqdm import tqdm
 sc.settings.set_figure_params(dpi=300, dpi_save = 400) 
 
 # Assuming 'data.json' contains valid JSON data

@@ -57,8 +57,8 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [ ] **Before any modification:** Backup `adata.raw`.
 - [ ] Filter cells, genes, proteins, samples failing QC (project-specific thresholds).
 - [ ] Normalize, batch correct (e.g. scVI), run automated clustering.
-- [ ] Automated cell typing: non-transformer and transformer models.
 - [ ] Post-normalization QC report → `figures/QC/post/`.
+- [ ] **No automated cell typing here** (moved to Phase 3.5b).
 
 ---
 
@@ -69,7 +69,17 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ---
 
-### Phase 4: Manual Cell Typing (Human-in-Loop, Iterative)
+### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
+
+- [ ] **Gene signature storage (TODO):** Store scores in **`adata.obsm['sig:hallmark']`** for Hallmark processes; for each project-specific `metadata/{signature_name}.json`, store in **`adata.obsm['sig:{signature_name}']`**. Do not default to storing in `adata.obs`; use `obsm` for signature matrices.
+- [ ] **Always apply:** Basic gene sets (e.g. Hallmark) plus any signatures provided in project `metadata/*.json`.
+- [ ] Automated cell typing (cluster → celltype); non-transformer and transformer models.
+- [ ] Optional cell-type deconvolution (Tangram, Cell2location, DestVI; batch per library/sample).
+- [ ] Phase 3.5b is a separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Phase 4 is skippable if automated cell typing is adequate.
+
+---
+
+### Phase 4: Manual Cell Typing (Human-in-Loop, Iterative; Skippable)
 
 - [ ] **sc_tools workflow:** Extract `cluster_id` from `adata.obs`; provide JSON template.
 - [ ] **JSON format:** `{cluster_id: {celltype_name: "...", total_obs_count: N}}`. Include counts per cluster for user guidance.
@@ -82,9 +92,8 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ### Phase 5: Downstream Biology
 
-- [ ] Gene scoring, gene set analysis.
-- [ ] Statistical comparison (1-vs-rest, pairwise per `skills.md`).
-- [ ] Celltype deconvolution (Tangram, Cell2location, DestVI; batch per library/sample).
+- [ ] Uses gene scores (and optionally deconvolution) from Phase 3.5b.
+- [ ] Gene set analysis; statistical comparison (1-vs-rest, pairwise per `skills.md`).
 - [ ] Spatial/process analysis: colocalization, Moran's I, neighborhood enrichment, ligand-receptor.
 - [ ] Visualization: publication-ready figures under project `figures/`.
 
@@ -134,7 +143,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 ### Completed
 
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
-- **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
+- **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
 - **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.
 - **Makefile project-aware:** `PROJECT ?= projects/visium/ggo_visium`; paths use `$(PROJECT)/...`.
 - **Metadata moved:** Root `metadata/` moved to `projects/visium/ggo_visium/metadata/`.
@@ -162,7 +171,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 ### Operational notes
 
 - **API:** `st.pl.*`, `st.tl.*`, `st.qc.*`, `st.memory.*` (scanpy-style).
-- **New project:** `./projects/create_project.sh <project_name> visium|visium_hd|xenium|imc`. Run make with `PROJECT=projects/<type>/<name>`.
+- **New project:** `./projects/create_project.sh <project_name> visium|visium_hd|xenium|imc|cosmx`. Run make with `PROJECT=projects/<type>/<name>`.
 - **Legacy:** `scripts/old_code/` is read-only. Do not modify; refactor into new scripts or `sc_tools` if needed.
 
 ---

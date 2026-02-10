@@ -3,12 +3,17 @@ Heatmap and clustermap utilities.
 
 Generic helpers for signature score heatmaps with annotation bars,
 hierarchical sorting, and clustering within groups.
+
+Categorical colors follow the scanpy convention: adata.uns[f'{obs_col}_colors']
+is a list of hex strings (one per category in order). If missing, we create
+and store it so all plotting stays consistent.
 """
 
 from typing import Optional, List, Dict, Tuple, Union, Any
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
 import seaborn as sns
 from scipy.cluster.hierarchy import linkage, leaves_list
@@ -16,6 +21,7 @@ from scipy.spatial.distance import pdist
 
 __all__ = [
     'hex_to_rgb',
+    'get_obs_category_colors',
     'cluster_within_groups',
     'annotation_colors_from_categories',
     'signature_score_heatmap',
@@ -49,6 +55,55 @@ def hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
     if len(hex_color) != 6:
         return (0.8, 0.8, 0.8)
     return tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def get_obs_category_colors(
+    adata,
+    obs_col: str,
+    store_if_missing: bool = True,
+) -> Optional[Dict[Any, Tuple[float, float, float]]]:
+    """
+    Get category -> RGB color mapping for a categorical obs column using the
+    scanpy convention: adata.uns[f'{obs_col}_colors'] is a list of hex strings
+    (one per category in order). If missing or length mismatch, create a default
+    palette and optionally store it in adata.uns.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Object with obs[obs_col] categorical and optionally uns[f'{obs_col}_colors'].
+    obs_col : str
+        Name of the categorical column in adata.obs.
+    store_if_missing : bool
+        If True (default), when colors are missing or invalid, create a palette
+        and set adata.uns[f'{obs_col}_colors'] to a list of hex strings.
+
+    Returns
+    -------
+    dict or None
+        Map from category value to (r, g, b) in [0, 1]. None if obs_col is not
+        present or not categorical.
+    """
+    if obs_col not in adata.obs.columns:
+        return None
+    ser = adata.obs[obs_col]
+    if not isinstance(ser.dtype, pd.CategoricalDtype):
+        return None
+    categories = ser.cat.categories.tolist()
+    n = len(categories)
+    uns_key = f"{obs_col}_colors"
+    existing = adata.uns.get(uns_key)
+    if existing is not None and len(existing) == n:
+        return {cat: hex_to_rgb(h) for cat, h in zip(categories, existing)}
+    # Create default palette (hex list, category order)
+    if n <= 12:
+        palette = sns.color_palette("Set3", n)
+    else:
+        palette = sns.color_palette("husl", n)
+    hex_list = [mcolors.to_hex(c) for c in palette]
+    if store_if_missing:
+        adata.uns[uns_key] = hex_list
+    return {cat: hex_to_rgb(h) for cat, h in zip(categories, hex_list)}
 
 
 def cluster_within_groups(
@@ -201,8 +256,7 @@ def signature_score_heatmap(
 
     # Build annotations DataFrame with display names
     annotations = pd.DataFrame(
-        {disp: adata.obs[obs_col].values}
-        for disp, obs_col in annotation_cols.items()
+        {disp: adata.obs[obs_col].values for disp, obs_col in annotation_cols.items()}
     )
     annotations.index = adata.obs_names
 
@@ -266,13 +320,21 @@ def signature_score_heatmap(
         sig_df = sig_df.loc[clustered_idx]
         annotations = annotations.loc[clustered_idx]
 
-    # Colors for annotation bars (RGB)
+    # Colors for annotation bars (RGB). Prefer adata.uns[f'{obs_col}_colors']
+    # (scanpy convention) for categorical columns; then solidity_colors_hex for
+    # "Solidity" if not from uns; else Set3 in annotation_colors_from_categories.
+    column_colors = {}
+    for disp, obs_col in annotation_cols.items():
+        if disp not in annotations.columns:
+            continue
+        obs_colors = get_obs_category_colors(adata, obs_col, store_if_missing=True)
+        if obs_colors is not None:
+            column_colors[disp] = obs_colors
     default_hex_dict = None
-    if solidity_colors_hex and len(annotation_cols) >= 2:
-        second_name = sort_by[1] if len(sort_by) > 1 else list(annotation_cols.keys())[1]
-        default_hex_dict = {second_name: solidity_colors_hex}
+    if solidity_colors_hex and "Solidity" in annotations.columns and "Solidity" not in column_colors:
+        default_hex_dict = {"Solidity": solidity_colors_hex}
     color_lists = annotation_colors_from_categories(
-        annotations, default_hex=default_hex_dict
+        annotations, column_colors=column_colors, default_hex=default_hex_dict
     )
     default_gray = (0.8, 0.8, 0.8)
     arrays = {

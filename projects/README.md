@@ -1,6 +1,6 @@
 # Projects
 
-All analysis projects live under **data-type** folders: `visium/`, `visium_hd/`, `xenium/`, `imc/`.
+All analysis projects live under **data-type** folders: `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`.
 
 Each project directory (e.g. `visium/ggo_visium/`) contains:
 

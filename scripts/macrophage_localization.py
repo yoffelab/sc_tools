@@ -379,8 +379,8 @@ def main():
         )
         pval_matrix = pval_matrix[[col for col in tumor_order if col in pval_matrix.columns]]
         
-        # Create annotation matrix with significance stars
-        annot_matrix = corr_matrix.copy()
+        # Create annotation matrix with significance stars (object dtype for string values)
+        annot_matrix = corr_matrix.astype(object).copy()
         for i in range(annot_matrix.shape[0]):
             for j in range(annot_matrix.shape[1]):
                 r_val = corr_matrix.iloc[i, j]

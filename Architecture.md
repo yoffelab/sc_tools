@@ -1,6 +1,6 @@
 # Project Architecture: Scalable Spatial Omics Analysis
 
-This document outlines the directory structure, data flow, and script inventory. The layout is **scalable across projects and data types** (Visium, Visium HD, Xenium, IMC). All **metadata**, **results**, and **figures** are **project-specific** under `projects/<platform>/<project_name>/`. There is no repo-root `metadata/`, `results/`, or `figures/`. The pipeline is non-linear; see `README.md` (Pipeline Workflow section) for the diagram.
+This document outlines the directory structure, data flow, and script inventory. The layout is **scalable across projects and data types** (Visium, Visium HD, Xenium, IMC, CosMx). All **metadata**, **results**, and **figures** are **project-specific** under `projects/<platform>/<project_name>/`. There is no repo-root `metadata/`, `results/`, or `figures/`. The pipeline is non-linear; see `README.md` (Pipeline Workflow section) for the diagram.
 
 ## 1. Directory Overview
 
@@ -42,11 +42,12 @@ This document outlines the directory structure, data flow, and script inventory.
 │   │       └── Journal.md
 │   ├── visium_hd/
 │   ├── xenium/
-│   └── imc/
+│   ├── imc/
+│   └── cosmx/
 └── .gitignore, .githooks/
 ```
 
-**Creating a new project:** Run `./projects/create_project.sh <project_name> <data_type>`. Valid `data_type`: `visium` | `visium_hd` | `xenium` | `imc`.
+**Creating a new project:** Run `./projects/create_project.sh <project_name> <data_type>`. Valid `data_type`: `visium` | `visium_hd` | `xenium` | `imc` | `cosmx`.
 
 ---
 
@@ -63,7 +64,7 @@ All of the following live under `projects/<platform>/<project_name>/`:
 | `results/adata.annotation.masked.h5ad` | AnnData with masks (project-specific). |
 | `results/scvi.h5ad`, `results/scvi.leiden.h5ad` | Batch-corrected, clustered AnnData. |
 | `results/scvi.leiden.phenotyped.h5ad` | Clustered + celltype annotated. |
-| `results/adata.img.genescores.h5ad` | Gene signature scores. |
+| `results/adata.img.genescores.h5ad` | Gene signature scores (current). **Target:** store in `adata.obsm['sig:hallmark']`, `adata.obsm['sig:{name}']` per `metadata/{name}.json` (see Mission.md TODO). |
 | `results/adata.deconvolution.h5ad` | Cell-type proportions (optional). |
 | `figures/QC/raw/` | Pre-normalization QC reports. |
 | `figures/QC/post/` | Post-normalization QC reports. |
@@ -100,25 +101,31 @@ All of the following live under `projects/<platform>/<project_name>/`:
 
 ### Phase 3: Preprocessing
 
-Backup `adata.raw`; filter; normalize; batch correct; cluster; automated cell typing. Post-QC → `$(PROJECT)/figures/QC/post/`.
+Backup `adata.raw`; filter; normalize; batch correct; cluster. Post-QC → `$(PROJECT)/figures/QC/post/`. No automated cell typing (that is in Phase 3.5b).
 
 ---
 
 ### Phase 3.5: Demographics (Branching)
 
-sc_tools helpers: piechart, histogram, violinplot, barplot, stacked barplot, scatterplot, correlogram, heatmap. Figure 1 for cohort description.
+Separate branch from Phase 3 (parallel to 3.5b). sc_tools helpers: piechart, histogram, violinplot, barplot, stacked barplot, scatterplot, correlogram, heatmap. Figure 1 for cohort description.
 
 ---
 
-### Phase 4: Manual Cell Typing (Human-in-Loop)
+### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
 
-JSON format `{cluster_id: {celltype_name, total_obs_count}}`; match cluster_id type; produce celltype and celltype_broad. Iterative until satisfactory. Save to `$(PROJECT)/metadata/celltype_map.json`.
+Separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Always apply basic gene sets (e.g. Hallmark) and any project-provided signatures from `metadata/{signature_name}.json`. Store scores in **`adata.obsm['sig:hallmark']`**, **`adata.obsm['sig:{signature_name}']`** (not in `obs` by default). Automated cell typing (cluster → celltype). Optional cell-type deconvolution (DestVI, Cell2location, Tangram) → `$(PROJECT)/results/adata.deconvolution.h5ad`. Required for Phase 5.
+
+---
+
+### Phase 4: Manual Cell Typing (Human-in-Loop; Skippable)
+
+Skippable if automated cell typing in 3.5b is adequate. JSON format `{cluster_id: {celltype_name, total_obs_count}}`; match cluster_id type; produce celltype and celltype_broad. Iterative until satisfactory. Save to `$(PROJECT)/metadata/celltype_map.json`.
 
 ---
 
 ### Phase 5: Downstream Biology
 
-Gene scoring, deconvolution, spatial/process analysis, colocalization, neighborhood enrichment.
+Uses gene scores and (optionally) deconvolution from Phase 3.5b. Spatial/process analysis, colocalization, neighborhood enrichment, publication figures.
 
 ---
 

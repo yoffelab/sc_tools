@@ -9,68 +9,73 @@ This document describes the **non-linear** analysis pipeline with human-in-the-l
 ## Workflow Diagram
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph P1["Phase 1: Data Ingestion & QC"]
         direction TB
         A1[Platform-specific ingestion] --> A2[Raw unnormalized AnnData]
-        A2 --> A3["QC metrics (scanpy.pp.calculate_qc_metrics)"]
+        A2 --> A3["QC metrics"]
         A3 --> A4["QC report: figures/QC/raw/"]
-        A1 --> |"Visium/HD: fastq + H&E + Cytassist → spaceranger → cloupe"| A2
-        A1 --> |"IMC: mcd/txt → segmentation → h5ad"| A2
-        A1 --> |"Xenium: assume preprocessed"| A2
+        A1 --> |"Visium/HD | IMC | Xenium"| A2
     end
 
     subgraph P2["Phase 2: Metadata Attachment"]
         direction TB
-        B1{Clinical map file provided?} --> |"No: HUMAN-IN-LOOP"| B2[Prepare sample→metadata CSV/xlsx]
+        B1{Clinical map provided?} --> |"No: HIL"| B2[Prepare CSV/xlsx]
         B2 --> B1
-        B1 --> |"Yes: $(PROJECT)/metadata/sample_metadata.csv"| B3[Join clinical metadata to adata.obs]
-        B3 --> B4[All clinical metadata attached]
+        B1 --> |"Yes"| B3[Join to adata.obs]
+        B3 --> B4[Clinical metadata attached]
     end
 
     subgraph P3["Phase 3: Preprocessing"]
         direction TB
-        C1[Backup adata.raw] --> C2[Filter cells/genes/samples failing QC]
+        C1[Backup adata.raw] --> C2[Filter QC failures]
         C2 --> C3[Normalize, batch correct, cluster]
         C3 --> C4[Automated cell typing]
         C4 --> C5["QC report: figures/QC/post/"]
     end
 
-    subgraph P35["Phase 3.5: Demographics (branch)"]
-        D1[Cohort stats: piechart, violin, bar, heatmap, etc.]
-        D2[Figure 1 for manuscript]
+    subgraph P35["Phase 3.5: Demographics"]
+        direction TB
+        D1[Cohort stats]
+        D2[Figure 1]
     end
 
     subgraph P4["Phase 4: Manual Cell Typing"]
         direction TB
-        E1[Extract cluster_id from adata.obs] --> E2[Provide JSON: cluster_id→celltype]
-        E2 --> E3{Mapping satisfactory?}
-        E3 --> |"No: HUMAN-IN-LOOP"| E2
+        E1[Extract cluster_id] --> E2[JSON: cluster_id→celltype]
+        E2 --> E3{Satisfactory?}
+        E3 --> |"No: HIL"| E2
         E3 --> |"Yes"| E4[Apply celltype + celltype_broad]
-        E4 --> E5[Matrixplot, UMAP, signature genes]
+        E4 --> E5[Matrixplot, UMAP, signatures]
     end
 
     subgraph P5["Phase 5: Downstream Biology"]
+        direction TB
         F1[Gene scoring, deconvolution]
         F2[Spatial/process analysis]
-        F3[Colocalization, Moran's I, neighborhood enrichment]
+        F3[Colocalization, Moran's I]
     end
 
-    subgraph P67["Phase 6–7: Meta Analysis (optional)"]
-        G1[Phase 6: Aggregate to ROI + patient level]
-        G2[Phase 7: Downstream on aggregated data]
+    subgraph P67["Phase 6–7: Meta Analysis"]
+        direction TB
+        G1[Phase 6: Aggregate ROI/patient]
+        G2[Phase 7: Downstream on aggregated]
     end
 
-    P1 --> P2
-    P2 --> P3
+    P1 --> P2 --> P3
     P3 --> P35
-    P3 --> P4
-    P4 --> P5
-    P3 --> |"Skip Phase 4 if auto-typing sufficient"| P5
-    P5 --> P67
+    P3 --> P4 --> P5 --> P67
+    P3 -.-> |"Skip Phase 4"| P5
+    P2 -.-> |"START here"| P3
+    P3 -.-> |"START here"| P4
 
-    P2 -.-> |"Preprocessed projects may START here"| P3
-    P3 -.-> |"Already clustered projects may START here"| P4
+    style P1 fill:#e3f2fd
+    style P2 fill:#fff3e0
+    style P3 fill:#e8f5e9
+    style P35 fill:#e1f5fe
+    style P4 fill:#fff3e0
+    style P5 fill:#f3e5f5
+    style P67 fill:#fafafa
 ```
 
 ---

@@ -11,7 +11,7 @@ from dask.diagnostics import ProgressBar
 # Configuration
 # -------------------------------
 sc_data_file = "results/seurat_object.h5ad"
-visium_hd_data_file = "results/adata.annotation.masked.h5ad"
+visium_hd_data_file = "results/adata.annotated.p2.h5ad"
 celltype_key = 'cell.type'
 visium_batch_key = 'sample_id'
 sc_batch_key = 'Batch'

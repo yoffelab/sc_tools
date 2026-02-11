@@ -29,7 +29,7 @@ sc.settings.set_figure_params(dpi=300, dpi_save=400)
 # ============================================================================
 
 # Input file
-ADATA_PATH = 'results/adata.img.genescores.h5ad'
+ADATA_PATH = 'results/adata.normalized.scored.p35.h5ad'
 
 # Output directory
 OUTPUT_DIR = 'figures/manuscript/spatial_multipage'

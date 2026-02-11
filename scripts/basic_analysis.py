@@ -12,7 +12,7 @@ import seaborn as sns
 # -----------------------------
 # Config supplied by you
 # -----------------------------
-ADATA_PATH = Path("results/adata.annotation.masked.h5ad")
+ADATA_PATH = Path("results/adata.annotated.p2.h5ad")
 cluster_key: str = "cluster"
 library_id_key: str = "library_id"
 

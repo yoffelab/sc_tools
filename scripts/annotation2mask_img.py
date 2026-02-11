@@ -339,4 +339,4 @@ plot_all_masks(
 for key in ["pathologist_annotation", "solidity_type", "architecture_type"]:
     generate_numeric_masks(adata, svs_shape_dict, label_key=key, expand_factor=1.65, out_dir="results/masks")
 
-adata.write('results/adata.annotation.masks.h5ad')
+adata.write('results/adata.annotated.p2.h5ad')

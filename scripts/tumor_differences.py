@@ -24,7 +24,7 @@ sc.settings.set_figure_params(dpi=300, dpi_save=400)
 
 # Load data
 print("Loading data...")
-adata = sc.read('results/adata.img.genescores.h5ad')
+adata = sc.read('results/adata.normalized.scored.p35.h5ad')
 
 # Load gene signatures to identify program columns
 with open('metadata/gene_signatures.json', 'r') as file:

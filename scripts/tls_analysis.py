@@ -28,7 +28,7 @@ print("Loading data...")
 with open('metadata/gene_signatures.json', 'r') as file:
     spatial_signatures = json.load(file)
 
-adata = sc.read('results/adata.img.genescores.h5ad')
+adata = sc.read('results/adata.normalized.scored.p35.h5ad')
 adata_tls = sc.read('results/tls_clustered.h5ad')
 
 adata.obs['solidity_type'] = pd.Categorical(

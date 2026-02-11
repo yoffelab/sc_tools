@@ -301,7 +301,7 @@ def create_tls_anndata(
 # Example usage:
 if __name__ == "__main__":
     # Load data
-    adata = sc.read('results/adata.img.genescores.h5ad')
+    adata = sc.read('results/adata.normalized.scored.p35.h5ad')
     
     # Create TLS anndata
     adata_tls = create_tls_anndata(

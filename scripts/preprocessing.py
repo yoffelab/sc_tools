@@ -13,7 +13,7 @@ import sthd
 # sthd.pl.qc_overview(adata_raw, save_name="qc_pre_filter.pdf")
 # sthd.io.save_h5ad(adata_raw, "output/raw_data.h5ad")
 
-adata = sc.read("results/adata.annotation.masked.h5ad")
+adata = sc.read("results/adata.annotated.p2.h5ad")
 
 # process metadata
 
@@ -87,7 +87,7 @@ adata_filtered = sthd.io.read_h5ad("results/adata_filtered.h5ad")
 adata_filtered = sthd.pp.filter_by_consensus_hvg_svg(adata_filtered, hvg_top_n=5000, svg_top_n=5000,)
 # filter mt, rb, and, hb genes
 adata = adata[:, ~(adata.var["mt"] | adata.var["ribo"]) | adata.var["hb"]]
-sthd.io.save_h5ad(adata_filtered, "results/adata_vg_filtered.h5ad")
+sthd.io.save_h5ad(adata_filtered, "results/adata.normalized.p3.h5ad")
 
 
 adata_batch = sthd.pp.batch_integrate(adata_filtered, batch_key = 'library_id', method = 'scvi')

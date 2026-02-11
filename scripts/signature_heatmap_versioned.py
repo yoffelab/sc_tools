@@ -33,7 +33,7 @@ from sc_tools.utils import signatures as sig_utils
 # -----------------------------------------------------------------------------
 # Paths (relative to cwd = PROJECT)
 # -----------------------------------------------------------------------------
-ADATA_PATH = Path("results/adata.img.genescores.h5ad")
+ADATA_PATH = Path("results/adata.normalized.scored.p35.h5ad")
 OUTPUT_DIR = Path("figures/manuscript/signature_heatmaps")
 
 # -----------------------------------------------------------------------------

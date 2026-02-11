@@ -225,7 +225,7 @@ def main():
     
     # Load AnnData
     print("\n2. Loading AnnData...")
-    adata_path = Path('results/adata.annotation.masked.h5ad')
+    adata_path = Path('results/adata.annotated.p2.h5ad')
     if not adata_path.exists():
         raise FileNotFoundError(f"AnnData file not found: {adata_path}")
     
@@ -298,7 +298,7 @@ def main():
     
     # Save AnnData with scores
     print("\n6. Saving AnnData with signature scores...")
-    output_path = Path('results/adata.img.genescores.h5ad')
+    output_path = Path('results/adata.normalized.scored.p35.h5ad')
     adata.write(output_path)
     print(f"   Saved: {output_path}")
     print(f"   Shape: {adata.shape}")

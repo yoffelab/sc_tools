@@ -53,19 +53,19 @@ $(PROJECT)/results/adata.annotation.h5ad: $(PROJECT)/scripts/loupe2adata.py
 # Script: annotation2mask_img.py
 # Purpose: Add image masks and pathologist annotations to AnnData
 # Input:  results/adata.annotation.h5ad
-# Output: results/adata.annotation.masked.h5ad
+# Output: results/adata.annotated.p2.h5ad (standard checkpoint)
 # Notes:  Embeds tissue images and masks into AnnData object for spatial
 #         visualization. Required for downstream spatial analysis.
 # ----------------------------------------------------------------------------
-$(PROJECT)/results/adata.annotation.masked.h5ad: $(PROJECT)/results/adata.annotation.h5ad $(PROJECT)/scripts/annotation2mask_img.py
+$(PROJECT)/results/adata.annotated.p2.h5ad: $(PROJECT)/results/adata.annotation.h5ad $(PROJECT)/scripts/annotation2mask_img.py
 	@echo "=========================================="
 	@echo "Phase I.2: Adding image masks and annotations"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/annotation2mask_img.py
-	@echo "✅ Created: $(PROJECT)/results/adata.annotation.masked.h5ad"
+	@echo "✅ Created: $(PROJECT)/results/adata.annotated.p2.h5ad"
 
 # Phase I target
-phase1: $(PROJECT)/results/adata.annotation.masked.h5ad
+phase1: $(PROJECT)/results/adata.annotated.p2.h5ad
 	@echo "✅ Phase I complete: Data ingestion and annotation"
 
 # ============================================================================
@@ -76,15 +76,15 @@ phase1: $(PROJECT)/results/adata.annotation.masked.h5ad
 # ----------------------------------------------------------------------------
 # Script: preprocessing.py
 # Purpose: QC, normalization, and scVI batch correction
-# Input:  results/adata.annotation.masked.h5ad
-# Output: results/scvi.h5ad
+# Input:  results/adata.annotated.p2.h5ad
+# Output: results/scvi.h5ad, results/adata.normalized.p3.h5ad
 # Notes:  - Filters cells and genes based on QC metrics
 #         - Normalizes and log-transforms data
 #         - Trains scVI model for batch correction and latent representation
 #         - Calculates mitochondrial, ribosomal, and hemoglobin content
 #         - Identifies highly variable genes (HVG) and spatially variable genes (SVG)
 # ----------------------------------------------------------------------------
-$(PROJECT)/results/scvi.h5ad: $(PROJECT)/results/adata.annotation.masked.h5ad $(PROJECT)/scripts/preprocessing.py
+$(PROJECT)/results/scvi.h5ad: $(PROJECT)/results/adata.annotated.p2.h5ad $(PROJECT)/scripts/preprocessing.py
 	@echo "=========================================="
 	@echo "Phase II.1: Preprocessing and batch correction"
 	@echo "=========================================="
@@ -133,9 +133,9 @@ $(PROJECT)/results/scvi.leiden.phenotyped.h5ad: $(PROJECT)/results/scvi.leiden.h
 # ----------------------------------------------------------------------------
 # Script: score_gene_signatures.py
 # Purpose: Calculate and store gene signature scores in AnnData
-# Input:  results/adata.annotation.masked.h5ad
+# Input:  results/adata.annotated.p2.h5ad
 #         metadata/gene_signatures.json
-# Output: results/adata.img.genescores.h5ad
+# Output: results/adata.normalized.scored.p35.h5ad (standard checkpoint)
 # Notes:  - Scores all gene signatures from metadata/gene_signatures.json
 #         - Includes tumor programs (EMT, Hypoxia, Proliferative)
 #         - Includes immune programs (Lymphoid, Innate, Processes)
@@ -143,18 +143,18 @@ $(PROJECT)/results/scvi.leiden.phenotyped.h5ad: $(PROJECT)/results/scvi.leiden.h
 #         - Z-scores each signature across spots for visualization
 #         - Required for all downstream analysis scripts
 # ----------------------------------------------------------------------------
-$(PROJECT)/results/adata.img.genescores.h5ad: $(PROJECT)/results/adata.annotation.masked.h5ad $(PROJECT)/metadata/gene_signatures.json $(PROJECT)/scripts/score_gene_signatures.py
+$(PROJECT)/results/adata.normalized.scored.p35.h5ad: $(PROJECT)/results/adata.annotated.p2.h5ad $(PROJECT)/metadata/gene_signatures.json $(PROJECT)/scripts/score_gene_signatures.py
 	@echo "=========================================="
 	@echo "Phase 3.5b.1: Gene signature scoring"
 	@echo "=========================================="
 	cd $(PROJECT) && python scripts/score_gene_signatures.py
-	@echo "✅ Created: $(PROJECT)/results/adata.img.genescores.h5ad"
+	@echo "✅ Created: $(PROJECT)/results/adata.normalized.scored.p35.h5ad"
 
 # ----------------------------------------------------------------------------
 # Script: celltype_deconvolution_phase3.py
 # Purpose: Deconvolve cell type proportions in spatial spots
 # Input:  results/seurat_object.h5ad (single-cell reference)
-#         results/adata.img.genescores.h5ad (spatial data)
+#         results/adata.normalized.scored.p35.h5ad (spatial data)
 # Output: results/adata.deconvolution.h5ad
 # Notes:  - Uses multiple methods with fallback: DestVI, Cell2location, Tangram
 #         - Processes libraries individually to manage memory
@@ -162,7 +162,7 @@ $(PROJECT)/results/adata.img.genescores.h5ad: $(PROJECT)/results/adata.annotatio
 #         - Estimates cell type proportions for each spatial spot
 #         - Required for differential cell-type proportion analysis
 # ----------------------------------------------------------------------------
-$(PROJECT)/results/adata.deconvolution.h5ad: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/results/seurat_object.h5ad $(PROJECT)/scripts/celltype_deconvolution_phase3.py
+$(PROJECT)/results/adata.deconvolution.h5ad: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/results/seurat_object.h5ad $(PROJECT)/scripts/celltype_deconvolution_phase3.py
 	@echo "=========================================="
 	@echo "Phase 3.5b.2: Cell type deconvolution"
 	@echo "=========================================="
@@ -170,7 +170,7 @@ $(PROJECT)/results/adata.deconvolution.h5ad: $(PROJECT)/results/adata.img.genesc
 	@echo "✅ Created: $(PROJECT)/results/adata.deconvolution.h5ad"
 
 # Phase 3.5b target (automated cell typing + gene scoring required; deconvolution optional)
-phase3.5b: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad $(PROJECT)/results/adata.img.genescores.h5ad
+phase3.5b: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad $(PROJECT)/results/adata.normalized.scored.p35.h5ad
 	@echo "✅ Phase 3.5b complete: Cell typing + gene scoring (deconvolution optional)"
 
 # Backward compatibility: phase3 runs phase 3.5b
@@ -184,13 +184,13 @@ phase3: phase3.5b
 # ----------------------------------------------------------------------------
 # Script: create_tls_anndata.py
 # Purpose: Extract and aggregate TLS regions from all tissue slides
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: results/tls_clustered.h5ad
 # Notes:  - Identifies TLS regions based on architecture annotations
 #         - Creates aggregated AnnData object for TLS-specific analysis
 #         - Required for tls_analysis.py
 # ----------------------------------------------------------------------------
-$(PROJECT)/results/tls_clustered.h5ad: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/create_tls_anndata.py
+$(PROJECT)/results/tls_clustered.h5ad: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/create_tls_anndata.py
 	@echo "=========================================="
 	@echo "Phase IV.1: TLS region extraction"
 	@echo "=========================================="
@@ -200,7 +200,7 @@ $(PROJECT)/results/tls_clustered.h5ad: $(PROJECT)/results/adata.img.genescores.h
 # ----------------------------------------------------------------------------
 # Script: tls_analysis.py
 # Purpose: TLS-specific transcriptomics analysis
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 #         results/tls_clustered.h5ad
 # Output: figures/manuscript/tls_analysis/ (various plots)
 #         figures/stats/tls_*.csv (statistics)
@@ -209,7 +209,7 @@ $(PROJECT)/results/tls_clustered.h5ad: $(PROJECT)/results/adata.img.genescores.h
 #         - Ligand-receptor crosstalk analysis
 #         - Statistical testing with FDR correction
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/tls_analysis: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/results/tls_clustered.h5ad $(PROJECT)/scripts/tls_analysis.py
+$(PROJECT)/figures/manuscript/tls_analysis: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/results/tls_clustered.h5ad $(PROJECT)/scripts/tls_analysis.py
 	@echo "=========================================="
 	@echo "Phase IV.2: TLS analysis"
 	@echo "=========================================="
@@ -220,14 +220,14 @@ $(PROJECT)/figures/manuscript/tls_analysis: $(PROJECT)/results/adata.img.genesco
 # ----------------------------------------------------------------------------
 # Script: spatial_analysis.py
 # Purpose: Spatially Variable Genes (SVG) and ligand-receptor analysis
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: figures/manuscript/spatial_analysis/ (SVG plots)
 #         figures/stats/spatial_*.csv (SVG statistics)
 # Notes:  - Identifies SVGs using Moran's I or squidpy.gr.spatial_autocorr
 #         - Compares SVG expression between Non-Solid and Solid tumors
 #         - Infers ligand-receptor interactions using squidpy.gr.ligrec
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/spatial_analysis: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/spatial_analysis.py
+$(PROJECT)/figures/manuscript/spatial_analysis: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/spatial_analysis.py
 	@echo "=========================================="
 	@echo "Phase IV.3: Spatial analysis (SVG and ligrec)"
 	@echo "=========================================="
@@ -238,7 +238,7 @@ $(PROJECT)/figures/manuscript/spatial_analysis: $(PROJECT)/results/adata.img.gen
 # ----------------------------------------------------------------------------
 # Script: tumor_differences.py
 # Purpose: 1-vs-all statistical testing across tumor types
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: figures/manuscript/tumor_differences/ (boxplots)
 #         figures/stats/tumor_differences_1vsall_stats.csv
 # Notes:  - Tests tumor programs (EMT, Hypoxia, Proliferative)
@@ -247,7 +247,7 @@ $(PROJECT)/figures/manuscript/spatial_analysis: $(PROJECT)/results/adata.img.gen
 #         - Generates boxplots with significance bars and p-values
 #         - One line per comparison in text annotations
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/tumor_differences: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/tumor_differences.py
+$(PROJECT)/figures/manuscript/tumor_differences: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/tumor_differences.py
 	@echo "=========================================="
 	@echo "Phase IV.4: Tumor differences analysis"
 	@echo "=========================================="
@@ -258,7 +258,7 @@ $(PROJECT)/figures/manuscript/tumor_differences: $(PROJECT)/results/adata.img.ge
 # ----------------------------------------------------------------------------
 # Script: macrophage_localization.py
 # Purpose: Measure macrophage colocalization with proliferative program
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: figures/manuscript/macrophage_localization/ (scatterplots, heatmaps)
 #         figures/stats/macrophage_proliferation_correlations.csv
 # Notes:  - Stratifies by Normal, Non-Solid, and Solid tumors
@@ -269,7 +269,7 @@ $(PROJECT)/figures/manuscript/tumor_differences: $(PROJECT)/results/adata.img.ge
 #         - Annotates correlations outside plot
 #         - Generates correlation heatmap and clustermap
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/macrophage_localization: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/macrophage_localization.py
+$(PROJECT)/figures/manuscript/macrophage_localization: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/macrophage_localization.py
 	@echo "=========================================="
 	@echo "Phase IV.5: Macrophage localization analysis"
 	@echo "=========================================="
@@ -280,7 +280,7 @@ $(PROJECT)/figures/manuscript/macrophage_localization: $(PROJECT)/results/adata.
 # ----------------------------------------------------------------------------
 # Script: process_colocalization.py
 # Purpose: Analyze spatial co-occurrence patterns of processes across spots
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: figures/process_colocalization/ (heatmaps, volcano plots)
 #         results/process_colocalization/*.csv (statistics)
 # Notes:  - Pearson correlation of processes across spots
@@ -290,7 +290,7 @@ $(PROJECT)/figures/manuscript/macrophage_localization: $(PROJECT)/results/adata.
 #         - Signature filtering (include/exclude) for selective visualization
 #         - Correlation heatmap and clustermap
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/process_colocalization: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/process_colocalization.py
+$(PROJECT)/figures/process_colocalization: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/process_colocalization.py
 	@echo "=========================================="
 	@echo "Phase IV.6: Process colocalization analysis"
 	@echo "=========================================="
@@ -303,7 +303,7 @@ $(PROJECT)/figures/process_colocalization: $(PROJECT)/results/adata.img.genescor
 phase4: $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/process_colocalization
 	@echo "✅ Phase IV complete: Analysis and statistical testing"
 
-# Phase IV direct: run phase 4 scripts only (assumes adata.img.genescores.h5ad exists).
+# Phase IV direct: run phase 4 scripts only (assumes adata.normalized.scored.p35.h5ad exists).
 # Use when phase 1-3 results exist and you want to skip dependency checks.
 phase4-direct:
 	@echo "=========================================="
@@ -323,13 +323,13 @@ phase4-direct:
 # ----------------------------------------------------------------------------
 # Script: manuscript_spatial_plots.py
 # Purpose: Generate publication-ready spatial plots
-# Input:  results/adata.img.genescores.h5ad
+# Input:  results/adata.normalized.scored.p35.h5ad
 # Output: figures/manuscript/ (various spatial visualizations)
 # Notes:  - Spatial plots of gene signatures and cell types
 #         - Follows statistical annotation rules from skills.md
 #         - All plots include significance bars and p-values
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/spatial_plots: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/manuscript_spatial_plots.py
+$(PROJECT)/figures/manuscript/spatial_plots: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/manuscript_spatial_plots.py
 	@echo "=========================================="
 	@echo "Phase V.1: Publication-ready spatial plots"
 	@echo "=========================================="
@@ -341,7 +341,7 @@ $(PROJECT)/figures/manuscript/spatial_plots: $(PROJECT)/results/adata.img.genesc
 # Script: signature_heatmap.py (legacy)
 # Purpose: Generate heatmap/clustermap visualizations (no datetime stamp)
 # ----------------------------------------------------------------------------
-$(PROJECT)/figures/manuscript/signature_heatmaps: $(PROJECT)/results/adata.img.genescores.h5ad $(PROJECT)/scripts/signature_heatmap.py
+$(PROJECT)/figures/manuscript/signature_heatmaps: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/signature_heatmap.py
 	@echo "=========================================="
 	@echo "Phase V.2: Signature heatmap visualization (legacy)"
 	@echo "=========================================="
@@ -366,7 +366,7 @@ signature_heatmaps_versioned:
 phase5: $(PROJECT)/figures/manuscript/spatial_plots $(PROJECT)/figures/manuscript/signature_heatmaps
 	@echo "✅ Phase V complete: Visualization"
 
-# Phase V direct: run phase 5 scripts only (assumes adata.img.genescores.h5ad exists).
+# Phase V direct: run phase 5 scripts only (assumes adata.normalized.scored.p35.h5ad exists).
 # Uses versioned signature heatmap script (datetime-stamped figures).
 phase5-direct:
 	@echo "=========================================="
@@ -401,9 +401,9 @@ help:
 	@echo ""
 	@echo "Current PROJECT: $(PROJECT)"
 	@echo "Individual script targets (paths under PROJECT):"
-	@echo "  results/adata.annotation.masked.h5ad       - Data ingestion"
+	@echo "  results/adata.annotated.p2.h5ad            - Phase 2 (annotated)"
 	@echo "  results/scvi.leiden.phenotyped.h5ad        - Phase 3.5b (automated cell typing)"
-	@echo "  results/adata.img.genescores.h5ad           - Gene scoring (Phase 3.5b)"
+	@echo "  results/adata.normalized.scored.p35.h5ad           - Gene scoring (Phase 3.5b)"
 	@echo "  results/adata.deconvolution.h5ad          - Deconvolution"
 	@echo "  results/tls_clustered.h5ad                 - TLS extraction"
 	@echo "  figures/manuscript/tumor_differences       - Tumor analysis"

@@ -23,7 +23,7 @@ sc.settings.set_figure_params(dpi=300, dpi_save=400)
 
 # Load data
 print("Loading data...")
-adata = sc.read('results/adata.img.genescores.h5ad')
+adata = sc.read('results/adata.normalized.scored.p35.h5ad')
 
 # Ensure spatial coordinates are available
 assert 'spatial' in adata.obsm, "Spatial coordinates not found in adata.obsm['spatial']"

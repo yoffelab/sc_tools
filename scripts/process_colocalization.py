@@ -974,7 +974,7 @@ def main():
     
     # Load data
     print("\n1. Loading data...")
-    adata_path = Path('results/adata.img.genescores.h5ad')
+    adata_path = Path('results/adata.normalized.scored.p35.h5ad')
     if not adata_path.exists():
         raise FileNotFoundError(f"AnnData file not found: {adata_path}")
     

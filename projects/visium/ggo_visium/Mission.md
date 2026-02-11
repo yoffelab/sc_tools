@@ -37,7 +37,7 @@ The project follows the repo phasing scheme (see root `Mission.md` and `README.m
 - [x] **Phase 1:** Data ingestion; AnnData with `sample`, spatial coords, H&E images.
 - [x] **Phase 2:** Grouping by pathology (Normal, Non-Solid, Solid) in `adata.obs`.
 - [x] **Phase 3:** scVI integration, Leiden clustering (preprocessing only).
-- [x] **Phase 3.5b:** Gene scoring (Seurat-based), automated cell typing, optional deconvolution; phenotyped AnnData and `adata.img.genescores.h5ad`.
+- [x] **Phase 3.5b:** Gene scoring (Seurat-based), automated cell typing, optional deconvolution; phenotyped AnnData and `adata.normalized.scored.p35.h5ad`.
 - [x] **Phase 4:** Manual cell typing refinement; phenotyped AnnData.
 - [x] **Phase 5 (partial):** Differential program analysis, macrophage localization, process colocalization, signature heatmaps (versioned), TLS B-cell/T-cell, ligand-receptor, manuscript spatial plots.
 

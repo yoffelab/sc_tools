@@ -13,6 +13,23 @@
 - **Reproducibility:** Makefile is project-aware (`PROJECT ?= projects/visium/ggo_visium`). Each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/` under `projects/<platform>/<project_name>/`.
 - **Standards:** All projects follow `skills.md` (statistics, significance bars, FDR). Documentation avoids apostrophes.
 
+### Phasing scheme (sc_tools)
+
+| Phase | Name | Notes |
+|-------|------|--------|
+| **1** | Data Ingestion & QC | Platform-specific ingestion; QC metrics and reports. |
+| **2** | Metadata Attachment | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. |
+| **3** | Preprocessing | Backup `adata.raw`; filter; normalize; batch correct (e.g. scVI); cluster. No automated cell typing. |
+| **3.5** | Demographics | Branch from Phase 3 (parallel to 3.5b). Cohort stats, Figure 1. |
+| **3.5b** | Gene scoring, automated cell typing, deconvolution | Branch from Phase 3 (parallel to 3.5). Hallmark + project signatures (target: `adata.obsm['sig:...']`); automated cell typing; optional deconvolution. Connects to Phase 4. |
+| **4** | Manual Cell Typing | Human-in-loop, iterative. Skippable if automated typing (3.5b) is adequate. |
+| **5** | Downstream Biology | Uses 3.5b outputs. Spatial/process analysis, figures. |
+| **6–7** | Meta Analysis | Optional. Aggregate ROI/patient; downstream on aggregated. |
+
+**Entry points:** Start at Phase 3 (preprocessed AnnData), Phase 3.5b (clustered AnnData), or Phase 4 (phenotyped AnnData). See README diagram for START HERE conditions.
+
+**Checkpoint nomenclature:** Standard result filenames and required metadata are defined and checked in **Architecture.md** (Section 2). Use `results/adata.raw.p1.h5ad`, `adata.annotated.p2.h5ad`, `adata.normalized.p3.h5ad`, `adata.normalized.scored.p35.h5ad`, `adata.celltyped.p4.h5ad`, and `adata.{level}.{feature}.h5ad` for aggregated (level ∈ roi|patient, feature ∈ mean_expression|celltype_frequency).
+
 ---
 
 ## 2. General Analysis — To-Do and Implementation Status
@@ -108,9 +125,9 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ## 3. Project-Specific Missions
 
-- **GGO Visium:** `projects/visium/ggo_visium/Mission.md`.
+- **GGO Visium:** `projects/visium/ggo_visium/Mission.md` (aligned with phasing scheme above).
 - **Other projects:** Add `Mission.md` and `Journal.md` via `./projects/create_project.sh <project_name> <data_type>`.
-- **Entry points:** Preprocessed projects may start at Phase 3 or 4.
+- **Entry points:** See Phasing scheme (Section 1). Start at Phase 3 (preprocessed), Phase 3.5b (clustered), or Phase 4 (phenotyped) as appropriate.
 
 ---
 

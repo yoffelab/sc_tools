@@ -15,18 +15,19 @@ Identify transcriptional and spatial differences across the lung tumor progressi
 
 ---
 
-## 2. Phase Alignment (New Schema)
+## 2. Phase Alignment (sc_tools Phasing Scheme)
 
-The project uses the 7-phase workflow. Entry point for GGO Visium: Phases 1–3 largely complete; focus on Phases 4–5 and optional 6–7.
+The project follows the repo phasing scheme (see root `Mission.md` and `README.md`). Phase 3 = preprocessing and clustering only; Phase 3.5b = gene scoring, automated cell typing, deconvolution (separate branch from 3, parallel to 3.5); Phase 4 = manual cell typing (skippable if 3.5b adequate).
 
-| New Phase | GGO Visium Status | Key Tasks |
-|-----------|-------------------|-----------|
+| Phase | GGO Visium Status | Key Tasks |
+|-------|-------------------|-----------|
 | **1** | Done | Ingestion (cloupe→AnnData), QC raw |
 | **2** | Done | Clinical metadata joined (solidity, patient) |
-| **3** | Done | scVI, clustering, automated typing |
+| **3** | Done | scVI, clustering (no cell typing in Phase 3) |
 | **3.5** | Partial | Demographics / Figure 1 cohort description |
-| **4** | Done | Manual cell typing (phenotyped) |
-| **5** | Active | Gene scoring, deconvolution, tumor_differences, process_colocalization, TLS, macrophage |
+| **3.5b** | Done | Gene scoring, automated cell typing, optional deconvolution |
+| **4** | Done | Manual cell typing (phenotyped); was used for refinement |
+| **5** | Active | tumor_differences, process_colocalization, TLS, macrophage, signature heatmaps, manuscript figures |
 | **6–7** | Pending | ROI/patient aggregation, meta analysis |
 
 ---
@@ -35,18 +36,21 @@ The project uses the 7-phase workflow. Entry point for GGO Visium: Phases 1–3 
 
 - [x] **Phase 1:** Data ingestion; AnnData with `sample`, spatial coords, H&E images.
 - [x] **Phase 2:** Grouping by pathology (Normal, Non-Solid, Solid) in `adata.obs`.
-- [x] **Phase 3:** scVI integration, Leiden clustering, automated cell typing.
-- [x] **Phase 4:** Manual cell typing; phenotyped AnnData.
-- [x] **Phase 5 (partial):** Gene scoring (Seurat-based), differential program analysis, macrophage localization, process colocalization, signature heatmaps, TLS B-cell/T-cell, ligand-receptor.
+- [x] **Phase 3:** scVI integration, Leiden clustering (preprocessing only).
+- [x] **Phase 3.5b:** Gene scoring (Seurat-based), automated cell typing, optional deconvolution; phenotyped AnnData and `adata.img.genescores.h5ad`.
+- [x] **Phase 4:** Manual cell typing refinement; phenotyped AnnData.
+- [x] **Phase 5 (partial):** Differential program analysis, macrophage localization, process colocalization, signature heatmaps (versioned), TLS B-cell/T-cell, ligand-receptor, manuscript spatial plots.
 
 ---
 
 ## 4. Implementation Roadmap (Current Priority)
 
 **Order of work:**
-1. **Unit tests for ggo_visium** — Implement first. Validate Makefile and scripts (Phases 1–5) run correctly with fixtures. Establish baseline before refactoring.
+1. **Unit tests for ggo_visium** — Implement first. Validate Makefile and scripts (Phases 1, 2, 3, 3.5b, 4, 5) run correctly with fixtures. Establish baseline before refactoring.
 2. **Unit tests for sc_tools** — Implement second. Ensure guaranteed behavior of sc_tools functions.
 3. **Implement functions** — Refactor scripts to use sc_tools; new code must compile and pass both test layers.
+
+Pipeline phasing is defined in root `Mission.md` (Phasing scheme) and `README.md` (diagram).
 
 ---
 

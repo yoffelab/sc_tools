@@ -88,5 +88,20 @@ This journal documents the technical evolution and rationale behind **project-sp
 (Add dated entries for analysis decisions, parameter choices, and fixes specific to this project.)
 JOURNAL_EOF
 
+cat > "${PROJECT_ROOT}/journal_summary.md" << SUMMARY_EOF
+# Journal Summary: ${PROJECT_NAME} (${DATA_TYPE})
+
+Condensed summary of \`Journal.md\` for this project. Full entries are in \`Journal.md\`.
+
+## Project scope
+(One short paragraph.)
+
+## Recent phase
+(Bullets or one paragraph on latest decisions and outcomes.)
+
+## Key conventions
+(One line each if needed.)
+SUMMARY_EOF
+
 echo "Created project: ${PROJECT_ROOT}"
-echo "  with: ${SUBDIRS[*]}, Mission.md, Journal.md"
+echo "  with: ${SUBDIRS[*]}, Mission.md, Journal.md, journal_summary.md"

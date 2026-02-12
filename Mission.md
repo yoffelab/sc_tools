@@ -159,6 +159,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 ### Completed
 
+- **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
 - **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
 - **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.

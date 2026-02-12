@@ -7,8 +7,9 @@ This document outlines the directory structure, data flow, and script inventory.
 ```text
 .
 ├── Architecture.md         # System roadmap (this file)
-├── Mission.md              # Toolkit and pipeline (general); project-specific in projects/<type>/<name>/Mission.md
+├── Mission.md              # Todo list and roadmap (general); project-specific in projects/<type>/<name>/Mission.md
 ├── Journal.md              # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
+├── journal_summary.md      # Short summary of Journal.md for context; per-project under projects/<type>/<name>/
 ├── skills.md               # Mandatory coding and statistical standards
 ├── pyproject.toml          # Package build (sc_tools installable)
 ├── environment.yml         # Conda environment
@@ -39,7 +40,8 @@ This document outlines the directory structure, data flow, and script inventory.
 │   │       ├── outputs/    # Intermediate outputs (deconvolution logs, etc.)
 │   │       ├── tests/      # Project integration tests (pytest)
 │   │       ├── Mission.md
-│   │       └── Journal.md
+│   │       ├── Journal.md
+│   │       └── journal_summary.md
 │   ├── visium_hd/
 │   ├── xenium/
 │   ├── imc/

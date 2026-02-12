@@ -10,6 +10,10 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2025-02-12] - journal_summary.md and Mission-as-todo workflow
+- **Action:** (1) Introduced **journal_summary.md** at repo root and per project (lymph_dlbcl, ggo_visium). It holds a short summary of Journal.md so both serve as long-term memory while the summary shortens context. (2) Mission.md is the single **todo list** for progress; keep it updated with checkboxes and current status. (3) In **work mode** (executing tasks), the agent updates Mission.md after each prompt; in plan mode, optional. (4) Created skill `.cursor/skills/journal-and-mission-workflow/SKILL.md`, rule `.cursor/rules/journal-and-mission.mdc`, and added a reminder in Cursor User settings. (5) Updated Architecture.md and projects/README.md; create_project.sh now creates journal_summary.md for new projects.
+- **Rationale:** Shorter context via journal summary; consistent progress tracking via Mission; explicit workflow so the agent keeps Mission current when doing concrete work.
+
 ### [2025-02-11] - ggo_visium checkpoint migration to standard names
 - **Action:** Renamed checkpoint files in ggo_visium: adata.annotation.masked.h5ad → adata.annotated.p2.h5ad; adata_vg_filtered.h5ad → adata.normalized.p3.h5ad; adata.img.genescores.h5ad → adata.normalized.scored.p35.h5ad. Backed up originals to results/backup260211/. Updated all scripts (annotation2mask_img, preprocessing, score_gene_signatures, signature_heatmap*, manuscript_spatial_plots, tumor_differences, macrophage_localization, process_colocalization, tls_analysis, spatial_analysis, create_tls_anndata, spatial_multipage, celltype_deconvolution_phase3, test_cell2location_spots, basic_analysis, celltype_deconvolution_tangram) and Makefile to use new paths.
 - **Rationale:** Align ggo_visium with standard checkpoint nomenclature (Architecture.md Section 2).

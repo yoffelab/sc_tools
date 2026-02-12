@@ -11,10 +11,11 @@ Each project directory (e.g. `visium/ggo_visium/`) contains:
 - `results/` — Processed AnnData (.h5ad), CSVs
 - `outputs/` — Intermediate tool outputs (e.g. deconvolution logs)
 - `tests/` — Project integration tests (pytest)
-- `Mission.md` — Project-specific goals (study aims, tasks, blockers)
-- `Journal.md` — Project-specific analysis decision log (parameters, rationale, fixes)
+- `Mission.md` — Project todo list and roadmap (study aims, tasks, blockers); keep updated to track progress.
+- `Journal.md` — Project-specific analysis decision log (parameters, rationale, fixes).
+- `journal_summary.md` — Short summary of Journal.md for context; update when Journal gains new entries.
 
-Root `Mission.md` and `Journal.md` are for the toolkit and repo structure; project-specific aims (e.g. TLS, macrophage analysis for GGO Visium) live in each project's Mission and Journal.
+Root `Mission.md`, `Journal.md`, and `journal_summary.md` exist at repo root for the toolkit; each project has its own for study-specific work.
 
 ---
 

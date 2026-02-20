@@ -247,6 +247,61 @@ Scripts to build `results/adata.immune.*.h5ad` and `results/adata.stromal.*.h5ad
 
 ---
 
+## Step 5b: Seurat RDS to AnnData (h5ad)
+
+Convert downloaded Seurat `.rds` objects to AnnData `.h5ad` so they can be used in Python/Scanpy. The conversion uses **Seurat** and **SeuratDisk** in R and preserves metadata (e.g. `meta.data` → `obs`, reductions → `obsm`, assay data → `X`/layers).
+
+**Required R packages:** `Seurat`, `SeuratDisk` (install in R: `install.packages("Seurat")`, then `remotes::install_github("mojaveazure/SeuratDisk")` or as per [SeuratDisk](https://mojaveazure.github.io/seurat-disk/)).
+
+**Single file:** Run from the project root `projects/imc/lymph_dlbcl/`:
+
+```bash
+Rscript scripts/seurat_rds_to_h5ad.R <input.rds> <output.h5ad> [work_dir]
+```
+
+Example:
+
+```bash
+Rscript scripts/seurat_rds_to_h5ad.R data/downloaded/stroma_1_preprocessing/S1_seurat_SO.rds results/seurat_converted/S1_seurat_SO.h5ad .
+```
+
+The third argument `work_dir` is optional; if set (e.g. `.` for project root), paths are resolved relative to it.
+
+**Batch (all RDS under a directory):**
+
+```bash
+# Convert every .rds under data/downloaded (default), write to results/seurat_converted/
+./scripts/batch_seurat_to_h5ad.sh
+
+# Custom RDS root (e.g. data/downloads)
+./scripts/batch_seurat_to_h5ad.sh data/downloads
+
+# Only convert files listed in metadata/files_to_download_rds.csv
+./scripts/batch_seurat_to_h5ad.sh --list
+./scripts/batch_seurat_to_h5ad.sh data/downloaded --list
+```
+
+Converted h5ad files are written under **`results/seurat_converted/`**, preserving the relative path structure (e.g. `stroma_1_preprocessing/S1_seurat_SO.rds` → `results/seurat_converted/stroma_1_preprocessing/S1_seurat_SO.h5ad`).
+
+---
+
+## Step 5c: Summarize h5ad inventory (which files are raw vs processed, DLC_code, labels)
+
+After converting RDS to h5ad, run the inventory script to get a summary table of each h5ad: **n_obs**, **n_vars**, whether it has **DLC_code** (sample code), **labels** / **meta** (cell-type annotations), **obsm**/layers, and inferred **stage** (preprocessing / merged / spatial) and **panel** (stromal / immune / TME).
+
+```bash
+python scripts/summarize_h5ad_inventory.py [h5ad_root]
+```
+
+Default `h5ad_root` is `results/seurat_converted`. Outputs:
+
+- **`metadata/h5ad_inventory_summary.csv`** — Full table with all obs columns, obsm/layers, and inferred_content from the RDS runbook.
+- **`metadata/h5ad_inventory_summary.md`** — Markdown summary table and short guide on which files are full (raw) vs subset/processed, which have sample codes, and which have cell-type labels.
+
+Use the CSV to compare **n_obs × n_vars** across files (unfiltered vs filtered), and filter by **has_DLC_code** or **has_labels** / **has_meta** to pick the most useful objects for downstream analysis.
+
+---
+
 ## Traceability
 
 - **Listing:** Keep `metadata/remote_csv_listing.txt` as the raw input (or document where it came from and the exact remote command in Journal.md).

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 DEG per sample (1 vs rest within user-defined sets) using a normalized+log1p view of adata.raw.X.
 - Keeps ALL genes (no HVG filter)
@@ -6,13 +5,14 @@ DEG per sample (1 vs rest within user-defined sets) using a normalized+log1p vie
 - Dotplot per compartment (epithelial, stromal, immune)
 """
 
+import warnings
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import scanpy as sc
-import warnings
 from scipy import sparse
 
 # -----------------------------
@@ -21,7 +21,7 @@ from scipy import sparse
 ADATA_PATH = Path("results/scvi.leiden.phenotyped.h5ad")
 cluster_key: str = "cluster"
 library_id_key: str = "library_id"
-library_ids: Dict[str, List[str]] = {
+library_ids: dict[str, list[str]] = {
     "P1_NAT": ["PT01-1_NAT", "PT01-3_NAT", "PT01-5_NAT"],
     "P1_TUM": ["PT01-2_TUM", "PT01-4_TUM", "PT01-6_TUM"],
     "P3_NAT": ["P3_S1_BL_NT_1_iF10_S7"],
@@ -32,9 +32,9 @@ library_ids: Dict[str, List[str]] = {
 }
 
 # DEG parameters
-DE_METHOD = "wilcoxon"          # robust and common with log1p data
+DE_METHOD = "wilcoxon"  # robust and common with log1p data
 PADJ_MAX = 0.05
-MIN_ABS_LOGFC = 0.5             # on log1p scale; adjust if needed
+MIN_ABS_LOGFC = 0.5  # on log1p scale; adjust if needed
 N_TOP = 5
 
 # Plot parameters
@@ -44,36 +44,66 @@ DOTSIZE_MIN, DOTSIZE_MAX = 40, 300
 OUT_DIR = Path("figures")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+
 # -----------------------------
 # Utilities
 # -----------------------------
 def _compartment(label: str) -> str:
     l = label.lower()
-    if any(k in l for k in [
-        "enterocyte", "goblet", "enteroendocrine", "crypt stem", "regenerative",
-        "neuroendocrine", "metabolic / stress", "weak epithelial", "epithelium", "tumor"
-    ]):
+    if any(
+        k in l
+        for k in [
+            "enterocyte",
+            "goblet",
+            "enteroendocrine",
+            "crypt stem",
+            "regenerative",
+            "neuroendocrine",
+            "metabolic / stress",
+            "weak epithelial",
+            "epithelium",
+            "tumor",
+        ]
+    ):
         return "epithelial"
-    if any(k in l for k in ["fibroblast", "smooth muscle", "pericyte", "ecm mix", "matrix remodeling", "ecm high"]):
+    if any(
+        k in l
+        for k in [
+            "fibroblast",
+            "smooth muscle",
+            "pericyte",
+            "ecm mix",
+            "matrix remodeling",
+            "ecm high",
+        ]
+    ):
         return "stromal"
-    if any(k in l for k in ["b cell", "plasma", "gc", "myeloid", "mast", "nk", "t cell", "dendritic"]):
+    if any(
+        k in l for k in ["b cell", "plasma", "gc", "myeloid", "mast", "nk", "t cell", "dendritic"]
+    ):
         return "immune"
     return "unknown"
+
 
 def _validate(adata: sc.AnnData) -> None:
     assert cluster_key in adata.obs, f"obs lacks {cluster_key}"
     assert library_id_key in adata.obs, f"obs lacks {library_id_key}"
-    assert adata.raw is not None and adata.raw.shape[1] > 0, "adata.raw is required and must contain genes"
+    assert adata.raw is not None and adata.raw.shape[1] > 0, (
+        "adata.raw is required and must contain genes"
+    )
     if not pd.api.types.is_categorical_dtype(adata.obs[cluster_key]):
         adata.obs[cluster_key] = adata.obs[cluster_key].astype("category")
     adata.obs[library_id_key] = adata.obs[library_id_key].astype(str)
 
+
 def _mask_compartment(adata: sc.AnnData, comp: str) -> np.ndarray:
     return adata.obs[cluster_key].astype(str).map(_compartment).values == comp
 
-def _subset_present_samples(adata: sc.AnnData, desired: Sequence[str]) -> List[str]:
+
+def _subset_present_samples(adata: sc.AnnData, desired: Sequence[str]) -> list[str]:
     present = set(adata.obs[library_id_key].unique().tolist())
     return [s for s in desired if s in present]
+
 
 def _normalized_log1p_view_from_raw(A: sc.AnnData) -> sc.AnnData:
     """
@@ -93,6 +123,7 @@ def _normalized_log1p_view_from_raw(A: sc.AnnData) -> sc.AnnData:
     sc.pp.log1p(B)  # natural log(1 + normalized)
     return B
 
+
 def _rank_genes_1vRest_normlog(
     As: sc.AnnData,
     groupby: str,
@@ -111,14 +142,15 @@ def _rank_genes_1vRest_normlog(
         groups=[target_group],
         reference="rest",
         method=DE_METHOD,
-        use_raw=False,             # we already put norm+log in X
-        n_genes=B.shape[1],        # all genes
+        use_raw=False,  # we already put norm+log in X
+        n_genes=B.shape[1],  # all genes
     )
     df = sc.get.rank_genes_groups_df(B, group=target_group)
     keep = ["names", "logfoldchanges", "scores", "pvals_adj"]
     df = df[[c for c in keep if c in df.columns]]
     df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=["logfoldchanges", "pvals_adj"])
     return df
+
 
 def _percent_expressing_raw(A: sc.AnnData, sample_name: str, genes: Sequence[str]) -> pd.Series:
     """
@@ -137,14 +169,15 @@ def _percent_expressing_raw(A: sc.AnnData, sample_name: str, genes: Sequence[str
     s = pd.Series(pct, index=A.raw.var_names)
     return s.reindex(genes)
 
+
 def _collect_deg_for_compartment(
     adata: sc.AnnData,
     comp: str,
-    library_sets: Dict[str, List[str]],
+    library_sets: dict[str, list[str]],
     n_top: int = N_TOP,
     padj_max: float = PADJ_MAX,
     min_abs_logfc: float = MIN_ABS_LOGFC,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     For a compartment:
       - For each user set with >= 2 samples, run 1vRest per sample on a norm+log view of raw
@@ -158,8 +191,8 @@ def _collect_deg_for_compartment(
     A = adata[mask].copy()
     A.obs[library_id_key] = A.obs[library_id_key].astype(str).astype("category")
 
-    sample2genes: Dict[str, List[str]] = {}
-    lfc_store: Dict[Tuple[str, str], float] = {}
+    sample2genes: dict[str, list[str]] = {}
+    lfc_store: dict[tuple[str, str], float] = {}
 
     for set_name, samples in library_sets.items():
         samples_present = _subset_present_samples(A, samples)
@@ -170,11 +203,26 @@ def _collect_deg_for_compartment(
 
         for samp in samples_present:
             df = _rank_genes_1vRest_normlog(As, groupby=library_id_key, target_group=samp)
-            sig = df[(df["pvals_adj"] <= padj_max) & (df["logfoldchanges"].abs() >= min_abs_logfc)].copy()
+            sig = df[
+                (df["pvals_adj"] <= padj_max) & (df["logfoldchanges"].abs() >= min_abs_logfc)
+            ].copy()
             if sig.empty:
                 continue
             # Remove unwanted genes before selecting top N
-            bad_prefixes = ("RPS", "RPL", "MT-", "MT_", "HB", "HBA", "HBB", "HBD", "HBG", "HBM", "HBQ", "HBZ")
+            bad_prefixes = (
+                "RPS",
+                "RPL",
+                "MT-",
+                "MT_",
+                "HB",
+                "HBA",
+                "HBB",
+                "HBD",
+                "HBG",
+                "HBM",
+                "HBQ",
+                "HBZ",
+            )
             sig = sig[~sig["names"].str.upper().str.startswith(bad_prefixes)]
 
             # Now pick top N from filtered genes
@@ -185,7 +233,7 @@ def _collect_deg_for_compartment(
             sample2genes[samp] = genes
             for g, lfc in zip(sig["names"], sig["logfoldchanges"]):
                 lfc_store[(str(g), samp)] = float(lfc)
-    
+
     if not sample2genes:
         return pd.DataFrame(), pd.DataFrame()
 
@@ -208,7 +256,20 @@ def _collect_deg_for_compartment(
     df_pct = df_pct.clip(lower=5.0, upper=100.0)
 
     # --- NEW BLOCK 1: remove ribosomal, mitochondrial, and hemoglobin genes ---
-    bad_prefixes = ("RPS", "RPL", "MT-", "MT_", "HB", "HBA", "HBB", "HBD", "HBG", "HBM", "HBQ", "HBZ")
+    bad_prefixes = (
+        "RPS",
+        "RPL",
+        "MT-",
+        "MT_",
+        "HB",
+        "HBA",
+        "HBB",
+        "HBD",
+        "HBG",
+        "HBM",
+        "HBQ",
+        "HBZ",
+    )
     mask_valid = ~df_lfc.index.str.upper().str.startswith(bad_prefixes)
     df_lfc = df_lfc.loc[mask_valid]
     df_pct = df_pct.loc[mask_valid]
@@ -234,7 +295,7 @@ def _dotplot_from_tables(
     title: str,
     out_png: Path,
     cmap: str = DOT_CMAP,
-    figsize: Tuple[int, int] = FIGSIZE,
+    figsize: tuple[int, int] = FIGSIZE,
     dot_min: float = DOTSIZE_MIN,
     dot_max: float = DOTSIZE_MAX,
 ) -> None:
@@ -261,8 +322,17 @@ def _dotplot_from_tables(
     xs, ys = xs[mask], ys[mask]
 
     fig, ax = plt.subplots(figsize=figsize)
-    sca = ax.scatter(xs, ys, c=V[mask], s=sizes[mask], cmap=cmap, vmin=vmin, vmax=vmax,
-                     edgecolors="none", alpha=0.95)
+    sca = ax.scatter(
+        xs,
+        ys,
+        c=V[mask],
+        s=sizes[mask],
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        edgecolors="none",
+        alpha=0.95,
+    )
     ax.set_xticks(np.arange(df_lfc.shape[1]))
     ax.set_xticklabels(df_lfc.columns.tolist(), rotation=90)
     ax.set_yticks(np.arange(df_lfc.shape[0]))
@@ -276,17 +346,23 @@ def _dotplot_from_tables(
     cbar.set_label("log fold change (1 vs rest; norm+log1p)")
 
     for p in [25, 50, 75, 100]:
-        plt.scatter([], [], s=dot_min + (p/100)*(dot_max - dot_min), c="k", label=f"{p}%")
-    ax.legend(scatterpoints=1, frameon=False, title="% expressing",
-              loc="upper right", bbox_to_anchor=(1.22, 1.0))
+        plt.scatter([], [], s=dot_min + (p / 100) * (dot_max - dot_min), c="k", label=f"{p}%")
+    ax.legend(
+        scatterpoints=1,
+        frameon=False,
+        title="% expressing",
+        loc="upper right",
+        bbox_to_anchor=(1.22, 1.0),
+    )
 
     for i, sample in enumerate(df_lfc.columns):
         if i % 2 == 0:
-            ax.axvspan(i - 0.5, i + 0.5, color='lightgrey', alpha=0.1, zorder=0)
+            ax.axvspan(i - 0.5, i + 0.5, color="lightgrey", alpha=0.1, zorder=0)
 
     fig.tight_layout()
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close()
+
 
 # -----------------------------
 # Main
@@ -297,12 +373,14 @@ def main():
 
     jobs = [
         ("epithelial", OUT_DIR / "deg_dotplot_epithelial.png"),
-        ("stromal",    OUT_DIR / "deg_dotplot_stromal.png"),
-        ("immune",     OUT_DIR / "deg_dotplot_immune.png"),
+        ("stromal", OUT_DIR / "deg_dotplot_stromal.png"),
+        ("immune", OUT_DIR / "deg_dotplot_immune.png"),
     ]
 
     for comp, out_png in jobs:
-        print(f"[{comp}] DE on normalized+log1p view of adata.raw.X; selecting up to {N_TOP} significant genes per sample")
+        print(
+            f"[{comp}] DE on normalized+log1p view of adata.raw.X; selecting up to {N_TOP} significant genes per sample"
+        )
         df_lfc, df_pct = _collect_deg_for_compartment(
             adata=adata,
             comp=comp,
@@ -312,7 +390,9 @@ def main():
             min_abs_logfc=MIN_ABS_LOGFC,
         )
         if df_lfc.empty:
-            print(f"[{comp}] no significant genes found (given thresholds) or no sets with >=2 samples. Skipping.")
+            print(
+                f"[{comp}] no significant genes found (given thresholds) or no sets with >=2 samples. Skipping."
+            )
             continue
 
         base = out_png.with_suffix("")
@@ -328,6 +408,7 @@ def main():
             figsize=FIGSIZE,
         )
         print(f"[{comp}] saved {out_png}")
+
 
 if __name__ == "__main__":
     main()

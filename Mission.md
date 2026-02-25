@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2025-02-09
+**Last Updated:** 2025-02-12
 
 ---
 
@@ -88,7 +88,7 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
 
-- [ ] **Gene signature storage (TODO):** Store scores in **`adata.obsm['sig:hallmark']`** for Hallmark processes; for each project-specific `metadata/{signature_name}.json`, store in **`adata.obsm['sig:{signature_name}']`**. Do not default to storing in `adata.obs`; use `obsm` for signature matrices.
+- [x] **Gene signature storage:** Implemented in `sc_tools.tl.score_signature`. Scores stored in **`obsm['signature_score']`** and **`obsm['signature_score_z']`** (single flat key; full-path column names). Report in `uns['signature_score_report']`. Downstream use `get_signature_df(adata)` / `get_signature_columns(adata)` (obsm-first, fallback to obs).
 - [ ] **Always apply:** Basic gene sets (e.g. Hallmark) plus any signatures provided in project `metadata/*.json`.
 - [ ] Automated cell typing (cluster → celltype); non-transformer and transformer models.
 - [ ] Optional cell-type deconvolution (Tangram, Cell2location, DestVI; batch per library/sample).
@@ -159,6 +159,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 ### Completed
 
+- **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
 - **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
 - **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
@@ -166,6 +167,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Makefile project-aware:** `PROJECT ?= projects/visium/ggo_visium`; paths use `$(PROJECT)/...`.
 - **Metadata moved:** Root `metadata/` moved to `projects/visium/ggo_visium/metadata/`.
 - **Legacy merged:** `scripts/old_code/` (read-only reference).
+- **Spatial multipage refactor (ggo_visium):** Logic moved from repo-root `scripts/spatial_multipage.py` into `projects/visium/ggo_visium/scripts/spatial_multipage_colocalization.py` using sc_tools: scores from obsm via `get_signature_df`, `multipage_spatial_pdf` and `truncated_similarity` in sc_tools; outputs to `figures/manuscript/macrophage_localization/` and `figures/manuscript/neutrophil_cytotoxic_tcell_localization/`. Repo-root script deprecated (docstring). Makefile target: `make spatial-multipage-colocalization`.
 
 ### In Progress — Next immediate steps
 
@@ -178,6 +180,18 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - [ ] Align Makefile targets with Phases 1–7 (see README Pipeline Workflow).
 - [ ] Update scripts to use `$(PROJECT)/metadata/` instead of `metadata/`. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
 - [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
+
+### CI/CD Roadmap (order: 1 → 2 → 3 → 4 → 5)
+
+Work through in sequence; each builds on the previous. See **skills.md** Section 11 and 15. **GitHub Actions last** (testing setup will be complex).
+
+1. **[x] Linting** — Ruff configured in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check` on `sc_tools`; all violations fixed. Scripts/ to be added once fixed.
+2. **[ ] Nextflow adoption** — Create Nextflow pipeline (`.nf` / `main.nf`) that implements the phase-dependent workflow (Phases 1–7); preserve checkpoint names and entry points from Architecture.md. Do this early so porting from Makefile is easier; Makefile may coexist during migration. Nextflow chosen for scalability and reproducibility. **Containerization:** Use Docker for local runs and Singularity/Apptainer for HPC. Auto-configure based on environment: detect local vs HPC and select Docker or Singularity accordingly (e.g. `nextflow.config` or profile). Define pipeline container image(s); publish to registry (Docker Hub, GHCR) for HPC pull.
+3. **[ ] Sphinx API docs** — Add `docs/` with Sphinx, autodoc for `sc_tools`; `make docs` or equivalent; document where built docs live.
+4. **[ ] PyPI deployment** — Ensure `pyproject.toml` builds wheel/sdist; add GitHub Action to publish to PyPI on release (trusted publishing or secrets); no credentials in repo.
+5. **[ ] GitHub Actions** — `.github/workflows/tests.yml` runs lint + pytest + Nextflow validation; fail on push/PR if any step fails. Last, because testing setup is complex.
+
+**Status:** Linting (1) done. Next: Nextflow (2).
 
 ### To Do (later)
 

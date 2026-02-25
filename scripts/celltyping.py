@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Single JSON mapping for VisiumHD:
 - Load metadata/cluster_map_with_color.json which maps leiden -> {cluster_key, cluster_color}
@@ -8,13 +7,14 @@ Single JSON mapping for VisiumHD:
 - Export DE CSVs for both keys
 """
 
-from pathlib import Path
 import json
 import re
-from typing import Dict, Sequence
-import scanpy as sc
-import pandas as pd
+from collections.abc import Sequence
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import pandas as pd
+import scanpy as sc
 
 # -----------------------------
 # Configuration
@@ -43,22 +43,25 @@ MIN_LFC_FOR_DISPLAY = 4
 DE_METHOD = "wilcoxon"  # or "wilcoxon"
 USE_RAW = False
 
+
 # -----------------------------
 # JSON IO
 # -----------------------------
-def read_mapping_json(path: Path) -> Dict:
+def read_mapping_json(path: Path) -> dict:
     with path.open("r") as f:
         return json.load(f)
 
+
 def _is_hex_color(s: str) -> bool:
     return bool(re.fullmatch(r"#([0-9a-fA-F]{6})", s or ""))
+
 
 # -----------------------------
 # Mapping and color logic
 # -----------------------------
 def apply_leiden_mapping(
     adata,
-    mapping: Dict,
+    mapping: dict,
     leiden_key: str = LEIDEN_KEY,
     cluster_key: str = CLUSTER_KEY,
 ) -> None:
@@ -71,7 +74,7 @@ def apply_leiden_mapping(
     unknown_color = defaults.get("unknown_color", "#cccccc")
 
     # Validate entries and build label->color map
-    label_to_color: Dict[str, str] = {}
+    label_to_color: dict[str, str] = {}
     missing_entries = []
     color_conflicts = []
 
@@ -97,7 +100,9 @@ def apply_leiden_mapping(
             label_to_color[label] = color
 
     if missing_entries:
-        print(f"Warning: missing mapping for leiden levels {missing_entries}. They will be set to '{unknown_label}'.")
+        print(
+            f"Warning: missing mapping for leiden levels {missing_entries}. They will be set to '{unknown_label}'."
+        )
 
     if color_conflicts:
         print("Warning: color conflicts detected for the following labels. First color kept:")
@@ -112,16 +117,12 @@ def apply_leiden_mapping(
         label = entry.get("cluster_key")
         return label if isinstance(label, str) and label else unknown_label
 
-    adata.obs[cluster_key] = adata.obs[leiden_key].astype(str).map(_label_for_level).astype("category")
+    adata.obs[cluster_key] = (
+        adata.obs[leiden_key].astype(str).map(_label_for_level).astype("category")
+    )
 
     # Order categories by frequency
-    ordered = (
-        adata.obs[cluster_key]
-        .value_counts()
-        .sort_values(ascending=False)
-        .index
-        .tolist()
-    )
+    ordered = adata.obs[cluster_key].value_counts().sort_values(ascending=False).index.tolist()
     adata.obs[cluster_key] = adata.obs[cluster_key].cat.reorder_categories(ordered)
 
     # Build palette aligned to ordered categories
@@ -130,6 +131,7 @@ def apply_leiden_mapping(
         color = label_to_color.get(label, unknown_color)
         palette.append(color)
     adata.uns[f"{cluster_key}_colors"] = palette
+
 
 # -----------------------------
 # Plotting
@@ -144,6 +146,7 @@ def plot_umap(adata, keys: Sequence[str], out_png: Path) -> None:
     )
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close()
+
 
 def plot_spatial_by_library(adata, color_key: str, out_dir: Path) -> None:
     assert "library_id" in adata.obs, "obs lacks library_id required for VisiumHD spatial plotting"
@@ -162,12 +165,15 @@ def plot_spatial_by_library(adata, color_key: str, out_dir: Path) -> None:
         except Exception as e:
             print(f"Skip spatial plot for library {lib} and key {color_key} due to: {e}")
 
+
 # -----------------------------
 # Differential expression and matrixplot
 # -----------------------------
 def run_de(adata, groupby: str) -> None:
     assert groupby in adata.obs, f"obs lacks {groupby}"
-    assert pd.api.types.is_categorical_dtype(adata.obs[groupby]), f"obs['{groupby}'] must be categorical"
+    assert pd.api.types.is_categorical_dtype(adata.obs[groupby]), (
+        f"obs['{groupby}'] must be categorical"
+    )
     sc.tl.rank_genes_groups(
         adata,
         groupby=groupby,
@@ -176,10 +182,12 @@ def run_de(adata, groupby: str) -> None:
         method=DE_METHOD,
     )
 
+
 def export_de_csv(adata, groupby: str, out_csv: Path) -> None:
     cats = list(adata.obs[groupby].cat.categories)
     df = sc.get.rank_genes_groups_df(adata, group=cats)
     df.to_csv(out_csv, index=False)
+
 
 def save_matrixplot(adata, groupby: str, out_png: Path) -> None:
     sc.pl.rank_genes_groups_matrixplot(
@@ -197,6 +205,7 @@ def save_matrixplot(adata, groupby: str, out_png: Path) -> None:
     plt.savefig(out_png, dpi=300, bbox_inches="tight")
     plt.close()
 
+
 # -----------------------------
 # Main
 # -----------------------------
@@ -208,7 +217,11 @@ def main():
     apply_leiden_mapping(adata, mapping, leiden_key=LEIDEN_KEY, cluster_key=CLUSTER_KEY)
 
     # UMAP and spatial for both keys
-    plot_umap(adata, keys=[LEIDEN_KEY, CLUSTER_KEY], out_png=FIG_DIR / f"umap_{LEIDEN_KEY}_and_{CLUSTER_KEY}.png")
+    plot_umap(
+        adata,
+        keys=[LEIDEN_KEY, CLUSTER_KEY],
+        out_png=FIG_DIR / f"umap_{LEIDEN_KEY}_and_{CLUSTER_KEY}.png",
+    )
     plot_umap(adata, keys=[LEIDEN_KEY], out_png=FIG_DIR / f"umap_{LEIDEN_KEY}.png")
     plot_umap(adata, keys=[CLUSTER_KEY], out_png=FIG_DIR / f"umap_{CLUSTER_KEY}.png")
     plot_spatial_by_library(adata, color_key=LEIDEN_KEY, out_dir=SPATIAL_DIR)
@@ -218,7 +231,9 @@ def main():
     for key in PROCESS_KEYS:
         run_de(adata, groupby=key)
         export_de_csv(adata, groupby=key, out_csv=META_DIR / f"{key}_rank_genes.csv")
-        save_matrixplot(adata, groupby=key, out_png=FIG_DIR / f"rank_gene_group_matrixplot_{key}.png")
+        save_matrixplot(
+            adata, groupby=key, out_png=FIG_DIR / f"rank_gene_group_matrixplot_{key}.png"
+        )
 
     print("Done.")
     print(f"- UMAP: {FIG_DIR / f'umap_{LEIDEN_KEY}_and_{CLUSTER_KEY}.png'}")
@@ -227,5 +242,7 @@ def main():
         print(f"- DE CSV: {META_DIR / f'{key}_rank_genes.csv'}")
         print(f"- Matrixplot: {FIG_DIR / f'rank_gene_group_matrixplot_{key}.png'}")
     adata.write(ADATA_OUT_PATH)
+
+
 if __name__ == "__main__":
     main()

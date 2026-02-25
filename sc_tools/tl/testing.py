@@ -7,18 +7,17 @@ Provides functions for:
 - Other statistical tests
 """
 
+import numpy as np
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
-from typing import List, Tuple, Optional
-import numpy as np
-import pandas as pd
 
 
-def mwu(data1: np.ndarray, data2: np.ndarray, 
-        alternative: str = 'two-sided') -> Tuple[float, float]:
+def mwu(
+    data1: np.ndarray, data2: np.ndarray, alternative: str = "two-sided"
+) -> tuple[float, float]:
     """
     Perform Mann-Whitney U test.
-    
+
     Parameters
     ----------
     data1 : array-like
@@ -27,7 +26,7 @@ def mwu(data1: np.ndarray, data2: np.ndarray,
         Second sample
     alternative : str
         Alternative hypothesis: 'two-sided', 'less', or 'greater'
-    
+
     Returns
     -------
     tuple
@@ -37,12 +36,12 @@ def mwu(data1: np.ndarray, data2: np.ndarray,
     return statistic, pvalue
 
 
-def fdr_correction(pvalues: np.ndarray, 
-                   method: str = 'fdr_bh',
-                   alpha: float = 0.05) -> Tuple[np.ndarray, np.ndarray, float, float]:
+def fdr_correction(
+    pvalues: np.ndarray, method: str = "fdr_bh", alpha: float = 0.05
+) -> tuple[np.ndarray, np.ndarray, float, float]:
     """
     Apply FDR (False Discovery Rate) correction using Benjamini-Hochberg method.
-    
+
     Parameters
     ----------
     pvalues : array-like
@@ -51,7 +50,7 @@ def fdr_correction(pvalues: np.ndarray,
         Correction method ('fdr_bh' for Benjamini-Hochberg)
     alpha : float
         Significance level
-    
+
     Returns
     -------
     tuple
@@ -63,4 +62,4 @@ def fdr_correction(pvalues: np.ndarray,
     return rejected, pvals_corrected, alpha_sidak, alpha_bonf
 
 
-__all__ = ['mwu', 'fdr_correction']
+__all__ = ["mwu", "fdr_correction"]

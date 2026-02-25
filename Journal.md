@@ -10,6 +10,30 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-02-17] - Docker + conda + UV integration; project_setup.md
+- **Action:** (1) Switched Dockerfile base from `python:3.10-slim` to `continuumio/miniconda3`; added conda env `sc_tools` with Python 3.10. (2) Install sc_tools via `uv pip install --python /opt/conda/envs/sc_tools/bin/python -e ".[deconvolution]"` (uv requires explicit --python for conda envs). (3) ENV PATH set to conda env bin so CMD/bash use sc_tools env. (4) Created `project_setup.md` at repo root: build, run, per-project table (ggo_visium, robin, lymph_dlbcl), local dev, verification. (5) Renamed `environment.yml` env from ggo_visium to sc_tools. (6) Added `run_docker.sh` for Robin. (7) run_docker.sh header note; README links to project_setup.md.
+- **Rationale:** Conda env sc_tools inside container for HPC/consistency; single image + runtime project selection; UV for fast install; project_setup.md centralizes setup docs.
+
+### [2026-02-17] - Signature scoring: obsm-based API (Option B single flat key)
+- **Action:** (1) Added `sc_tools.tl.score_signature` to score two-level JSON signatures with scanpy `score_genes`, storing raw and z-scored matrices in `obsm['signature_score']` and `obsm['signature_score_z']` with full-path column names (e.g. Myeloid/Macrophage_Core) for traceability. Report in `uns['signature_score_report']`. (2) Extended `sc_tools.utils.signatures`: `get_signature_columns_from_obsm`, `get_signature_df`, and `get_signature_columns` now prefer obsm when present. (3) Updated `sc_tools.tl.colocalization` and `sc_tools.pl.heatmaps` to use `get_signature_df(adata)` so downstream works with obsm or obs. (4) Robin: `run_signature_scoring.py` (p3 -> p35); ggo_visium: project `score_gene_signatures.py` uses sc_tools; Makefiles point p35 to these scripts. (5) Architecture.md Section 2.2 updated for p35 obsm key names and report.
+- **Rationale:** Single flat obsm key gives one place to look and full-path column names for traceability; backward compatibility via get_signature_df fallback to obs.
+
+### [2025-02-12] - Docker/Singularity for Nextflow pipeline; auto-config local vs HPC
+- **Action:** Updated skills.md and Mission.md to require containerization for the Nextflow pipeline. Use **Docker** for local runs and **Singularity/Apptainer** for HPC. Pipeline must **auto-configure** based on environment: detect local (Docker available) vs HPC (Singularity available) and select the appropriate executor. Define container image(s); publish to registry for HPC pull.
+- **Rationale:** Environment parity across local and HPC; reproducibility; HPC typically provides Singularity, not Docker; local dev uses Docker.
+
+### [2025-02-12] - Switch from Snakemake to Nextflow
+- **Action:** Reverted Snakemake adoption; adopted **Nextflow** instead for the phase-dependent pipeline (Phases 1–7). Updated Mission.md, skills.md, journal_summary.md. Nextflow chosen for scalability and reproducibility.
+- **Rationale:** Nextflow offers better scalability (cloud, HPC), built-in Docker/Singularity support, and a strong reproducibility story; aligns with skills.md Workflow Managers.
+
+### [2025-02-12] - Ruff linting workflow
+- **Action:** (1) Added Ruff to `pyproject.toml` dev deps and `[tool.ruff]` config (line-length 100, select E/W/F/I/B/C4/UP, ignore E501/B008/E741/E402). (2) Ran `ruff format` and `ruff check --fix` on sc_tools; fixed B007, B905, F841, C408 violations; E741 (Moran's I) and E402 (imports) ignored for scientific scripts. (3) Root `Makefile` added with `make lint` (ruff check + format --check) and `make format`; `make test` placeholder. (4) sc_tools passes lint; scripts/ has many violations, to be added incrementally.
+- **Rationale:** CI/CD Roadmap item 1; ensure code compiles, passes lint, and runs before commit (skills.md).
+
+### [2025-02-12] - Snakemake adoption and CI/CD roadmap
+- **Action:** (1) Updated skills.md Section 11 to **adopt Snakemake** for the phase-dependent pipeline (Phases 1–7); existing phase workflow maps to Snakemake rules; Makefile may coexist during migration; Snakemake runs in CI (dry-run or fixtures). (2) Added Snakemake to Section 15 CI (optional step in GitHub Actions). (3) Added CI/CD Roadmap to Mission.md with ordered checklist: 1 Linting, 2 GitHub Actions, 3 Snakemake adoption, 4 Sphinx, 5 PyPI. (4) Added snakemake to Appendix (CI/CD, Linting & Docs).
+- **Rationale:** Align with skills.md Workflow Managers; adopt the documented phase workflow as Snakemake for reproducibility and CI validation; provide clear implementation order.
+
 ### [2025-02-12] - journal_summary.md and Mission-as-todo workflow
 - **Action:** (1) Introduced **journal_summary.md** at repo root and per project (lymph_dlbcl, ggo_visium). It holds a short summary of Journal.md so both serve as long-term memory while the summary shortens context. (2) Mission.md is the single **todo list** for progress; keep it updated with checkboxes and current status. (3) In **work mode** (executing tasks), the agent updates Mission.md after each prompt; in plan mode, optional. (4) Created skill `.cursor/skills/journal-and-mission-workflow/SKILL.md`, rule `.cursor/rules/journal-and-mission.mdc`, and added a reminder in Cursor User settings. (5) Updated Architecture.md and projects/README.md; create_project.sh now creates journal_summary.md for new projects.
 - **Rationale:** Shorter context via journal summary; consistent progress tracking via Mission; explicit workflow so the agent keeps Mission current when doing concrete work.

@@ -9,35 +9,38 @@ is a list of hex strings (one per category in order). If missing, we create
 and store it so all plotting stays consistent.
 """
 
-from typing import Optional, List, Dict, Tuple, Union, Any
+from typing import Any
+
+import matplotlib.colors as mcolors
+
+from sc_tools.utils.signatures import get_signature_df
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.patches import Patch
 import seaborn as sns
-from scipy.cluster.hierarchy import linkage, leaves_list
+from matplotlib.patches import Patch
+from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import pdist
 
 __all__ = [
-    'hex_to_rgb',
-    'get_obs_category_colors',
-    'cluster_within_groups',
-    'annotation_colors_from_categories',
-    'signature_score_heatmap',
+    "hex_to_rgb",
+    "get_obs_category_colors",
+    "cluster_within_groups",
+    "annotation_colors_from_categories",
+    "signature_score_heatmap",
 ]
 
 
 # Defaults
-DEFAULT_CLUSTER_METHOD = 'average'
-DEFAULT_CLUSTER_METRIC = 'euclidean'
+DEFAULT_CLUSTER_METHOD = "average"
+DEFAULT_CLUSTER_METRIC = "euclidean"
 DEFAULT_HEATMAP_FIGSIZE = (16, 12)
 DEFAULT_CLUSTERMAP_FIGSIZE = (18, 14)
 DEFAULT_DENDROGRAM_RATIO = 0.1
 DEFAULT_VMIN, DEFAULT_VMAX = -3, 3
 
 
-def hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
+def hex_to_rgb(hex_color: str) -> tuple[float, float, float]:
     """
     Convert hex color to RGB tuple in (0, 1) range.
 
@@ -51,7 +54,7 @@ def hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
     tuple
         (r, g, b) in [0, 1].
     """
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     if len(hex_color) != 6:
         return (0.8, 0.8, 0.8)
     return tuple(int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
@@ -61,7 +64,7 @@ def get_obs_category_colors(
     adata,
     obs_col: str,
     store_if_missing: bool = True,
-) -> Optional[Dict[Any, Tuple[float, float, float]]]:
+) -> dict[Any, tuple[float, float, float]] | None:
     """
     Get category -> RGB color mapping for a categorical obs column using the
     scanpy convention: adata.uns[f'{obs_col}_colors'] is a list of hex strings
@@ -94,7 +97,7 @@ def get_obs_category_colors(
     uns_key = f"{obs_col}_colors"
     existing = adata.uns.get(uns_key)
     if existing is not None and len(existing) == n:
-        return {cat: hex_to_rgb(h) for cat, h in zip(categories, existing)}
+        return {cat: hex_to_rgb(h) for cat, h in zip(categories, existing, strict=True)}
     # Create default palette (hex list, category order)
     if n <= 12:
         palette = sns.color_palette("Set3", n)
@@ -103,7 +106,7 @@ def get_obs_category_colors(
     hex_list = [mcolors.to_hex(c) for c in palette]
     if store_if_missing:
         adata.uns[uns_key] = hex_list
-    return {cat: hex_to_rgb(h) for cat, h in zip(categories, hex_list)}
+    return {cat: hex_to_rgb(h) for cat, h in zip(categories, hex_list, strict=True)}
 
 
 def cluster_within_groups(
@@ -157,9 +160,9 @@ def cluster_within_groups(
 
 def annotation_colors_from_categories(
     annotations: pd.DataFrame,
-    column_colors: Optional[Dict[str, Dict[str, Tuple[float, float, float]]]] = None,
-    default_hex: Optional[Dict[str, str]] = None,
-) -> Dict[str, List[Tuple[float, float, float]]]:
+    column_colors: dict[str, dict[str, tuple[float, float, float]]] | None = None,
+    default_hex: dict[str, str] | None = None,
+) -> dict[str, list[tuple[float, float, float]]]:
     """
     Build per-column color lists (RGB) for annotation bars.
 
@@ -188,8 +191,8 @@ def annotation_colors_from_categories(
             pal_hex = default_hex[col]
             pal = {k: hex_to_rgb(v) for k, v in pal_hex.items()}
         else:
-            pal_list = sns.color_palette('Set3', len(unique_vals))
-            pal = dict(zip(unique_vals, pal_list))
+            pal_list = sns.color_palette("Set3", len(unique_vals))
+            pal = dict(zip(unique_vals, pal_list, strict=True))
         colors = [pal.get(v, default_gray) for v in annotations[col]]
         out[col] = colors
 
@@ -198,19 +201,19 @@ def annotation_colors_from_categories(
 
 def signature_score_heatmap(
     adata,
-    sig_columns: List[str],
-    annotation_cols: Dict[str, str],
-    sort_by: List[str],
-    category_orders: Optional[Dict[str, List]] = None,
+    sig_columns: list[str],
+    annotation_cols: dict[str, str],
+    sort_by: list[str],
+    category_orders: dict[str, list] | None = None,
     cluster: bool = False,
-    sig_prefix: str = 'sig:',
-    sig_suffix: str = '_z',
+    sig_prefix: str = "sig:",
+    sig_suffix: str = "_z",
     vmin: float = DEFAULT_VMIN,
     vmax: float = DEFAULT_VMAX,
-    figsize: Optional[Tuple[float, float]] = None,
-    solidity_colors_hex: Optional[Dict[str, str]] = None,
-    legend_title: Optional[str] = None,
-) -> Tuple[plt.Figure, Optional[Any]]:
+    figsize: tuple[float, float] | None = None,
+    solidity_colors_hex: dict[str, str] | None = None,
+    legend_title: str | None = None,
+) -> tuple[plt.Figure, Any | None]:
     """
     Build heatmap or clustermap of signature scores with annotation bars.
 
@@ -260,12 +263,11 @@ def signature_score_heatmap(
     )
     annotations.index = adata.obs_names
 
-    # Signature matrix and row labels
-    sig_matrix = adata.obs[sig_columns].values
-    sig_labels = [
-        c.replace(sig_prefix, '').replace(sig_suffix, '') for c in sig_columns
-    ]
-    sig_df = pd.DataFrame(sig_matrix, index=adata.obs_names, columns=sig_labels)
+    # Signature matrix and row labels (from obsm or obs)
+    sig_df = get_signature_df(adata)
+    cols = [c for c in sig_columns if c in sig_df.columns]
+    sig_df = sig_df[cols]
+    sig_labels = [c.replace(sig_prefix, "").replace(sig_suffix, "") for c in sig_df.columns]
 
     # Order for each sort dimension
     orders = {}
@@ -293,9 +295,9 @@ def signature_score_heatmap(
         return tuple(key)
 
     annotations = annotations.copy()
-    annotations['_key'] = annotations.apply(key_row, axis=1)
-    annotations = annotations.sort_values('_key')
-    annotations = annotations.drop(columns=['_key'])
+    annotations["_key"] = annotations.apply(key_row, axis=1)
+    annotations = annotations.sort_values("_key")
+    annotations = annotations.drop(columns=["_key"])
     sorted_idx = annotations.index
     sig_df = sig_df.loc[sorted_idx]
 
@@ -331,12 +333,15 @@ def signature_score_heatmap(
         if obs_colors is not None:
             column_colors[disp] = obs_colors
     default_hex_dict = None
-    if solidity_colors_hex and "Solidity" in annotations.columns and "Solidity" not in column_colors:
+    if (
+        solidity_colors_hex
+        and "Solidity" in annotations.columns
+        and "Solidity" not in column_colors
+    ):
         default_hex_dict = {"Solidity": solidity_colors_hex}
     color_lists = annotation_colors_from_categories(
         annotations, column_colors=column_colors, default_hex=default_hex_dict
     )
-    default_gray = (0.8, 0.8, 0.8)
     arrays = {
         col: np.array([color_lists[col][i] for i in range(len(annotations))]).reshape(1, -1, 3)
         for col in annotations.columns
@@ -345,13 +350,13 @@ def signature_score_heatmap(
     if cluster:
         g = sns.clustermap(
             sig_df.T,
-            cmap='RdBu_r',
+            cmap="RdBu_r",
             center=0,
             vmin=vmin,
             vmax=vmax,
             figsize=figsize,
             linewidths=0,
-            cbar_kws={'label': 'Z-scored Signature Score'},
+            cbar_kws={"label": "Z-scored Signature Score"},
             dendrogram_ratio=DEFAULT_DENDROGRAM_RATIO,
             cbar_pos=(0.02, 0.85, 0.03, 0.12),
             row_cluster=True,
@@ -365,40 +370,41 @@ def signature_score_heatmap(
         heatmap_pos = g.ax_heatmap.get_position()
         ann_h = 0.015
         for i, col in enumerate(annotations.columns):
-            ax_ann = fig.add_axes([
-                heatmap_pos.x0,
-                heatmap_pos.y1 + (i * ann_h),
-                heatmap_pos.width,
-                ann_h,
-            ])
-            ax_ann.imshow(arrays[col], aspect='auto', interpolation='nearest', rasterized=True)
+            ax_ann = fig.add_axes(
+                [
+                    heatmap_pos.x0,
+                    heatmap_pos.y1 + (i * ann_h),
+                    heatmap_pos.width,
+                    ann_h,
+                ]
+            )
+            ax_ann.imshow(arrays[col], aspect="auto", interpolation="nearest", rasterized=True)
             ax_ann.set_xticks([])
             ax_ann.set_yticks([])
-            ax_ann.set_ylabel(col, rotation=0, ha='right', va='center', fontsize=9)
+            ax_ann.set_ylabel(col, rotation=0, ha="right", va="center", fontsize=9)
             for spine in ax_ann.spines.values():
                 spine.set_visible(False)
-        g.ax_heatmap.set_xlabel(f'Spots (n={len(annotations)})', fontsize=11)
-        g.ax_heatmap.set_ylabel('Gene Signatures', fontsize=11)
+        g.ax_heatmap.set_xlabel(f"Spots (n={len(annotations)})", fontsize=11)
+        g.ax_heatmap.set_ylabel("Gene Signatures", fontsize=11)
         if legend_title and sort_by and solidity_colors_hex:
             second = sort_by[1] if len(sort_by) > 1 else None
             if second:
                 legend_elems = [
-                    Patch(facecolor=hex_to_rgb(v), label=k)
-                    for k, v in solidity_colors_hex.items()
+                    Patch(facecolor=hex_to_rgb(v), label=k) for k, v in solidity_colors_hex.items()
                 ]
                 leg_ax = fig.add_axes([0.95, 0.95, 0.05, 0.05])
-                leg_ax.axis('off')
+                leg_ax.axis("off")
                 leg_ax.legend(handles=legend_elems, title=legend_title or second, fontsize=9)
         return fig, g
     else:
         fig, ax = plt.subplots(figsize=figsize)
         sns.heatmap(
             sig_df.T,
-            cmap='RdBu_r',
+            cmap="RdBu_r",
             center=0,
             vmin=vmin,
             vmax=vmax,
-            cbar_kws={'label': 'Z-scored Signature Score'},
+            cbar_kws={"label": "Z-scored Signature Score"},
             linewidths=0,
             ax=ax,
             xticklabels=False,
@@ -410,16 +416,23 @@ def signature_score_heatmap(
         h_ann = 0.02
         for i, col in enumerate(annotations.columns):
             ax_ann = fig.add_axes([x0, y1 + (i * h_ann), w, h_ann])
-            ax_ann.imshow(arrays[col], aspect='auto', interpolation='nearest')
+            ax_ann.imshow(arrays[col], aspect="auto", interpolation="nearest")
             ax_ann.set_xticks([])
             ax_ann.set_yticks([])
-            ax_ann.set_ylabel(col, rotation=0, ha='right', va='center', fontsize=10)
-        ax.set_title(f'Signature Scores (sorted by {sort_by[0]} then {sort_by[1]})', fontsize=14, fontweight='bold', pad=20)
-        ax.set_xlabel(f'Spots (n={len(annotations)})', fontsize=12)
-        ax.set_ylabel('Gene Signatures', fontsize=12)
+            ax_ann.set_ylabel(col, rotation=0, ha="right", va="center", fontsize=10)
+        ax.set_title(
+            f"Signature Scores (sorted by {sort_by[0]} then {sort_by[1]})",
+            fontsize=14,
+            fontweight="bold",
+            pad=20,
+        )
+        ax.set_xlabel(f"Spots (n={len(annotations)})", fontsize=12)
+        ax.set_ylabel("Gene Signatures", fontsize=12)
         if legend_title and solidity_colors_hex:
-            legend_elems = [Patch(facecolor=hex_to_rgb(v), label=k) for k, v in solidity_colors_hex.items()]
+            legend_elems = [
+                Patch(facecolor=hex_to_rgb(v), label=k) for k, v in solidity_colors_hex.items()
+            ]
             leg_ax = fig.add_axes([0.95, 0.95, 0.05, 0.05])
-            leg_ax.axis('off')
+            leg_ax.axis("off")
             leg_ax.legend(handles=legend_elems, title=legend_title, fontsize=9)
         return fig, None

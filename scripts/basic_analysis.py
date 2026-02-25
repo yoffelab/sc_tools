@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
 from pathlib import Path
-from typing import Dict, List, Sequence, Tuple
 
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import scanpy as sc
-from matplotlib.patches import Wedge
 import seaborn as sns
+from matplotlib.patches import Wedge
 
 # -----------------------------
 # Config supplied by you
@@ -36,6 +33,7 @@ def prepare_table(adata, solidity_order, arch_order, drop_arch=None):
 
     return table
 
+
 def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
     solidity = table.index
     arch = table.columns
@@ -48,7 +46,7 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
     outer_colors = plt.get_cmap(cmap_outer)(np.linspace(0.1, 0.9, len(solidity)))
     inner_colors = plt.get_cmap(cmap_inner)(np.linspace(0.1, 0.9, len(arch)))
 
-    fig, ax = plt.subplots(figsize=(4, 3), dpi = 200)
+    fig, ax = plt.subplots(figsize=(4, 3), dpi=200)
 
     # ---- Draw outer ring via pie (donut) ----
     outer_wedges, _ = ax.pie(
@@ -57,7 +55,7 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
         startangle=90,
         labels=None,
         colors=outer_colors,
-        wedgeprops=dict(width=0.3, edgecolor="white")
+        wedgeprops=dict(width=0.3, edgecolor="white"),
     )
 
     # ---- Draw inner wedges manually using Wedge patches ----
@@ -91,8 +89,8 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
                 theta2=a2,
                 width=0.3,
                 facecolor=inner_colors[a_idx],
-                edgecolor="black",      # border visible
-                linewidth=0.7
+                edgecolor="black",  # border visible
+                linewidth=0.7,
             )
             ax.add_patch(patch)
 
@@ -103,9 +101,12 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
             pct = row[a_idx] / row_total * 100
 
             ax.text(
-                x, y,
+                x,
+                y,
                 f"{arch_name}\n{row[a_idx]} ({pct:.2f}%)",
-                ha="center", va="center", fontsize=7.5
+                ha="center",
+                va="center",
+                fontsize=7.5,
             )
 
         # Label outer slice
@@ -115,9 +116,13 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
         y = np.sin(np.deg2rad(ang_mid)) * 1.18
 
         ax.text(
-            x, y,
+            x,
+            y,
             f"{sol_name}\n{outer_counts[s_idx]} ({outer_pct:.2f}%)",
-            ha="center", va="center", fontsize=10, fontweight="bold"
+            ha="center",
+            va="center",
+            fontsize=10,
+            fontweight="bold",
         )
 
     ax.set(aspect="equal")
@@ -127,8 +132,7 @@ def nested_donut(table, title=None, cmap_outer="tab20c", cmap_inner="tab20b"):
     return fig, ax
 
 
-import matplotlib.pyplot as plt
-import numpy as np
+
 
 def stacked_bar_with_labels(table, colors=None, title=None):
     """
@@ -164,7 +168,7 @@ def stacked_bar_with_labels(table, colors=None, title=None):
             color=colors[i],
             edgecolor="black",
             linewidth=0.6,
-            label=a
+            label=a,
         )
 
         # Annotate each segment
@@ -178,13 +182,7 @@ def stacked_bar_with_labels(table, colors=None, title=None):
             y_pos = bottom[j] + c / 2
 
             ax.text(
-                j,
-                y_pos,
-                f"{c} ({pct:.2f}%)",
-                ha="center",
-                va="center",
-                fontsize=8,
-                color="black"
+                j, y_pos, f"{c} ({pct:.2f}%)", ha="center", va="center", fontsize=8, color="black"
             )
 
         bottom += counts[:, i]
@@ -198,6 +196,7 @@ def stacked_bar_with_labels(table, colors=None, title=None):
     ax.set_xticklabels(solidity, rotation=45, ha="right")
 
     return fig, ax
+
 
 # -----------------------------
 # Run
@@ -217,50 +216,42 @@ arch_order_with_core = ["Core", "Scar Tissue", "Blood Vessel", "Bronchus", "TLS"
 arch_order_no_core = ["Scar Tissue", "Blood Vessel", "Bronchus", "TLS"]
 
 table_with_core = prepare_table(
-    adata,
-    solidity_order=solidity_order,
-    arch_order=arch_order_with_core,
-    drop_arch=None
+    adata, solidity_order=solidity_order, arch_order=arch_order_with_core, drop_arch=None
 )
 
 nested_donut(table_with_core, title="Structure Proportion (with core)")
 plt.tight_layout()
 sns.despine()
-plt.savefig('figures/nested_solidity_structure_count_with_core_pie.png')
-plt.savefig('figures/nested_solidity_structure_count_with_core_pie.pdf')
+plt.savefig("figures/nested_solidity_structure_count_with_core_pie.png")
+plt.savefig("figures/nested_solidity_structure_count_with_core_pie.pdf")
 plt.close()
 
-stacked_bar_with_labels(table_with_core,
-                        title="Structure Proportion (with core)")
+stacked_bar_with_labels(table_with_core, title="Structure Proportion (with core)")
 plt.tight_layout()
 sns.despine()
-plt.savefig('figures/nested_solidity_structure_count_with_core_bar.png')
-plt.savefig('figures/nested_solidity_structure_count_with_core_bar.pdf')
+plt.savefig("figures/nested_solidity_structure_count_with_core_bar.png")
+plt.savefig("figures/nested_solidity_structure_count_with_core_bar.pdf")
 plt.close()
 
 table_no_core = prepare_table(
-    adata,
-    solidity_order=solidity_order,
-    arch_order=arch_order_no_core,
-    drop_arch=["Core"]
+    adata, solidity_order=solidity_order, arch_order=arch_order_no_core, drop_arch=["Core"]
 )
 plt.tight_layout()
 sns.despine()
-plt.savefig('figures/nested_solidity_structure_count_without_core_pie.png')
-plt.savefig('figures/nested_solidity_structure_count_without_core_pie.pdf')
+plt.savefig("figures/nested_solidity_structure_count_without_core_pie.png")
+plt.savefig("figures/nested_solidity_structure_count_without_core_pie.pdf")
 plt.close()
 
 nested_donut(table_no_core, title="Structure Proportion")
 plt.tight_layout()
 sns.despine()
-plt.savefig('figures/nested_solidity_structure_count_without_core_pie.png')
-plt.savefig('figures/nested_solidity_structure_count_without_core_pie.pdf')
+plt.savefig("figures/nested_solidity_structure_count_without_core_pie.png")
+plt.savefig("figures/nested_solidity_structure_count_without_core_pie.pdf")
 plt.close()
 
-stacked_bar_with_labels(table_no_core,
-                        title="Structure Proportion")
+stacked_bar_with_labels(table_no_core, title="Structure Proportion")
 plt.tight_layout()
 sns.despine()
-plt.savefig('figures/nested_solidity_structure_count_without_core_bar.png')
-plt.savefig('figures/nested_solidity_structure_count_without_core_bar.pdf')
+plt.savefig("figures/nested_solidity_structure_count_without_core_bar.png")
+plt.savefig("figures/nested_solidity_structure_count_without_core_bar.pdf")
 plt.close()

@@ -14,10 +14,6 @@ All code in this package should be generic and not project-specific.
 __version__ = "0.1.0"
 
 # Import main modules following scanpy pattern
-from . import pl
-from . import tl
-from . import qc
-from . import utils
-from . import memory
+from . import memory, pl, qc, tl, utils
 
-__all__ = ['pl', 'tl', 'qc', 'utils', 'memory']
+__all__ = ["pl", "tl", "qc", "utils", "memory"]

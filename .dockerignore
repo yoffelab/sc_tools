@@ -1,0 +1,56 @@
+# Git and env
+.git
+.gitignore
+.githooks
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+
+# Build artifacts
+build
+dist
+*.egg-info
+.eggs
+
+# Exclude large/generated data (mount at runtime)
+projects/visium/*/data
+projects/visium/*/results
+projects/visium/*/figures
+projects/visium/*/outputs
+projects/visium_hd/*/data
+projects/visium_hd/*/results
+projects/visium_hd/*/figures
+projects/visium_hd/*/outputs
+projects/imc/*/data
+projects/imc/*/results
+projects/imc/*/figures
+projects/imc/*/outputs
+projects/xenium/*/data
+projects/xenium/*/results
+projects/cosmx/*/data
+
+# Large files (even if not in gitignore)
+*.h5ad
+*.h5
+*.rds
+*.h5Seurat
+*.tiff
+*.tif
+*.ndpi
+*.svs
+*.zip
+*.tar
+*.tar.gz
+
+# Misc
+.cursor
+*.ipynb
+.ipynb_checkpoints
+.DS_Store
+
+# Legacy
+scripts/old_code

@@ -6,13 +6,12 @@ Format: YYDDMM.hh.mm.filename.extension (e.g. 250208.14.30.volcano_faceted.pdf)
 
 from datetime import datetime
 from pathlib import Path
-from typing import Union
 
 # Default DPI for raster figure exports
 DEFAULT_FIGURE_DPI = 300
 
 
-def get_version_prefix(dt: Union[datetime, None] = None) -> str:
+def get_version_prefix(dt: datetime | None = None) -> str:
     """
     Return a version prefix string for filenames: YYDDMM.hh.mm.
 
@@ -31,7 +30,7 @@ def get_version_prefix(dt: Union[datetime, None] = None) -> str:
     return dt.strftime("%y%d%m.%H.%M")
 
 
-def versioned_filename(basename: str, ext: str, dt: Union[datetime, None] = None) -> str:
+def versioned_filename(basename: str, ext: str, dt: datetime | None = None) -> str:
     """
     Build a versioned filename: YYDDMM.hh.mm.basename.ext (no path).
 
@@ -55,11 +54,11 @@ def versioned_filename(basename: str, ext: str, dt: Union[datetime, None] = None
 
 
 def versioned_path(
-    base_dir: Union[str, Path],
+    base_dir: str | Path,
     basename: str,
     ext: str,
-    subdir: Union[str, None] = None,
-    dt: Union[datetime, None] = None,
+    subdir: str | None = None,
+    dt: datetime | None = None,
 ) -> Path:
     """
     Build full path for a versioned file, optionally under a subdir (e.g. pdf/, png/).

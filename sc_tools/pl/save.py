@@ -2,29 +2,27 @@
 Versioned figure saving: PDF + PNG with datetime prefix, dpi=300, under pdf/ and png/.
 """
 
-from pathlib import Path
-from typing import Union, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 
 from ..utils.save import (
-    versioned_path,
-    get_version_prefix,
     DEFAULT_FIGURE_DPI,
+    versioned_path,
 )
 
 
 def save_figure(
     fig: plt.Figure,
     basename: str,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     dpi: int = DEFAULT_FIGURE_DPI,
-    dt: Optional[datetime] = None,
+    dt: datetime | None = None,
     bbox_inches: str = "tight",
     pad_inches: float = 0.1,
     create_pdf_png_folders: bool = True,
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     """
     Save a figure in two formats with a versioned filename under pdf/ and png/.
 

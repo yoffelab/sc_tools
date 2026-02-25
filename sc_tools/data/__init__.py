@@ -8,8 +8,8 @@ from .io import (
 )
 
 __all__ = [
-    'get_cache_key',
-    'load_cached_signatures',
-    'save_cached_signatures',
-    'write_h5ad',
+    "get_cache_key",
+    "load_cached_signatures",
+    "save_cached_signatures",
+    "write_h5ad",
 ]

@@ -8,9 +8,8 @@ Following scanpy's API pattern, this module provides analysis functions:
 """
 
 # Import tool functions
-from . import testing
-from . import colocalization
-from . import deconvolution
+from . import colocalization, deconvolution, testing
 from . import io as io_save
+from .score_signature import score_signature
 
-__all__ = ['testing', 'colocalization', 'deconvolution', 'io_save']
+__all__ = ["testing", "colocalization", "deconvolution", "io_save", "score_signature"]

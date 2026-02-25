@@ -9,9 +9,9 @@ Output: figures/manuscript/signature_heatmaps/pdf/YYDDMM.hh.mm.<basename>.pdf
         figures/manuscript/signature_heatmaps/png/YYDDMM.hh.mm.<basename>.png
 """
 
-from pathlib import Path
 import sys
 from datetime import datetime
+from pathlib import Path
 
 # Ensure repo root is on path when script is run from project (e.g. ggo_visium)
 _script_dir = Path(__file__).resolve().parent
@@ -27,7 +27,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scanpy as sc
 
-from sc_tools.pl import heatmaps, save as pl_save
+from sc_tools.pl import heatmaps
+from sc_tools.pl import save as pl_save
 from sc_tools.utils import signatures as sig_utils
 
 # -----------------------------------------------------------------------------
@@ -72,9 +73,7 @@ def _prepare_tumor_type(adata):
     """Filter to valid tumor types; create tumor_type from pathologist_annotation if needed."""
     if TUMOR_TYPE_COL not in adata.obs.columns:
         if "pathologist_annotation" not in adata.obs.columns:
-            raise KeyError(
-                f"Need '{TUMOR_TYPE_COL}' or 'pathologist_annotation' in adata.obs"
-            )
+            raise KeyError(f"Need '{TUMOR_TYPE_COL}' or 'pathologist_annotation' in adata.obs")
         adata.obs[TUMOR_TYPE_COL] = pd.Categorical(
             adata.obs["pathologist_annotation"].astype(str).replace(PATHOLOGIST_TO_TUMOR_TYPE),
             categories=SOLIDITY_ORDER,

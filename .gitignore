@@ -118,8 +118,17 @@ logs/
 
 # Generated / tooling
 repomix-output.xml
+.snakemake_lint_done
+.snakemake_format_done
+.snakemake_test_done
+
+# Apptainer/Singularity SIF (build from Dockerfile; see project_setup.md)
+containers/*.sif
 
 # Model weights and large QC/generated (>1MB) — pre-commit blocks size; keep ignored
+# Explicit: do not commit CSVs or other data > 1MB (see .cursor/rules/git-no-large-files.mdc)
+projects/visium_hd/robin_round2/metadata/cluster_rank_genes.csv
+projects/visium_hd/robin_round2/metadata/leiden_rank_genes.csv
 *.pt
 *web_summary.html
 projects/visium_hd/*/models/

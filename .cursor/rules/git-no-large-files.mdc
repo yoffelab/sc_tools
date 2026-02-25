@@ -1,0 +1,12 @@
+---
+description: Do not commit or push files larger than 1MB to the repository
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Git: No large files in commits
+
+- **Do not commit or push files larger than 1MB** to the repository.
+- This matches the limit documented in `.gitignore` (pre-commit hook to block files > 1MB).
+- Before staging or pushing: check file sizes; exclude any file over 1MB from the commit. Use `.gitignore` or leave them unstaged.
+- Large data, results, figures over 1MB, and binary assets should stay out of version control or be stored elsewhere (e.g. Git LFS if needed later).

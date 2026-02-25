@@ -1,0 +1,6 @@
+# ggo_visium Snakemake config
+# Paths relative to project dir (workdir when running snakemake -d . or -d projects/visium/ggo_visium)
+repo_root: "../../.."
+project_rel: "projects/visium/ggo_visium"
+# SIF path relative to repo root (used by run_apptainer.sh)
+container_sif: "containers/sc_tools.sif"

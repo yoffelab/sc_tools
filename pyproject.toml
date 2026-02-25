@@ -61,6 +61,7 @@ gpu = [
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "ruff>=0.1.0",
 ]
 
 [project.urls]
@@ -70,3 +71,37 @@ Documentation = "https://github.com/yoffelab/sc_tools#readme"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["sc_tools*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+# Lint sc_tools (required). Scripts: add once fixed (run: ruff check scripts --exclude scripts/old_code).
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "scripts/old_code",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "E741",   # ambiguous I (used for Moran's I in spatial stats)
+    "E402",   # module level import not at top (common in scripts with lazy loading)
+]
+
+[tool.ruff.format]
+quote-style = "double"

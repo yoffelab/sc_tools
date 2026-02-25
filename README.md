@@ -21,7 +21,17 @@ pip install -e ".[deconvolution]"
 pip install -e ".[deconvolution,gpu]"
 ```
 
-Conda users can still use `conda env create -f environment.yml` and then `pip install -e .` inside that environment. See `ENVIRONMENT_SETUP.md` for details.
+Conda users can use `conda env create -f environment.yml` and then `pip install -e ".[deconvolution]"` inside that environment. See [project_setup.md](project_setup.md) for details.
+
+**Lint (required before commit):** `make lint` runs Ruff check and format on `sc_tools`. Fix violations with `make format` and manual edits. See `skills.md` Section 11.
+
+**Docker:** Build with `docker build -t sc_tools:latest .`. Uses **conda** env `sc_tools` and **uv** for fast package installation. See [project_setup.md](project_setup.md) for full setup and per-project instructions. Run a project:
+```bash
+./scripts/run_docker.sh projects/visium/ggo_visium              # interactive bash
+./scripts/run_docker.sh projects/visium/ggo_visium python scripts/loupe2adata.py
+./projects/visium/ggo_visium/run_docker.sh                     # from project
+```
+Docker is auto-installed via Homebrew on macOS if missing. The script mounts the full repo; override image with `SC_TOOLS_IMAGE=myimage ./scripts/run_docker.sh ...`
 
 ---
 

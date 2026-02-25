@@ -1,0 +1,137 @@
+# ggo_visium Snakemake pipeline — Apptainer-based
+# Run from repo root: snakemake -d projects/visium/ggo_visium -s projects/visium/ggo_visium/Snakefile [target]
+# Or from project dir: snakemake -d . -s Snakefile [target]
+# Uses Apptainer via scripts/run_apptainer.sh (set SC_TOOLS_SIF or use containers/sc_tools.sif).
+
+configfile: "config.yaml"
+
+ROOT = config["repo_root"]
+PROJECT = config["project_rel"]
+
+def run_apptainer(script):
+    return f'cd {ROOT} && ./scripts/run_apptainer.sh {PROJECT} python {script}'
+
+# ---- Phase I ----
+rule adata_annotation:
+    output: "results/adata.annotation.h5ad"
+    input: "scripts/loupe2adata.py"
+    shell: run_apptainer("scripts/loupe2adata.py")
+
+rule adata_annotated_p2:
+    output: "results/adata.annotated.p2.h5ad"
+    input: "results/adata.annotation.h5ad", "scripts/annotation2mask_img.py"
+    shell: run_apptainer("scripts/annotation2mask_img.py")
+
+rule phase1:
+    input: "results/adata.annotated.p2.h5ad"
+
+# ---- Phase II ----
+rule scvi_h5ad:
+    output: "results/scvi.h5ad"
+    input: "results/adata.annotated.p2.h5ad", "scripts/preprocessing.py"
+    shell: run_apptainer("scripts/preprocessing.py")
+
+rule scvi_leiden:
+    output: "results/scvi.leiden.h5ad"
+    input: "results/scvi.h5ad", "scripts/clustering.py"
+    shell: run_apptainer("scripts/clustering.py")
+
+rule phase2:
+    input: "results/scvi.leiden.h5ad"
+
+# ---- Phase 3.5b ----
+rule scvi_leiden_phenotyped:
+    output: "results/scvi.leiden.phenotyped.h5ad"
+    input: "results/scvi.leiden.h5ad", "scripts/celltyping.py"
+    shell: run_apptainer("scripts/celltyping.py")
+
+rule adata_p35:
+    output: "results/adata.normalized.scored.p35.h5ad"
+    input: "results/adata.annotated.p2.h5ad", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
+    shell: run_apptainer("scripts/score_gene_signatures.py")
+
+rule adata_deconvolution:
+    output: "results/adata.deconvolution.h5ad"
+    input: "results/adata.normalized.scored.p35.h5ad", "results/seurat_object.h5ad", "scripts/celltype_deconvolution_phase3.py"
+    shell: run_apptainer("scripts/celltype_deconvolution_phase3.py")
+
+rule phase35b:
+    input: "results/scvi.leiden.phenotyped.h5ad", "results/adata.normalized.scored.p35.h5ad"
+
+# ---- Phase IV ----
+rule tls_clustered:
+    output: "results/tls_clustered.h5ad"
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/create_tls_anndata.py"
+    shell: run_apptainer("scripts/create_tls_anndata.py")
+
+rule tls_analysis:
+    output: touch("figures/manuscript/tls_analysis/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "results/tls_clustered.h5ad", "scripts/tls_analysis.py"
+    shell: run_apptainer("scripts/tls_analysis.py") + " && mkdir -p figures/manuscript/tls_analysis && touch figures/manuscript/tls_analysis/.done"
+
+rule spatial_analysis:
+    output: touch("figures/manuscript/spatial_analysis/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/spatial_analysis.py"
+    shell: run_apptainer("scripts/spatial_analysis.py") + " && mkdir -p figures/manuscript/spatial_analysis && touch figures/manuscript/spatial_analysis/.done"
+
+rule tumor_differences:
+    output: touch("figures/manuscript/tumor_differences/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/tumor_differences.py"
+    shell: run_apptainer("scripts/tumor_differences.py") + " && mkdir -p figures/manuscript/tumor_differences && touch figures/manuscript/tumor_differences/.done"
+
+rule macrophage_localization:
+    output: touch("figures/manuscript/macrophage_localization/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/macrophage_localization.py"
+    shell: run_apptainer("scripts/macrophage_localization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/stats && touch figures/manuscript/macrophage_localization/.done"
+
+rule neutrophil_cytotoxic_tcell_localization:
+    output: touch("figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/neutrophil_cytotoxic_tcell_localization.py"
+    shell: run_apptainer("scripts/neutrophil_cytotoxic_tcell_localization.py") + " && mkdir -p figures/manuscript/neutrophil_cytotoxic_tcell_localization figures/stats && touch figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done"
+
+rule process_colocalization:
+    output: touch("figures/process_colocalization/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/process_colocalization.py"
+    shell: run_apptainer("scripts/process_colocalization.py") + " && mkdir -p figures/process_colocalization results/process_colocalization && touch figures/process_colocalization/.done"
+
+rule phase4:
+    input:
+        "figures/manuscript/tumor_differences/.done",
+        "figures/manuscript/macrophage_localization/.done",
+        "figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done",
+        "figures/process_colocalization/.done"
+
+rule localization_only:
+    input: "figures/manuscript/macrophage_localization/.done", "figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done"
+
+rule localization_only_direct:
+    output: touch("figures/manuscript/localization_direct.done")
+    shell: run_apptainer("scripts/macrophage_localization.py") + " && " + run_apptainer("scripts/neutrophil_cytotoxic_tcell_localization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/manuscript/neutrophil_cytotoxic_tcell_localization figures/stats && touch figures/manuscript/localization_direct.done"
+
+rule spatial_multipage_colocalization:
+    output: touch("figures/manuscript/spatial_multipage_colocalization.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/spatial_multipage_colocalization.py"
+    shell: run_apptainer("scripts/spatial_multipage_colocalization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/manuscript/neutrophil_cytotoxic_tcell_localization && touch figures/manuscript/spatial_multipage_colocalization.done"
+
+# ---- Phase V ----
+rule spatial_plots:
+    output: touch("figures/manuscript/spatial_plots/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/manuscript_spatial_plots.py"
+    shell: run_apptainer("scripts/manuscript_spatial_plots.py") + " && mkdir -p figures/manuscript/spatial_plots && touch figures/manuscript/spatial_plots/.done"
+
+rule signature_heatmaps:
+    output: touch("figures/manuscript/signature_heatmaps/.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/signature_heatmap.py"
+    shell: run_apptainer("scripts/signature_heatmap.py") + " && mkdir -p figures/manuscript/signature_heatmaps && touch figures/manuscript/signature_heatmaps/.done"
+
+rule signature_heatmaps_versioned:
+    output: touch("figures/manuscript/signature_heatmaps_versioned.done")
+    input: "results/adata.normalized.scored.p35.h5ad", "scripts/signature_heatmap_versioned.py"
+    shell: run_apptainer("scripts/signature_heatmap_versioned.py") + " && touch figures/manuscript/signature_heatmaps_versioned.done"
+
+rule phase5:
+    input: "figures/manuscript/spatial_plots/.done", "figures/manuscript/signature_heatmaps/.done"
+
+# ---- Default: full pipeline ----
+rule all:
+    input: "results/adata.annotated.p2.h5ad", "results/scvi.leiden.h5ad", "results/scvi.leiden.phenotyped.h5ad", "results/adata.normalized.scored.p35.h5ad", "figures/manuscript/tumor_differences/.done", "figures/manuscript/macrophage_localization/.done", "figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done", "figures/process_colocalization/.done", "figures/manuscript/spatial_plots/.done", "figures/manuscript/signature_heatmaps/.done"

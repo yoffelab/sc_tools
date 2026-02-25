@@ -1,18 +1,13 @@
 # in conda env with tia
-import scanpy as sc
-import numpy as np
-import pandas as pd
-import cv2
 import re
-from pathlib import Path
-import openslide
 from glob import glob
-
-import re
 from pathlib import Path
+
+import cv2
+import numpy as np
 import openslide
 import pandas as pd
-import numpy as np
+import scanpy as sc
 
 
 def parse_svs_library_id(svs_path):
@@ -63,17 +58,15 @@ def build_svs_shape_dict(svs_files):
             print(f"❌ Failed to open {svs}: {e}")
     return shape_dict
 
-import numpy as np
-import cv2
-import pandas as pd
-from math import cos, sin, pi
+
+from math import cos, pi, sin
+
 
 def hexagon_vertices(cx, cy, radius):
     """Return (x, y) vertices of a regular hexagon centered at (cx, cy)."""
-    return np.array([
-        (cx + radius * cos(a), cy + radius * sin(a))
-        for a in np.linspace(0, 2 * pi, 7)
-    ], np.int32)
+    return np.array(
+        [(cx + radius * cos(a), cy + radius * sin(a)) for a in np.linspace(0, 2 * pi, 7)], np.int32
+    )
 
 
 def draw_hex_mask(df, shape, radius, scale=1.0, label_map=None, label_col="pathologist_annotation"):
@@ -96,11 +89,10 @@ def draw_hex_mask(df, shape, radius, scale=1.0, label_map=None, label_col="patho
 
     return mask
 
-import numpy as np
-import cv2
-from pathlib import Path
-from matplotlib.colors import ListedColormap
+
 import matplotlib.cm as cm
+from matplotlib.colors import ListedColormap
+
 
 def save_mask_and_overlay(mask, hires_img, out_dir, lib_id, label_key, label_map):
     """
@@ -180,7 +172,9 @@ def generate_numeric_masks(
         hires_img = adata.uns["spatial"][lib]["images"]["hires"]
         h_hires, w_hires = hires_img.shape[:2]
 
-        mask = draw_hex_mask(df, (h_hires, w_hires), spot_r, s_hires, label_map, label_col=label_key)
+        mask = draw_hex_mask(
+            df, (h_hires, w_hires), spot_r, s_hires, label_map, label_col=label_key
+        )
 
         # Store in adata
         adata.uns.setdefault("masks", {}).setdefault(lib, {})[label_key] = mask
@@ -193,12 +187,9 @@ def generate_numeric_masks(
         cats_present = [cat for cat, idx in label_map.items() if idx in unique_ids]
         print(f"📊 {lib}: mask stored ({mask.shape}), labels={cats_present}")
 
+
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-import scanpy as sc
-import numpy as np
-from pathlib import Path
-import matplotlib.cm as cm
+
 
 def plot_annotation_vs_mask(
     adata,
@@ -214,8 +205,9 @@ def plot_annotation_vs_mask(
 
     if global_colors is None:
         import matplotlib.cm as cm
+
         global_colors = [cm.tab20(i / len(global_cats)) for i in range(len(global_cats))]
-        print(f"⚠️ No color map found, using tab20.")
+        print("⚠️ No color map found, using tab20.")
     cmap = ListedColormap([background_color] + list(global_colors))
 
     for lib in adata.obs["library_id"].unique():
@@ -264,7 +256,8 @@ def plot_all_masks(
 
         # Collect mask keys that actually exist for this lib
         available_keys = [
-            key for key in mask_keys
+            key
+            for key in mask_keys
             if lib in adata.uns.get("masks", {}) and key in adata.uns["masks"][lib]
         ]
         if not available_keys:
@@ -284,7 +277,7 @@ def plot_all_masks(
                 continue
 
             # ---- choose color map ----
-            if f'{key}_colors' in adata.uns:
+            if f"{key}_colors" in adata.uns:
                 cats = list(adata.obs[key].cat.categories)
                 colors = adata.uns.get(f"{key}_colors", None)
                 if colors is None:
@@ -316,8 +309,9 @@ def plot_all_masks(
         plt.tight_layout()
         plt.show()
 
+
 # Build shape dict from real SVS files
-svs_files = glob('data/hne_images/*.svs')
+svs_files = glob("data/hne_images/*.svs")
 svs_shape_dict = build_svs_shape_dict(svs_files)
 
 # Generate masks
@@ -327,7 +321,7 @@ adata = sc.read("results/adata.annotation.h5ad")
 for key in ["pathologist_annotation", "solidity_type", "architecture_type"]:
     generate_numeric_masks(adata, svs_shape_dict, label_key=key, expand_factor=1.65)
 
-sc.pl.umap(adata, color = ["pathologist_annotation", "solidity_type", "architecture_type"])
+sc.pl.umap(adata, color=["pathologist_annotation", "solidity_type", "architecture_type"])
 
 plot_all_masks(
     adata,
@@ -337,6 +331,8 @@ plot_all_masks(
 
 # Regenerate consistent numeric masks and save all outputs
 for key in ["pathologist_annotation", "solidity_type", "architecture_type"]:
-    generate_numeric_masks(adata, svs_shape_dict, label_key=key, expand_factor=1.65, out_dir="results/masks")
+    generate_numeric_masks(
+        adata, svs_shape_dict, label_key=key, expand_factor=1.65, out_dir="results/masks"
+    )
 
-adata.write('results/adata.annotated.p2.h5ad')
+adata.write("results/adata.annotated.p2.h5ad")

@@ -9,11 +9,8 @@ Following scanpy's API pattern, this module provides plotting functions:
 """
 
 # Import plotting functions
-from . import spatial
-from . import heatmaps
-from . import statistical
-from . import volcano
+from . import heatmaps, spatial, statistical, volcano
 from . import save as save_figs
 from .save import save_figure
 
-__all__ = ['spatial', 'heatmaps', 'statistical', 'volcano', 'save_figs', 'save_figure']
+__all__ = ["spatial", "heatmaps", "statistical", "volcano", "save_figs", "save_figure"]

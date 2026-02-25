@@ -79,7 +79,7 @@ Checkpoints must satisfy the following so scripts and validators can rely on the
 | **adata.raw.p1.h5ad** | `obs['sample']`, `obs['raw_data_dir']` (or equivalent), `obsm['spatial']`; `X` raw counts; no normalization. |
 | **adata.annotated.p2.h5ad** | All of p1; `obs` includes clinical/metadata columns from `metadata/sample_metadata.csv` (or join equivalent); optional `uns` keys for images/masks. |
 | **adata.normalized.p3.h5ad** | Normalized/batch-corrected representation (e.g. `obsm['X_scvi']`); `obs['leiden']` (or cluster column); `adata.raw` backed up. |
-| **adata.normalized.scored.p35.h5ad** | All of p3; signature scores in `obsm['sig:hallmark']` and/or `obsm['sig:{name}']` per project `metadata/{name}.json` (target); optional `obs['celltype']`/`celltype_broad` if automated typing run. |
+| **adata.normalized.scored.p35.h5ad** | All of p3 (or p2 where p3 not used); signature scores in `obsm['signature_score']` (raw) and `obsm['signature_score_z']` (z-scored), column names = full path (e.g. `Myeloid/Macrophage_Core`); `uns['signature_score_report']` for per-signature n_present, n_missing, status; optional `obs['celltype']`/`celltype_broad` if automated typing run. |
 | **adata.celltyped.p4.h5ad** | All of p35; `obs['celltype']`, `obs['celltype_broad']` from `metadata/celltype_map.json`. |
 | **adata.{level}.{feature}.h5ad** | `obs` indexed by `level` (roi or patient); `X` or layer holds aggregated `feature` (mean expression or celltype frequency). |
 
@@ -98,6 +98,19 @@ Checkpoints must satisfy the following so scripts and validators can rely on the
 **Legacy / migration:** Existing projects may still use `adata.annotation.masked.h5ad`, `scvi.leiden.phenotyped.h5ad`, `adata.img.genescores.h5ad` until scripts are updated. New pipelines and scripts **must** write the standard checkpoint names above. Validators should accept either legacy or standard names and report which convention is used.
 
 **Makefile:** Use `$(PROJECT)` for all project paths, e.g. `$(PROJECT)/results/adata.raw.p1.h5ad`.
+
+### 2.4 Signature scoring (Phase 3.5b): how to run, inputs, outputs
+
+Gene signature scoring uses `sc_tools.tl.score_signature` and writes **obsm** (`signature_score`, `signature_score_z`) and **uns** (`signature_score_report`). Each project has a thin script; run from **project root** (so paths like `results/` and `metadata/` resolve).
+
+| Project | How to run | Inputs | Output |
+|--------|------------|--------|--------|
+| **Robin** | `make -C projects/visium_hd/robin phase35` or `cd projects/visium_hd/robin && python scripts/run_signature_scoring.py` | `results/adata.normalized.p3.h5ad`, `metadata/gene_signatures.json` | `results/adata.normalized.scored.p35.h5ad` |
+| **ggo_visium** | `make -C projects/visium/ggo_visium phase3.5b` (or phase3), or `cd projects/visium/ggo_visium && python scripts/score_gene_signatures.py` | `results/adata.annotated.p2.h5ad`, `metadata/gene_signatures.json` | `results/adata.normalized.scored.p35.h5ad` |
+
+**Note:** Robin builds p35 from **p3** (normalized adata). ggo_visium builds p35 from **p2** (annotated adata). Downstream scripts in both projects read p35.
+
+**Nextflow + containers:** The pipeline will use Nextflow with Docker (local) and Singularity/Apptainer (HPC). Auto-configure based on environment detection; publish container image(s) to a registry for HPC pull. See Mission.md CI/CD Roadmap.
 
 ---
 
@@ -237,5 +250,5 @@ pytest projects/visium/ggo_visium/tests/ -v
 
 ## 8. Development Environment
 
-- **Environment:** `environment.yml` (conda), `requirements.txt` (pip). Package: `pip install -e ".[deconvolution]"`.
+- **Environment:** `environment.yml` (conda env sc_tools), `requirements.txt` (pip). Package: `pip install -e ".[deconvolution]"`. Docker: see [project_setup.md](project_setup.md).
 - **Libraries:** scanpy, squidpy, anndata, scvi-tools, tangram-sc; statannotations, pinguoin for figures.

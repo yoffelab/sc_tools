@@ -103,5 +103,15 @@ Condensed summary of \`Journal.md\` for this project. Full entries are in \`Jour
 (One line each if needed.)
 SUMMARY_EOF
 
+# run_docker.sh: wrapper to run pipeline in Docker
+cat > "${PROJECT_ROOT}/run_docker.sh" << RUN_DOCKER_EOF
+#!/usr/bin/env bash
+# Run Docker for ${PROJECT_NAME}. From repo root: ./projects/${DATA_TYPE}/${PROJECT_NAME}/run_docker.sh [command]
+SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="\$(cd "\$SCRIPT_DIR/../../.." && pwd)"
+exec "\$REPO_ROOT/scripts/run_docker.sh" projects/${DATA_TYPE}/${PROJECT_NAME} "\$@"
+RUN_DOCKER_EOF
+chmod +x "${PROJECT_ROOT}/run_docker.sh"
+
 echo "Created project: ${PROJECT_ROOT}"
-echo "  with: ${SUBDIRS[*]}, Mission.md, Journal.md, journal_summary.md"
+echo "  with: ${SUBDIRS[*]}, Mission.md, Journal.md, journal_summary.md, run_docker.sh"

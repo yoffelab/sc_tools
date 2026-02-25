@@ -3,7 +3,6 @@ GPU detection and management utilities.
 """
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +10,7 @@ logger = logging.getLogger(__name__)
 def check_gpu_available() -> bool:
     """
     Check if GPU is available for PyTorch.
-    
+
     Returns
     -------
     bool
@@ -19,11 +18,12 @@ def check_gpu_available() -> bool:
     """
     try:
         import torch
+
         if torch.cuda.is_available():
             device_name = torch.cuda.get_device_name(0)
             device_props = torch.cuda.get_device_properties(0)
             total_memory_gb = device_props.total_memory / 1e9
-            
+
             logger.info(f"   ✅ GPU available: {device_name}")
             logger.info(f"   GPU memory: {total_memory_gb:.2f} GB")
             return True
@@ -38,10 +38,10 @@ def check_gpu_available() -> bool:
         return False
 
 
-def get_gpu_setting(use_gpu: Optional[bool] = None) -> bool:
+def get_gpu_setting(use_gpu: bool | None = None) -> bool:
     """
     Determine GPU usage setting with auto-detection.
-    
+
     Parameters
     ----------
     use_gpu : bool, optional
@@ -49,7 +49,7 @@ def get_gpu_setting(use_gpu: Optional[bool] = None) -> bool:
         - None: Auto-detect GPU availability
         - True: Force GPU (with warning if not available)
         - False: Force CPU
-    
+
     Returns
     -------
     bool

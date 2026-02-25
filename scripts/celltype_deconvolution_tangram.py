@@ -1,21 +1,20 @@
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import scanpy as sc
 import tangram as tg
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-import os
-from dask import delayed, compute
-from dask.diagnostics import ProgressBar
 
 # -------------------------------
 # Configuration
 # -------------------------------
 sc_data_file = "results/seurat_object.h5ad"
 visium_hd_data_file = "results/adata.annotated.p2.h5ad"
-celltype_key = 'cell.type'
-visium_batch_key = 'sample_id'
-sc_batch_key = 'Batch'
-output_dir = 'output/tangram_batches'
+celltype_key = "cell.type"
+visium_batch_key = "sample_id"
+sc_batch_key = "Batch"
+output_dir = "output/tangram_batches"
 os.makedirs(output_dir, exist_ok=True)
 n_genes_max = 2000
 
@@ -49,9 +48,13 @@ if visium_adata.raw is not None:
 
 # Check if Visium data is count-like
 if hasattr(visium_adata.X, "data"):
-    assert np.allclose(visium_adata.X.data.astype(int), visium_adata.X.data), "visium_adata.X contains non-integers"
+    assert np.allclose(visium_adata.X.data.astype(int), visium_adata.X.data), (
+        "visium_adata.X contains non-integers"
+    )
 else:
-    assert np.allclose(visium_adata.X.astype(int), visium_adata.X), "visium_adata.X contains non-integers"
+    assert np.allclose(visium_adata.X.astype(int), visium_adata.X), (
+        "visium_adata.X contains non-integers"
+    )
 
 # -------------------------------
 # Signature gene selection (~2000 genes)
@@ -59,11 +62,13 @@ else:
 print("Selecting signature genes...")
 
 # Step 1: HVGs
-sc.pp.highly_variable_genes(sc_adata, flavor="seurat_v3", n_top_genes=3000, subset=False, batch_key=sc_batch_key)
+sc.pp.highly_variable_genes(
+    sc_adata, flavor="seurat_v3", n_top_genes=3000, subset=False, batch_key=sc_batch_key
+)
 hvg_genes = set(sc_adata.var[sc_adata.var.highly_variable].index)
 
 # Step 2: Top markers per cell type
-sc.tl.rank_genes_groups(sc_adata, groupby=celltype_key, method='wilcoxon', use_raw=False)
+sc.tl.rank_genes_groups(sc_adata, groupby=celltype_key, method="wilcoxon", use_raw=False)
 marker_genes = []
 for group in sc_adata.obs[celltype_key].unique():
     top_genes = sc.get.rank_genes_groups_df(sc_adata, group=group).head(100).names.tolist()
@@ -87,7 +92,7 @@ visium_adata = visium_adata[:, signature_genes].copy()
 # Remove QC-filtered cells before dot plot
 # -------------------------------
 # Example: if QC-filtered cells are marked in the celltype_key column
-qc_labels = ["QC_Filtered", "Doublets", "Low quality", 'Unknown III (SM)']  # adjust to your dataset
+qc_labels = ["QC_Filtered", "Doublets", "Low quality", "Unknown III (SM)"]  # adjust to your dataset
 sc_adata = sc_adata[~sc_adata.obs[celltype_key].isin(qc_labels)].copy()
 
 # -------------------------------
@@ -143,11 +148,11 @@ assert sum(len(v) for v in grouped_var_names.values()) > 0, "No marker genes rem
 # Plot without manual group positions or labels
 sc.pl.dotplot(
     sc_adata,
-    var_names=grouped_var_names,      # dict triggers automatic grouping
+    var_names=grouped_var_names,  # dict triggers automatic grouping
     groupby=celltype_key,
     standard_scale="var",
     dot_max=0.5,
-    dendrogram=False
+    dendrogram=False,
 )
 
 
@@ -159,7 +164,7 @@ all_preds = []
 for batch in visium_adata.obs[visium_batch_key].unique():
     print(f"\n[•] Processing batch: {batch}")
     output_path = os.path.join(output_dir, f"tangram_pred_{batch}.h5ad")
-    
+
     if os.path.exists(output_path):
         print(f"[✓] Skipping batch {batch} (already computed)")
         batch_adata_map = sc.read_h5ad(output_path)
@@ -167,7 +172,9 @@ for batch in visium_adata.obs[visium_batch_key].unique():
         batch_adata = visium_adata[visium_adata.obs[visium_batch_key] == batch].copy()
         sc_copy = sc_adata.copy()
         tg.pp_adatas(sc_copy, batch_adata, genes=signature_genes)
-        batch_adata_map = tg.map_cells_to_space(sc_copy, batch_adata, mode='clusters', cluster_label=celltype_key, num_epochs = 500)
+        batch_adata_map = tg.map_cells_to_space(
+            sc_copy, batch_adata, mode="clusters", cluster_label=celltype_key, num_epochs=500
+        )
         batch_adata_map.write(output_path)
         print(f"[✔] Saved: {output_path}")
 
@@ -177,16 +184,17 @@ for batch in visium_adata.obs[visium_batch_key].unique():
 # Merge final output
 # -------------------------------
 import anndata
+
 merged_adata = anndata.concat(all_preds)
 merged_adata.write_h5ad(os.path.join(output_dir, "tangram_prediction_merged.csv"))
 print("\n✅ All Tangram batches completed and merged.")
-os.makedirs('figures/tangram/', exist_ok = True)
+os.makedirs("figures/tangram/", exist_ok=True)
 
-import matplotlib.pyplot as plt
+
 for batch in visium_adata.obs[visium_batch_key].unique():
     print(f"\n[•] Processing batch: {batch}")
     output_path = os.path.join(output_dir, f"tangram_pred_{batch}.h5ad")
-    
+
     adata_st = visium_adata[visium_adata.obs[visium_batch_key] == batch].copy()
 
     if os.path.exists(output_path):
@@ -194,14 +202,16 @@ for batch in visium_adata.obs[visium_batch_key].unique():
     else:
         sc_copy = sc_adata.copy()
         tg.pp_adatas(sc_copy, batch_adata, genes=signature_genes)
-        ad_map = tg.map_cells_to_space(sc_copy, batch_adata, mode='clusters', cluster_label=celltype_key, num_epochs = 500)
+        ad_map = tg.map_cells_to_space(
+            sc_copy, batch_adata, mode="clusters", cluster_label=celltype_key, num_epochs=500
+        )
         ad_map.write(output_path)
         print(f"[✔] Saved: {output_path}")
 
     tg.project_cell_annotations(ad_map, adata_st, annotation=celltype_key)
     annotation_list = list(pd.unique(sc_adata.obs[celltype_key]))
-    tg.plot_cell_annotation_sc(adata_st, annotation_list,perc=0.2, spot_size = 1, scale_factor = 1)
+    tg.plot_cell_annotation_sc(adata_st, annotation_list, perc=0.2, spot_size=1, scale_factor=1)
 
-    plt.savefig(f'figures/tangram/{batch}.pdf', bbox_inches = 'tight')
-    plt.savefig(f'figures/tangram/{batch}.png', bbox_inches = 'tight')
+    plt.savefig(f"figures/tangram/{batch}.pdf", bbox_inches="tight")
+    plt.savefig(f"figures/tangram/{batch}.png", bbox_inches="tight")
     plt.close()

@@ -1,25 +1,39 @@
 # ============================================================================
 # Spatial Omics Analysis Pipeline Makefile
 # ============================================================================
-# Project-aware: set PROJECT to the project dir (e.g. projects/visium/ggo_visium).
-# Scripts run with cwd = PROJECT so paths (results/, metadata/, etc.) are correct.
+# DEPRECATED: Prefer Snakemake (Snakefile + config.yaml in this dir). Use Apptainer
+# for containerized runs. See project_setup.md.
+#
+# Project-aware: run from project dir (cd projects/visium/ggo_visium && make) or repo root (make -C projects/visium/ggo_visium).
+# All file paths are relative to the project dir so both invocations work.
 #
 # Usage:
-#   make all              - Run entire pipeline (default PROJECT=projects/visium/ggo_visium)
-#   make PROJECT=projects/visium/ggo_visium phase1
-#   make phase1           - Run Phase I: Data Ingestion
-#   make phase2           - Run Phase II: Preprocessing
-#   ... phase3, phase4, phase5
-#   make clean            - Remove intermediate results (use with caution)
+#   make all              - Run entire pipeline
+#   make phase1           - Phase I: Data ingestion
+#   make USE_DOCKER=1 phase1   - Run inside Docker (conda sc_tools in container)
+#   make localization-only - Macrophage + neutrophil-cytotoxic T-cell analyses only
+#   make clean            - Remove intermediate results (CAUTION)
 #
-# Dependencies: Python 3.x, conda environment. Activate before running:
-#   conda activate robin
+# Local:  conda activate sc_tools, then make (or USE_DOCKER=0).
+# Docker: make USE_DOCKER=1 (run_docker.sh from repo root).
 # ============================================================================
 
-PROJECT ?= projects/visium/ggo_visium
-CONDA_ENV ?= robin
+# Project dir as seen by make (always . when Makefile is in project dir; paths relative to cwd)
+PROJECT ?= .
+# Path from repo root to this project (for run_docker.sh only)
+PROJECT_REL := projects/visium/ggo_visium
+CONDA_ENV ?= sc_tools
 
-.PHONY: all phase1 phase2 phase3 phase3.5b phase4 phase5 phase4-direct phase5-direct signature_heatmaps_versioned clean help
+# Docker: run scripts via run_docker.sh from repo root (project dir is projects/visium/ggo_visium, so 3 levels up)
+USE_DOCKER ?= 0
+REPO_ROOT := ../../..
+ifeq ($(USE_DOCKER),1)
+  RUN_SCRIPT := cd $(REPO_ROOT) && ./scripts/run_docker.sh $(PROJECT_REL) python
+else
+  RUN_SCRIPT := cd $(PROJECT) && python
+endif
+
+.PHONY: all phase1 phase2 phase3 phase3.5b phase4 phase5 phase4-direct phase5-direct signature_heatmaps_versioned spatial-multipage-colocalization localization-only localization-only-direct clean help
 
 # Default target: run entire pipeline
 all: phase1 phase2 phase3.5b phase4 phase5
@@ -46,7 +60,7 @@ $(PROJECT)/results/adata.annotation.h5ad: $(PROJECT)/scripts/loupe2adata.py
 	@echo "=========================================="
 	@echo "Phase I.1: Converting Loupe data to AnnData"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/loupe2adata.py
+	$(RUN_SCRIPT) scripts/loupe2adata.py
 	@echo "✅ Created: $(PROJECT)/results/adata.annotation.h5ad"
 
 # ----------------------------------------------------------------------------
@@ -61,7 +75,7 @@ $(PROJECT)/results/adata.annotated.p2.h5ad: $(PROJECT)/results/adata.annotation.
 	@echo "=========================================="
 	@echo "Phase I.2: Adding image masks and annotations"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/annotation2mask_img.py
+	$(RUN_SCRIPT) scripts/annotation2mask_img.py
 	@echo "✅ Created: $(PROJECT)/results/adata.annotated.p2.h5ad"
 
 # Phase I target
@@ -88,7 +102,7 @@ $(PROJECT)/results/scvi.h5ad: $(PROJECT)/results/adata.annotated.p2.h5ad $(PROJE
 	@echo "=========================================="
 	@echo "Phase II.1: Preprocessing and batch correction"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/preprocessing.py
+	$(RUN_SCRIPT) scripts/preprocessing.py
 	@echo "✅ Created: $(PROJECT)/results/scvi.h5ad"
 
 # ----------------------------------------------------------------------------
@@ -103,7 +117,7 @@ $(PROJECT)/results/scvi.leiden.h5ad: $(PROJECT)/results/scvi.h5ad $(PROJECT)/scr
 	@echo "=========================================="
 	@echo "Phase II.2: Leiden clustering"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/clustering.py
+	$(RUN_SCRIPT) scripts/clustering.py
 	@echo "✅ Created: $(PROJECT)/results/scvi.leiden.h5ad"
 
 # Phase II target (preprocessing + clustering only; no cell typing)
@@ -127,7 +141,7 @@ $(PROJECT)/results/scvi.leiden.phenotyped.h5ad: $(PROJECT)/results/scvi.leiden.h
 	@echo "=========================================="
 	@echo "Phase 3.5b.0: Automated cell typing"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/celltyping.py
+	$(RUN_SCRIPT) scripts/celltyping.py
 	@echo "✅ Created: $(PROJECT)/results/scvi.leiden.phenotyped.h5ad"
 
 # ----------------------------------------------------------------------------
@@ -147,7 +161,7 @@ $(PROJECT)/results/adata.normalized.scored.p35.h5ad: $(PROJECT)/results/adata.an
 	@echo "=========================================="
 	@echo "Phase 3.5b.1: Gene signature scoring"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/score_gene_signatures.py
+	$(RUN_SCRIPT) scripts/score_gene_signatures.py
 	@echo "✅ Created: $(PROJECT)/results/adata.normalized.scored.p35.h5ad"
 
 # ----------------------------------------------------------------------------
@@ -166,7 +180,7 @@ $(PROJECT)/results/adata.deconvolution.h5ad: $(PROJECT)/results/adata.normalized
 	@echo "=========================================="
 	@echo "Phase 3.5b.2: Cell type deconvolution"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/celltype_deconvolution_phase3.py
+	$(RUN_SCRIPT) scripts/celltype_deconvolution_phase3.py
 	@echo "✅ Created: $(PROJECT)/results/adata.deconvolution.h5ad"
 
 # Phase 3.5b target (automated cell typing + gene scoring required; deconvolution optional)
@@ -194,7 +208,7 @@ $(PROJECT)/results/tls_clustered.h5ad: $(PROJECT)/results/adata.normalized.score
 	@echo "=========================================="
 	@echo "Phase IV.1: TLS region extraction"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/create_tls_anndata.py
+	$(RUN_SCRIPT) scripts/create_tls_anndata.py
 	@echo "✅ Created: $(PROJECT)/results/tls_clustered.h5ad"
 
 # ----------------------------------------------------------------------------
@@ -213,7 +227,7 @@ $(PROJECT)/figures/manuscript/tls_analysis: $(PROJECT)/results/adata.normalized.
 	@echo "=========================================="
 	@echo "Phase IV.2: TLS analysis"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/tls_analysis.py
+	$(RUN_SCRIPT) scripts/tls_analysis.py
 	@mkdir -p $(PROJECT)/figures/manuscript/tls_analysis
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/tls_analysis/"
 
@@ -231,7 +245,7 @@ $(PROJECT)/figures/manuscript/spatial_analysis: $(PROJECT)/results/adata.normali
 	@echo "=========================================="
 	@echo "Phase IV.3: Spatial analysis (SVG and ligrec)"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/spatial_analysis.py
+	$(RUN_SCRIPT) scripts/spatial_analysis.py
 	@mkdir -p $(PROJECT)/figures/manuscript/spatial_analysis
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/spatial_analysis/"
 
@@ -251,7 +265,7 @@ $(PROJECT)/figures/manuscript/tumor_differences: $(PROJECT)/results/adata.normal
 	@echo "=========================================="
 	@echo "Phase IV.4: Tumor differences analysis"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/tumor_differences.py
+	$(RUN_SCRIPT) scripts/tumor_differences.py
 	@mkdir -p $(PROJECT)/figures/manuscript/tumor_differences
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/tumor_differences/"
 
@@ -273,9 +287,64 @@ $(PROJECT)/figures/manuscript/macrophage_localization: $(PROJECT)/results/adata.
 	@echo "=========================================="
 	@echo "Phase IV.5: Macrophage localization analysis"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/macrophage_localization.py
+	$(RUN_SCRIPT) scripts/macrophage_localization.py
 	@mkdir -p $(PROJECT)/figures/manuscript/macrophage_localization
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/macrophage_localization/"
+
+# ----------------------------------------------------------------------------
+# Script: neutrophil_cytotoxic_tcell_localization.py
+# Purpose: Measure correlation of SLC16A3+ neutrophil score vs cytotoxic T-cell score
+# Input:  results/adata.normalized.scored.p35.h5ad
+# Output: figures/manuscript/neutrophil_cytotoxic_tcell_localization/ (scatterplot PDF/PNG)
+#         figures/stats/neutrophil_cytotoxic_tcell_correlations.csv
+# Notes:  - Stratifies by Normal, Non-Solid, and Solid tumors
+#         - X-axis: SLC16A3+ Neutrophil (z), Y-axis: Liron T cell cytotoxicity (z)
+#         - Filters spots with both scores >= 0; Pearson and regression per tumor type
+# ----------------------------------------------------------------------------
+$(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/neutrophil_cytotoxic_tcell_localization.py
+	@echo "=========================================="
+	@echo "Phase IV.5b: Neutrophil vs cytotoxic T-cell localization"
+	@echo "=========================================="
+	$(RUN_SCRIPT) scripts/neutrophil_cytotoxic_tcell_localization.py
+	@mkdir -p $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization $(PROJECT)/figures/stats
+	@echo "✅ Created: $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization/"
+
+# ----------------------------------------------------------------------------
+# Convenience: run only macrophage (proliferative vs macrophage) + neutrophil vs cytotoxic T-cell
+# Same as running the two figure targets below; no tumor_differences or process_colocalization.
+# ----------------------------------------------------------------------------
+localization-only: $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization
+	@echo "✅ Localization analyses complete: macrophage_localization + neutrophil_cytotoxic_tcell_localization"
+
+# Run the two localization scripts only (no dependency on p35 timestamp; assumes p35 exists).
+# Use this to avoid make rebuilding the full pipeline when p35 is older than its prereqs.
+# ----------------------------------------------------------------------------
+localization-only-direct:
+	@echo "=========================================="
+	@echo "Localization only (direct): macrophage + neutrophil-cytotoxic T-cell"
+	@echo "=========================================="
+	$(RUN_SCRIPT) scripts/macrophage_localization.py
+	$(RUN_SCRIPT) scripts/neutrophil_cytotoxic_tcell_localization.py
+	@mkdir -p $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization $(PROJECT)/figures/stats
+	@echo "✅ Created: figures/manuscript/macrophage_localization/ and neutrophil_cytotoxic_tcell_localization/"
+
+# ----------------------------------------------------------------------------
+# Script: spatial_multipage_colocalization.py (refactored multipage + boxplot)
+# Purpose: Multipage PDF per library (H&E, annotation, solidity, 2 scores, truncated similarity)
+#          and proportion-positive boxplot by solidity (Mann-Whitney + FDR).
+# Input:  results/adata.normalized.scored.p35.h5ad
+# Output: figures/manuscript/macrophage_localization/ (spatial_multipage.pdf + boxplot PDF/PNG + CSV)
+#         figures/manuscript/neutrophil_cytotoxic_tcell_localization/ (same layout)
+# Notes:  Uses sc_tools.pl.spatial.multipage_spatial_pdf and sc_tools.tl.colocalization.
+#         Run this target for the canonical multipage + proportion boxplot pipeline.
+# ----------------------------------------------------------------------------
+spatial-multipage-colocalization: $(PROJECT)/results/adata.normalized.scored.p35.h5ad $(PROJECT)/scripts/spatial_multipage_colocalization.py
+	@echo "=========================================="
+	@echo "Spatial multipage colocalization (macrophage + neutrophil-cytotoxic)"
+	@echo "=========================================="
+	$(RUN_SCRIPT) scripts/spatial_multipage_colocalization.py
+	@mkdir -p $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization
+	@echo "✅ Created: figures/manuscript/macrophage_localization/ and neutrophil_cytotoxic_tcell_localization/"
 
 # ----------------------------------------------------------------------------
 # Script: process_colocalization.py
@@ -294,13 +363,13 @@ $(PROJECT)/figures/process_colocalization: $(PROJECT)/results/adata.normalized.s
 	@echo "=========================================="
 	@echo "Phase IV.6: Process colocalization analysis"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/process_colocalization.py
+	$(RUN_SCRIPT) scripts/process_colocalization.py
 	@mkdir -p $(PROJECT)/figures/process_colocalization
 	@mkdir -p $(PROJECT)/results/process_colocalization
 	@echo "✅ Created: $(PROJECT)/figures/process_colocalization/"
 
 # Phase IV target
-phase4: $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/process_colocalization
+phase4: $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization $(PROJECT)/figures/process_colocalization
 	@echo "✅ Phase IV complete: Analysis and statistical testing"
 
 # Phase IV direct: run phase 4 scripts only (assumes adata.normalized.scored.p35.h5ad exists).
@@ -309,10 +378,11 @@ phase4-direct:
 	@echo "=========================================="
 	@echo "Phase IV (direct): Running analysis scripts"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/tumor_differences.py
-	cd $(PROJECT) && python scripts/macrophage_localization.py
-	cd $(PROJECT) && python scripts/process_colocalization.py
-	@mkdir -p $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/process_colocalization $(PROJECT)/results/process_colocalization
+	$(RUN_SCRIPT) scripts/tumor_differences.py
+	$(RUN_SCRIPT) scripts/macrophage_localization.py
+	$(RUN_SCRIPT) scripts/neutrophil_cytotoxic_tcell_localization.py
+	$(RUN_SCRIPT) scripts/process_colocalization.py
+	@mkdir -p $(PROJECT)/figures/manuscript/tumor_differences $(PROJECT)/figures/manuscript/macrophage_localization $(PROJECT)/figures/manuscript/neutrophil_cytotoxic_tcell_localization $(PROJECT)/figures/process_colocalization $(PROJECT)/results/process_colocalization $(PROJECT)/figures/stats
 	@echo "✅ Phase IV (direct) complete"
 
 # ============================================================================
@@ -333,7 +403,7 @@ $(PROJECT)/figures/manuscript/spatial_plots: $(PROJECT)/results/adata.normalized
 	@echo "=========================================="
 	@echo "Phase V.1: Publication-ready spatial plots"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/manuscript_spatial_plots.py
+	$(RUN_SCRIPT) scripts/manuscript_spatial_plots.py
 	@mkdir -p $(PROJECT)/figures/manuscript/spatial_plots
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/spatial_plots/"
 
@@ -345,7 +415,7 @@ $(PROJECT)/figures/manuscript/signature_heatmaps: $(PROJECT)/results/adata.norma
 	@echo "=========================================="
 	@echo "Phase V.2: Signature heatmap visualization (legacy)"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/signature_heatmap.py
+	$(RUN_SCRIPT) scripts/signature_heatmap.py
 	@mkdir -p $(PROJECT)/figures/manuscript/signature_heatmaps
 	@echo "✅ Created: $(PROJECT)/figures/manuscript/signature_heatmaps/"
 
@@ -359,7 +429,7 @@ signature_heatmaps_versioned:
 	@echo "=========================================="
 	@echo "Signature heatmaps (versioned, sc_tools)"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/signature_heatmap_versioned.py
+	$(RUN_SCRIPT) scripts/signature_heatmap_versioned.py
 	@echo "✅ Versioned heatmaps in $(PROJECT)/figures/manuscript/signature_heatmaps/pdf and .../png"
 
 # Phase V target
@@ -372,8 +442,8 @@ phase5-direct:
 	@echo "=========================================="
 	@echo "Phase V (direct): Running visualization scripts"
 	@echo "=========================================="
-	cd $(PROJECT) && python scripts/manuscript_spatial_plots.py
-	cd $(PROJECT) && python scripts/signature_heatmap_versioned.py
+	$(RUN_SCRIPT) scripts/manuscript_spatial_plots.py
+	$(RUN_SCRIPT) scripts/signature_heatmap_versioned.py
 	@mkdir -p $(PROJECT)/figures/manuscript/spatial_plots $(PROJECT)/figures/manuscript/signature_heatmaps
 	@echo "✅ Phase V (direct) complete"
 
@@ -393,6 +463,8 @@ help:
 	@echo "  make phase3           - Alias for phase3.5b"
 	@echo "  make phase4           - Phase IV: Analysis and statistics"
 	@echo "  make phase5           - Phase V: Visualization"
+	@echo "  make localization-only        - Macrophage (prolif vs M2) + Neutrophil vs cytotoxic T-cell only"
+	@echo "  make localization-only-direct - Same, but skip deps (assumes p35 exists; use with USE_DOCKER=1)"
 	@echo "  make phase4-direct    - Phase IV only (assumes genescores exist; use conda activate $(CONDA_ENV))"
 	@echo "  make phase5-direct    - Phase V only (versioned heatmap output)"
 	@echo "  make signature_heatmaps_versioned - Signature heatmaps only (datetime-stamped pdf/png)"
@@ -400,6 +472,8 @@ help:
 	@echo "  make help             - Show this help message"
 	@echo ""
 	@echo "Current PROJECT: $(PROJECT)"
+	@echo "Use USE_DOCKER=1 to run all script commands inside Docker (e.g. make USE_DOCKER=1 phase4)."
+	@echo ""
 	@echo "Individual script targets (paths under PROJECT):"
 	@echo "  results/adata.annotated.p2.h5ad            - Phase 2 (annotated)"
 	@echo "  results/scvi.leiden.phenotyped.h5ad        - Phase 3.5b (automated cell typing)"
@@ -408,6 +482,7 @@ help:
 	@echo "  results/tls_clustered.h5ad                 - TLS extraction"
 	@echo "  figures/manuscript/tumor_differences       - Tumor analysis"
 	@echo "  figures/manuscript/macrophage_localization - Macrophage analysis"
+	@echo "  figures/manuscript/neutrophil_cytotoxic_tcell_localization - Neutrophil vs cytotoxic T-cell"
 	@echo "  figures/process_colocalization             - Process colocalization"
 	@echo "  figures/manuscript/signature_heatmaps     - Signature heatmaps (versioned: pdf/ and png/ with YYDDMM.hh.mm prefix)"
 

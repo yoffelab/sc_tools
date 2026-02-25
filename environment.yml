@@ -1,4 +1,4 @@
-name: ggo_visium
+name: sc_tools
 channels:
   - conda-forge
   - bioconda

@@ -103,6 +103,11 @@ This journal documents the technical evolution, parameters, and rationale behind
 - **Action:** Correlation matrix (macrophage signatures × tumor types); heatmap and clustermap with significance stars.
 - **Output:** `correlation_heatmap.pdf`, `correlation_clustermap.pdf` in `figures/manuscript/macrophage_localization/`.
 
+### [2025-02-23] - Neutrophil–Cytotoxic T-cell Colocalization
+- **Action:** Added SLC16A3+ Neutrophil signature to `metadata/gene_signatures.json` (Liron); created `neutrophil_cytotoxic_tcell_localization.py` to measure correlation between SLC16A3+ neutrophil score (x) and Liron cytotoxic T-cell score (y), stratified by tumor type.
+- **Rationale:** Interrogate spatial/transcriptional relationship between SLC16A3+ neutrophils and cytotoxic T-cells, mirroring macrophage localization (proliferative vs M2).
+- **Implementation:** Uses `sc_tools.utils.signatures.get_signature_df` (obsm-first); scatter with regression and Pearson per Normal/Non-Solid/Solid; outputs PDF/PNG and `figures/stats/neutrophil_cytotoxic_tcell_correlations.csv`. Makefile target and Phase IV dependency added; Mission.md updated.
+
 ---
 
 ## Future Rationale & Pending Decisions

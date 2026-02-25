@@ -27,7 +27,7 @@ The project follows the repo phasing scheme (see root `Mission.md` and `README.m
 | **3.5** | Partial | Demographics / Figure 1 cohort description |
 | **3.5b** | Done | Gene scoring, automated cell typing, optional deconvolution |
 | **4** | Done | Manual cell typing (phenotyped); was used for refinement |
-| **5** | Active | tumor_differences, process_colocalization, TLS, macrophage, signature heatmaps, manuscript figures |
+| **5** | Active | tumor_differences, macrophage localization, neutrophil–cytotoxic T-cell colocalization, process_colocalization, TLS, signature heatmaps, manuscript figures |
 | **6–7** | Pending | ROI/patient aggregation, meta analysis |
 
 ---
@@ -39,7 +39,7 @@ The project follows the repo phasing scheme (see root `Mission.md` and `README.m
 - [x] **Phase 3:** scVI integration, Leiden clustering (preprocessing only).
 - [x] **Phase 3.5b:** Gene scoring (Seurat-based), automated cell typing, optional deconvolution; phenotyped AnnData and `adata.normalized.scored.p35.h5ad`.
 - [x] **Phase 4:** Manual cell typing refinement; phenotyped AnnData.
-- [x] **Phase 5 (partial):** Differential program analysis, macrophage localization, process colocalization, signature heatmaps (versioned), TLS B-cell/T-cell, ligand-receptor, manuscript spatial plots.
+- [x] **Phase 5 (partial):** Differential program analysis, macrophage localization, neutrophil–cytotoxic T-cell colocalization (SLC16A3+ neutrophil vs cytotoxic T-cell), process colocalization, signature heatmaps (versioned), TLS B-cell/T-cell, ligand-receptor, manuscript spatial plots.
 
 ---
 
@@ -70,6 +70,7 @@ Pipeline phasing is defined in root `Mission.md` (Phasing scheme) and `README.md
 - [ ] **Cell Type Colocalization:** Pearson, Moran's I, neighborhood enrichment on deconvolution proportions.
 - [ ] **Spatial Transition Areas:** Transcriptional changes (Normal↔Non-Solid↔Solid; tumor core vs TLS).
 - [ ] **Macrophage State Comparison:** 1-vs-all testing across tumor types.
+- [x] **Neutrophil–cytotoxic T-cell colocalization:** SLC16A3+ neutrophil vs Liron cytotoxic T-cell score; scatter and Pearson per tumor type (script: neutrophil_cytotoxic_tcell_localization.py).
 - [ ] **Differential Cell Type Proportions:** 1-vs-all on deconvolution proportions.
 - [ ] **TLS Niche Extraction:** Subset lymphoid-rich neighborhoods; spatial TLS distribution.
 

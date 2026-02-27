@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2025-02-12
+**Last Updated:** 2026-02-26
 
 ---
 
@@ -45,17 +45,23 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [ ] **Required annotations:** `adata.obs['sample']` (sample of origin), `adata.obs['raw_data_dir']` (backup path for original data). Spatial coords in `adata.obsm['spatial']`.
 
 #### QC Metrics (sc_tools.qc)
-- [ ] Implement `calculate_qc_metrics` (wrap scanpy `pp.calculate_qc_metrics`).
-- [ ] Implement `filter_cells`, `filter_genes` (wrap scanpy).
-- [ ] Implement `highly_variable_genes` (wrap scanpy).
-- [ ] Implement `spatially_variable_genes` (wrap squidpy). Sample-specific QC on spots/cells and genes/proteins.
-- [ ] Two QC versions: pre-normalization and post-normalization.
+- [x] Implement `calculate_qc_metrics` (wrap scanpy `pp.calculate_qc_metrics`; optional mt/hb patterns).
+- [x] Implement `filter_cells`, `filter_genes` (wrap scanpy).
+- [x] Implement `highly_variable_genes` (wrap scanpy).
+- [x] Implement `spatially_variable_genes` (wrap squidpy `gr.spatial_autocorr`). Sample-specific QC on spots/cells and genes/proteins.
+- [x] Two QC versions: pre-normalization and post-normalization (same API; call at raw and after normalize).
 
 #### QC Plots
-- [ ] 2x2 grid: total_count (total expression), gene/protein expression histogram, log1p version (all platforms).
-- [ ] Spatial transcriptomics: % mt, % hb per spot.
-- [ ] Multipage spatial plot per sample: total_count, log1p, %mt (1x3 subplot) as QC report.
-- [ ] Save under `projects/<platform>/<project>/figures/QC/raw/` (pre) and `figures/QC/post/` (post).
+- [x] 2x2 grid: total_count (total expression), gene/protein expression histogram, log1p version (all platforms). `sc_tools.qc.plots.qc_2x2_grid`; also `sc_tools.pl.qc_2x2_grid`.
+- [x] 2x4 pre vs post: left 2x2 pre-filter, right 2x2 post-filter. `sc_tools.qc.plots.qc_2x4_pre_post`.
+- [x] Spatial transcriptomics: % mt, % hb per spot (from `calculate_qc_metrics` with mt_pattern/hb_pattern).
+- [x] Multipage spatial plot per sample: total_count, log1p, %mt (1x3 subplot) as QC report. `sc_tools.qc.plots.qc_spatial_multipage`; also `sc_tools.pl.qc_spatial_multipage`.
+- [x] Violin metrics: n_genes_by_counts, total_counts, pct_counts_mt (optional groupby). `sc_tools.qc.plots.qc_violin_metrics`.
+- [x] Scatter: total_counts vs n_genes_by_counts, color pct_counts_mt. `sc_tools.qc.plots.qc_scatter_counts_genes`.
+- [x] Highly variable genes plot: mean vs dispersion, HVG highlighted. `sc_tools.qc.plots.plot_highly_variable_genes`.
+- [x] Spatially variable genes plot: mean/rank vs Moran's I; per-library when `library_id` present (`spatially_variable_genes_per_library`). Skip SVG only when library_id missing. `sc_tools.qc.plots.plot_spatially_variable_genes`.
+- [x] Save under `projects/<platform>/<project>/figures/QC/raw/` (pre) and `figures/QC/post/` (post). Caller passes output_dir or output_path.
+- [x] Single QC report script: `scripts/run_qc_report.py` produces all QC figures; Snakemake rule `qc_report` → `figures/QC/qc_report.done`.
 - [ ] **Future:** MA plots (per gene/protein across samples).
 
 ---
@@ -161,6 +167,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 - **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
 - **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
+- **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §11 and in the skill).
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
 - **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
 - **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.
@@ -186,12 +193,12 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 Work through in sequence; each builds on the previous. See **skills.md** Section 11 and 15. **GitHub Actions last** (testing setup will be complex).
 
 1. **[x] Linting** — Ruff configured in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check` on `sc_tools`; all violations fixed. Scripts/ to be added once fixed.
-2. **[ ] Nextflow adoption** — Create Nextflow pipeline (`.nf` / `main.nf`) that implements the phase-dependent workflow (Phases 1–7); preserve checkpoint names and entry points from Architecture.md. Do this early so porting from Makefile is easier; Makefile may coexist during migration. Nextflow chosen for scalability and reproducibility. **Containerization:** Use Docker for local runs and Singularity/Apptainer for HPC. Auto-configure based on environment: detect local vs HPC and select Docker or Singularity accordingly (e.g. `nextflow.config` or profile). Define pipeline container image(s); publish to registry (Docker Hub, GHCR) for HPC pull.
+2. **[x] Snakemake** — Already adopted as THE workflow engine. Each project has its own Snakefile. **Containerization:** Apptainer (Linux/HPC, primary); Docker (macOS/Windows, fallback). Auto-detect via `scripts/run_container.sh`. Publish container image to registry (Docker Hub, GHCR) for HPC pull.
 3. **[ ] Sphinx API docs** — Add `docs/` with Sphinx, autodoc for `sc_tools`; `make docs` or equivalent; document where built docs live.
 4. **[ ] PyPI deployment** — Ensure `pyproject.toml` builds wheel/sdist; add GitHub Action to publish to PyPI on release (trusted publishing or secrets); no credentials in repo.
-5. **[ ] GitHub Actions** — `.github/workflows/tests.yml` runs lint + pytest + Nextflow validation; fail on push/PR if any step fails. Last, because testing setup is complex.
+5. **[ ] GitHub Actions** — `.github/workflows/tests.yml` runs lint + pytest + Snakemake dry-run; fail on push/PR if any step fails. Last, because testing setup is complex.
 
-**Status:** Linting (1) done. Next: Nextflow (2).
+**Status:** Linting (1) and Snakemake (2) done. Next: Sphinx docs (3).
 
 ### To Do (later)
 

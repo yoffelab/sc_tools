@@ -1,0 +1,2657 @@
+data/Jan202023_Liver_TMA1_9.mcd:
+    id: b44b8980-1cbb-4638-b1c8-14496a1c211e
+    name: Jan202023_Liver_TMA1_9
+    imctools_version: 2.1.8
+    created: '2023-03-07T00:25:15.127592+00:00'
+    n_slides: 1
+    n_panoramas: 3
+    n_ROIs: 6
+    ROI_numbers:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    all_ROIs_same_channels: 'true'
+    consensus_channels:
+        0: HH3(In113)
+        1: <EMPTY>(In115)
+        2: <EMPTY>(Xe131)
+        3: <EMPTY>(La139)
+        4: aSMA(Pr141)
+        5: TNFa(Nd142)
+        6: Iba1(Nd143)
+        7: NE(Nd144)
+        8: CKB(Nd145)
+        9: PDL1(Nd146)
+        10: CD163(Sm147)
+        11: CD14(Nd148)
+        12: CD11b(Sm149)
+        13: PD1(Nd150)
+        14: CD31(Eu151)
+        15: CD45(Sm152)
+        16: SORT1(Eu153)
+        17: CD15(Sm154)
+        18: FoxP3(Gd155)
+        19: CD4(Gd156)
+        20: CD204(Gd158)
+        21: NKG2A(Tb159)
+        22: CK7(Gd160)
+        23: CD20(Dy161)
+        24: CD8A(Dy162)
+        25: CD27(Dy163)
+        26: ARG1(Dy164)
+        27: HLADR(Ho165)
+        28: EOMES(Er166)
+        29: GRANZYMEB(Er167)
+        30: Ki67(Er168)
+        31: CItH3(Tm169)
+        32: CD3(Er170)
+        33: TRDC(Yb171)
+        34: IFNg(Yb172)
+        35: CD45RO(Yb173)
+        36: K818(Yb174)
+        37: CD16(Lu175)
+        38: CD11c(Yb176)
+        39: DNA1(Ir191)
+        40: DNA2(Ir193)
+        41: <EMPTY>(Pt194)
+        42: Vimentin(Pt195)
+        43: CD68(Pt196)
+        44: <EMPTY>(Pt198)
+        45: <EMPTY>(Pb206)
+    panoramas:
+        1:
+            slide_id: 0
+            id: 1
+            image_type: Imported
+            description: image_50381313.JPG
+            x1: 1439.885
+            y1: 25000.0
+            x2: 73560.116
+            y2: 25000.0
+            x3: 73560.116
+            y3: 0.0
+            x4: 1439.885
+            y4: 0.0
+            rotation_angle: 0.0
+        2:
+            slide_id: 0
+            id: 2
+            image_type: Instrument
+            description: Panorama_002
+            x1: 18972.0
+            y1: 20148.0
+            x2: 23964.0
+            y2: 20148.0
+            x3: 23964.0
+            y3: 5364.0
+            x4: 18972.0
+            y4: 5364.0
+            rotation_angle: 0.0
+        3:
+            slide_id: 0
+            id: 3
+            image_type: Default
+            description: ROIs
+            x1: 0.0
+            y1: 0.0
+            x2: 75000.0
+            y2: 0.0
+            x3: 0.0
+            y3: 0.0
+            x4: 0.0
+            y4: 25000.0
+            rotation_angle: 0.0
+    acquisitions:
+        1:
+            slide_id: 0
+            id: 1
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1570
+            max_y: 1504
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-07T12:19:09.314059-05:00'
+            end_timestamp: '2023-02-07T16:10:29.871756-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 21801.764
+            roi_start_y_pos_um: 15417.256
+            roi_end_x_pos_um: 23372.301
+            roi_end_y_pos_um: 13919.125
+            description: 27_YG_X3
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+        2:
+            slide_id: 0
+            id: 2
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1579
+            max_y: 1052
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-07T16:10:42.994644-05:00'
+            end_timestamp: '2023-02-07T18:53:05.936554-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 21775.472
+            roi_start_y_pos_um: 13118.0
+            roi_end_x_pos_um: 23354.999
+            roi_end_y_pos_um: 12070.411
+            description: 27_YG_X4
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+        3:
+            slide_id: 0
+            id: 3
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1550
+            max_y: 1347
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-07T18:53:19.117318-05:00'
+            end_timestamp: '2023-02-07T22:17:14.926482-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 21749.659
+            roi_start_y_pos_um: 11433.056
+            roi_end_x_pos_um: 23300.193
+            roi_end_y_pos_um: 10091.424
+            description: 27_YG_X5
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+        4:
+            slide_id: 0
+            id: 4
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1573
+            max_y: 1511
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-07T22:17:28.051545-05:00'
+            end_timestamp: '2023-02-08T02:09:27.478608-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 21651.971
+            roi_start_y_pos_um: 7792.17
+            roi_end_x_pos_um: 23225.508
+            roi_end_y_pos_um: 6287.059
+            description: 31_VK_X7
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+        5:
+            slide_id: 0
+            id: 5
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1580
+            max_y: 1493
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-08T02:09:40.631363-05:00'
+            end_timestamp: '2023-02-08T06:00:03.615216-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 19845.273
+            roi_start_y_pos_um: 19217.708
+            roi_end_x_pos_um: 21425.811
+            roi_end_y_pos_um: 17730.548
+            description: 31_VK_X1
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+        6:
+            slide_id: 0
+            id: 6
+            origin: mcd
+            source_path: data/Jan202023_Liver_TMA1_9.mcd
+            max_x: 1220
+            max_y: 1458
+            signal_type: Dual
+            segment_data_format: Float
+            ablation_frequency: 200.0
+            ablation_power: 5.0
+            start_timestamp: '2023-02-08T06:00:16.752290-05:00'
+            end_timestamp: '2023-02-08T08:55:12.007210-05:00'
+            movement_type: XRaster
+            ablation_distance_between_shots_x: 1.0
+            ablation_distance_between_shots_y: 1.0
+            template: 20220930_Linda_Bojmar_Liver
+            roi_start_x_pos_um: 19840.866
+            roi_start_y_pos_um: 17258.431
+            roi_end_x_pos_um: 21061.405
+            roi_end_y_pos_um: 15806.163
+            description: 31_VK_X2
+            has_before_ablation_image: 'true'
+            has_after_ablation_image: 'true'
+            is_valid: 'true'
+    Slide:
+    -   ID: '0'
+        Description: Slide
+        Filename: E:\CYTOF\Hyperion\Linda Bojmar\Liver TMA\Jan202023_Liver_TMA1_9.mcd
+        SlideType: '""'
+        WidthUm: '75000'
+        HeightUm: '25000'
+        ImageEndOffset: '27007'
+        ImageStartOffset: '166'
+        ImageFile: '""'
+        EnergyDb: '0'
+        Frequency: '200'
+        FMarkSlideLength: '125000'
+        FMarkSlideThickness: '12000'
+        Name: Empty12AF
+        SwVersion: 7.0.8493.0
+    Panorama:
+    -   ID: '1'
+        SlideID: '0'
+        Description: image_50381313.JPG
+        SlideY4PosUm: '0'
+        SlideX4PosUm: '1439.885'
+        SlideY3PosUm: '0'
+        SlideX3PosUm: '73560.116'
+        SlideY2PosUm: '25000'
+        SlideX2PosUm: '73560.116'
+        SlideY1PosUm: '25000'
+        SlideX1PosUm: '1439.885'
+        ImageEndOffset: '4176424'
+        ImageStartOffset: '27007'
+        PixelWidth: '0'
+        PixelHeight: '0'
+        ImageFormat: PNG
+        PixelScaleCoef: '1'
+        Type: Imported
+        IsLocked: 'true'
+        RotationAngle: '0'
+    -   ID: '2'
+        SlideID: '0'
+        Description: Panorama_002
+        SlideY4PosUm: '5364'
+        SlideX4PosUm: '18972'
+        SlideY3PosUm: '5364'
+        SlideX3PosUm: '23964'
+        SlideY2PosUm: '20148'
+        SlideX2PosUm: '23964'
+        SlideY1PosUm: '20148'
+        SlideX1PosUm: '18972'
+        ImageEndOffset: '71409124'
+        ImageStartOffset: '4176424'
+        PixelWidth: '0'
+        PixelHeight: '0'
+        ImageFormat: PNG
+        PixelScaleCoef: '1'
+        Type: Instrument
+        IsLocked: 'true'
+        RotationAngle: '0'
+    -   ID: '3'
+        SlideID: '0'
+        Description: ROIs
+        SlideY4PosUm: '25000'
+        SlideX4PosUm: '0'
+        SlideY3PosUm: '0'
+        SlideX3PosUm: '0'
+        SlideY2PosUm: '0'
+        SlideX2PosUm: '75000'
+        SlideY1PosUm: '0'
+        SlideX1PosUm: '0'
+        ImageEndOffset: '0'
+        ImageStartOffset: '0'
+        PixelWidth: '0'
+        PixelHeight: '0'
+        ImageFormat: PNG
+        PixelScaleCoef: '1'
+        Type: Default
+        RotationAngle: '0'
+    CalibrationFinal:
+    -   ID: '1'
+        AcquisitionID: '1'
+        TimeStamp: '2023-02-07T12:18:54.1227431-05:00'
+        OptimalDetectorVoltageStart: '-1858.02699920912'
+        OptimalDetectorVoltageEnd: '-1784.4988567058933'
+        OptimalDetectorDualCoefficientStart: '0.029775814609452778'
+        OptimalDetectorDualCoefficientEnd: '0.030607959358673727'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    -   ID: '2'
+        AcquisitionID: '2'
+        TimeStamp: '2023-02-07T16:10:29.8954468-05:00'
+        OptimalDetectorVoltageStart: '-1784.4988567058933'
+        OptimalDetectorVoltageEnd: '-1834.1794491832889'
+        OptimalDetectorDualCoefficientStart: '0.030607959358673727'
+        OptimalDetectorDualCoefficientEnd: '0.029626378372055329'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    -   ID: '3'
+        AcquisitionID: '3'
+        TimeStamp: '2023-02-07T18:53:05.9664779-05:00'
+        OptimalDetectorVoltageStart: '-1834.1794491832889'
+        OptimalDetectorVoltageEnd: '-1817.9303022660251'
+        OptimalDetectorDualCoefficientStart: '0.029626378372055329'
+        OptimalDetectorDualCoefficientEnd: '0.0297174401872188'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    -   ID: '4'
+        AcquisitionID: '4'
+        TimeStamp: '2023-02-07T22:17:14.9514168-05:00'
+        OptimalDetectorVoltageStart: '-1817.9303022660251'
+        OptimalDetectorVoltageEnd: '-1813.4672127535559'
+        OptimalDetectorDualCoefficientStart: '0.0297174401872188'
+        OptimalDetectorDualCoefficientEnd: '0.031369803161720784'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    -   ID: '5'
+        AcquisitionID: '5'
+        TimeStamp: '2023-02-08T02:09:27.5113298-05:00'
+        OptimalDetectorVoltageStart: '-1813.4672127535559'
+        OptimalDetectorVoltageEnd: '-1820.9595584081635'
+        OptimalDetectorDualCoefficientStart: '0.031369803161720784'
+        OptimalDetectorDualCoefficientEnd: '0.029727125306278777'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    -   ID: '6'
+        AcquisitionID: '6'
+        TimeStamp: '2023-02-08T06:00:03.648127-05:00'
+        OptimalDetectorVoltageStart: '-1820.9595584081635'
+        OptimalDetectorVoltageEnd: '-1811.8668771658131'
+        OptimalDetectorDualCoefficientStart: '0.029727125306278777'
+        OptimalDetectorDualCoefficientEnd: '0.030387976181182823'
+        OptimalHelium: '0.25000000000000006'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0'
+        TransientCrossTalk2: '0'
+        ReferenceEnergy: '8.0959175850085216E-10'
+        MaximumEnergy: '1.7257598E-08'
+    Calibration:
+    -   ID: '1'
+        AcquisitionID: '1'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    -   ID: '2'
+        AcquisitionID: '2'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    -   ID: '3'
+        AcquisitionID: '3'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    -   ID: '4'
+        AcquisitionID: '4'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    -   ID: '5'
+        AcquisitionID: '5'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    -   ID: '6'
+        AcquisitionID: '6'
+        Timestamp: '2023-02-07T11:24:40.9829825-05:00'
+    AcquisitionChannel:
+    -   ID: '0'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '1'
+        ChannelLabel: X
+    -   ID: '1'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '1'
+        ChannelLabel: Y
+    -   ID: '2'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '1'
+        ChannelLabel: Z
+    -   ID: '3'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '1'
+        ChannelLabel: HH3
+    -   ID: '4'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '5'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '6'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '7'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '1'
+        ChannelLabel: aSMA
+    -   ID: '8'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '1'
+        ChannelLabel: TNFa
+    -   ID: '9'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '1'
+        ChannelLabel: Iba1
+    -   ID: '10'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '1'
+        ChannelLabel: NE
+    -   ID: '11'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '1'
+        ChannelLabel: CKB
+    -   ID: '12'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '1'
+        ChannelLabel: PD_L1
+    -   ID: '13'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '1'
+        ChannelLabel: CD163
+    -   ID: '14'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '1'
+        ChannelLabel: CD14
+    -   ID: '15'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '1'
+        ChannelLabel: CD11b
+    -   ID: '16'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '1'
+        ChannelLabel: PD_1
+    -   ID: '17'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '1'
+        ChannelLabel: CD31
+    -   ID: '18'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '1'
+        ChannelLabel: CD45
+    -   ID: '19'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '1'
+        ChannelLabel: SORT1
+    -   ID: '20'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '1'
+        ChannelLabel: CD15
+    -   ID: '21'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '1'
+        ChannelLabel: FoxP3
+    -   ID: '22'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '1'
+        ChannelLabel: CD4
+    -   ID: '23'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '1'
+        ChannelLabel: CD204
+    -   ID: '24'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '1'
+        ChannelLabel: NKG2A
+    -   ID: '25'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '1'
+        ChannelLabel: CK7
+    -   ID: '26'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '1'
+        ChannelLabel: CD20
+    -   ID: '27'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '1'
+        ChannelLabel: CD8A
+    -   ID: '28'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '1'
+        ChannelLabel: CD27
+    -   ID: '29'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '1'
+        ChannelLabel: ARG1
+    -   ID: '30'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '1'
+        ChannelLabel: HLA_DR
+    -   ID: '31'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '1'
+        ChannelLabel: EOMES
+    -   ID: '32'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '1'
+        ChannelLabel: GRANZYME_B
+    -   ID: '33'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '1'
+        ChannelLabel: Ki_67
+    -   ID: '34'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '1'
+        ChannelLabel: CItH3
+    -   ID: '35'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '1'
+        ChannelLabel: CD3
+    -   ID: '36'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '1'
+        ChannelLabel: TRDC
+    -   ID: '37'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '1'
+        ChannelLabel: IFNg
+    -   ID: '38'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '1'
+        ChannelLabel: CD45RO
+    -   ID: '39'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '1'
+        ChannelLabel: K8_18
+    -   ID: '40'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '1'
+        ChannelLabel: CD16
+    -   ID: '41'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '1'
+        ChannelLabel: CD11c
+    -   ID: '42'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '1'
+        ChannelLabel: DNA1
+    -   ID: '43'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '1'
+        ChannelLabel: DNA2
+    -   ID: '44'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '45'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '1'
+        ChannelLabel: Vimentin
+    -   ID: '46'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '1'
+        ChannelLabel: CD68
+    -   ID: '47'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '48'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '1'
+        ChannelLabel: null
+    -   ID: '49'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '2'
+        ChannelLabel: X
+    -   ID: '50'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '2'
+        ChannelLabel: Y
+    -   ID: '51'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '2'
+        ChannelLabel: Z
+    -   ID: '52'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '2'
+        ChannelLabel: HH3
+    -   ID: '53'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '54'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '55'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '56'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '2'
+        ChannelLabel: aSMA
+    -   ID: '57'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '2'
+        ChannelLabel: TNFa
+    -   ID: '58'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '2'
+        ChannelLabel: Iba1
+    -   ID: '59'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '2'
+        ChannelLabel: NE
+    -   ID: '60'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '2'
+        ChannelLabel: CKB
+    -   ID: '61'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '2'
+        ChannelLabel: PD_L1
+    -   ID: '62'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '2'
+        ChannelLabel: CD163
+    -   ID: '63'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '2'
+        ChannelLabel: CD14
+    -   ID: '64'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '2'
+        ChannelLabel: CD11b
+    -   ID: '65'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '2'
+        ChannelLabel: PD_1
+    -   ID: '66'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '2'
+        ChannelLabel: CD31
+    -   ID: '67'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '2'
+        ChannelLabel: CD45
+    -   ID: '68'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '2'
+        ChannelLabel: SORT1
+    -   ID: '69'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '2'
+        ChannelLabel: CD15
+    -   ID: '70'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '2'
+        ChannelLabel: FoxP3
+    -   ID: '71'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '2'
+        ChannelLabel: CD4
+    -   ID: '72'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '2'
+        ChannelLabel: CD204
+    -   ID: '73'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '2'
+        ChannelLabel: NKG2A
+    -   ID: '74'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '2'
+        ChannelLabel: CK7
+    -   ID: '75'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '2'
+        ChannelLabel: CD20
+    -   ID: '76'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '2'
+        ChannelLabel: CD8A
+    -   ID: '77'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '2'
+        ChannelLabel: CD27
+    -   ID: '78'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '2'
+        ChannelLabel: ARG1
+    -   ID: '79'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '2'
+        ChannelLabel: HLA_DR
+    -   ID: '80'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '2'
+        ChannelLabel: EOMES
+    -   ID: '81'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '2'
+        ChannelLabel: GRANZYME_B
+    -   ID: '82'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '2'
+        ChannelLabel: Ki_67
+    -   ID: '83'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '2'
+        ChannelLabel: CItH3
+    -   ID: '84'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '2'
+        ChannelLabel: CD3
+    -   ID: '85'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '2'
+        ChannelLabel: TRDC
+    -   ID: '86'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '2'
+        ChannelLabel: IFNg
+    -   ID: '87'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '2'
+        ChannelLabel: CD45RO
+    -   ID: '88'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '2'
+        ChannelLabel: K8_18
+    -   ID: '89'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '2'
+        ChannelLabel: CD16
+    -   ID: '90'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '2'
+        ChannelLabel: CD11c
+    -   ID: '91'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '2'
+        ChannelLabel: DNA1
+    -   ID: '92'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '2'
+        ChannelLabel: DNA2
+    -   ID: '93'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '94'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '2'
+        ChannelLabel: Vimentin
+    -   ID: '95'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '2'
+        ChannelLabel: CD68
+    -   ID: '96'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '97'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '2'
+        ChannelLabel: null
+    -   ID: '98'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '3'
+        ChannelLabel: X
+    -   ID: '99'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '3'
+        ChannelLabel: Y
+    -   ID: '100'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '3'
+        ChannelLabel: Z
+    -   ID: '101'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '3'
+        ChannelLabel: HH3
+    -   ID: '102'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '103'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '104'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '105'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '3'
+        ChannelLabel: aSMA
+    -   ID: '106'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '3'
+        ChannelLabel: TNFa
+    -   ID: '107'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '3'
+        ChannelLabel: Iba1
+    -   ID: '108'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '3'
+        ChannelLabel: NE
+    -   ID: '109'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '3'
+        ChannelLabel: CKB
+    -   ID: '110'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '3'
+        ChannelLabel: PD_L1
+    -   ID: '111'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '3'
+        ChannelLabel: CD163
+    -   ID: '112'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '3'
+        ChannelLabel: CD14
+    -   ID: '113'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '3'
+        ChannelLabel: CD11b
+    -   ID: '114'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '3'
+        ChannelLabel: PD_1
+    -   ID: '115'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '3'
+        ChannelLabel: CD31
+    -   ID: '116'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '3'
+        ChannelLabel: CD45
+    -   ID: '117'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '3'
+        ChannelLabel: SORT1
+    -   ID: '118'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '3'
+        ChannelLabel: CD15
+    -   ID: '119'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '3'
+        ChannelLabel: FoxP3
+    -   ID: '120'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '3'
+        ChannelLabel: CD4
+    -   ID: '121'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '3'
+        ChannelLabel: CD204
+    -   ID: '122'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '3'
+        ChannelLabel: NKG2A
+    -   ID: '123'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '3'
+        ChannelLabel: CK7
+    -   ID: '124'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '3'
+        ChannelLabel: CD20
+    -   ID: '125'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '3'
+        ChannelLabel: CD8A
+    -   ID: '126'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '3'
+        ChannelLabel: CD27
+    -   ID: '127'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '3'
+        ChannelLabel: ARG1
+    -   ID: '128'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '3'
+        ChannelLabel: HLA_DR
+    -   ID: '129'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '3'
+        ChannelLabel: EOMES
+    -   ID: '130'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '3'
+        ChannelLabel: GRANZYME_B
+    -   ID: '131'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '3'
+        ChannelLabel: Ki_67
+    -   ID: '132'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '3'
+        ChannelLabel: CItH3
+    -   ID: '133'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '3'
+        ChannelLabel: CD3
+    -   ID: '134'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '3'
+        ChannelLabel: TRDC
+    -   ID: '135'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '3'
+        ChannelLabel: IFNg
+    -   ID: '136'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '3'
+        ChannelLabel: CD45RO
+    -   ID: '137'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '3'
+        ChannelLabel: K8_18
+    -   ID: '138'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '3'
+        ChannelLabel: CD16
+    -   ID: '139'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '3'
+        ChannelLabel: CD11c
+    -   ID: '140'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '3'
+        ChannelLabel: DNA1
+    -   ID: '141'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '3'
+        ChannelLabel: DNA2
+    -   ID: '142'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '143'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '3'
+        ChannelLabel: Vimentin
+    -   ID: '144'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '3'
+        ChannelLabel: CD68
+    -   ID: '145'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '146'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '3'
+        ChannelLabel: null
+    -   ID: '147'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '4'
+        ChannelLabel: X
+    -   ID: '148'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '4'
+        ChannelLabel: Y
+    -   ID: '149'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '4'
+        ChannelLabel: Z
+    -   ID: '150'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '4'
+        ChannelLabel: HH3
+    -   ID: '151'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '152'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '153'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '154'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '4'
+        ChannelLabel: aSMA
+    -   ID: '155'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '4'
+        ChannelLabel: TNFa
+    -   ID: '156'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '4'
+        ChannelLabel: Iba1
+    -   ID: '157'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '4'
+        ChannelLabel: NE
+    -   ID: '158'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '4'
+        ChannelLabel: CKB
+    -   ID: '159'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '4'
+        ChannelLabel: PD_L1
+    -   ID: '160'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '4'
+        ChannelLabel: CD163
+    -   ID: '161'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '4'
+        ChannelLabel: CD14
+    -   ID: '162'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '4'
+        ChannelLabel: CD11b
+    -   ID: '163'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '4'
+        ChannelLabel: PD_1
+    -   ID: '164'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '4'
+        ChannelLabel: CD31
+    -   ID: '165'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '4'
+        ChannelLabel: CD45
+    -   ID: '166'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '4'
+        ChannelLabel: SORT1
+    -   ID: '167'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '4'
+        ChannelLabel: CD15
+    -   ID: '168'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '4'
+        ChannelLabel: FoxP3
+    -   ID: '169'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '4'
+        ChannelLabel: CD4
+    -   ID: '170'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '4'
+        ChannelLabel: CD204
+    -   ID: '171'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '4'
+        ChannelLabel: NKG2A
+    -   ID: '172'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '4'
+        ChannelLabel: CK7
+    -   ID: '173'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '4'
+        ChannelLabel: CD20
+    -   ID: '174'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '4'
+        ChannelLabel: CD8A
+    -   ID: '175'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '4'
+        ChannelLabel: CD27
+    -   ID: '176'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '4'
+        ChannelLabel: ARG1
+    -   ID: '177'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '4'
+        ChannelLabel: HLA_DR
+    -   ID: '178'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '4'
+        ChannelLabel: EOMES
+    -   ID: '179'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '4'
+        ChannelLabel: GRANZYME_B
+    -   ID: '180'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '4'
+        ChannelLabel: Ki_67
+    -   ID: '181'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '4'
+        ChannelLabel: CItH3
+    -   ID: '182'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '4'
+        ChannelLabel: CD3
+    -   ID: '183'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '4'
+        ChannelLabel: TRDC
+    -   ID: '184'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '4'
+        ChannelLabel: IFNg
+    -   ID: '185'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '4'
+        ChannelLabel: CD45RO
+    -   ID: '186'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '4'
+        ChannelLabel: K8_18
+    -   ID: '187'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '4'
+        ChannelLabel: CD16
+    -   ID: '188'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '4'
+        ChannelLabel: CD11c
+    -   ID: '189'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '4'
+        ChannelLabel: DNA1
+    -   ID: '190'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '4'
+        ChannelLabel: DNA2
+    -   ID: '191'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '192'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '4'
+        ChannelLabel: Vimentin
+    -   ID: '193'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '4'
+        ChannelLabel: CD68
+    -   ID: '194'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '195'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '4'
+        ChannelLabel: null
+    -   ID: '196'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '5'
+        ChannelLabel: X
+    -   ID: '197'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '5'
+        ChannelLabel: Y
+    -   ID: '198'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '5'
+        ChannelLabel: Z
+    -   ID: '199'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '5'
+        ChannelLabel: HH3
+    -   ID: '200'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '201'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '202'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '203'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '5'
+        ChannelLabel: aSMA
+    -   ID: '204'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '5'
+        ChannelLabel: TNFa
+    -   ID: '205'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '5'
+        ChannelLabel: Iba1
+    -   ID: '206'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '5'
+        ChannelLabel: NE
+    -   ID: '207'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '5'
+        ChannelLabel: CKB
+    -   ID: '208'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '5'
+        ChannelLabel: PD_L1
+    -   ID: '209'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '5'
+        ChannelLabel: CD163
+    -   ID: '210'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '5'
+        ChannelLabel: CD14
+    -   ID: '211'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '5'
+        ChannelLabel: CD11b
+    -   ID: '212'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '5'
+        ChannelLabel: PD_1
+    -   ID: '213'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '5'
+        ChannelLabel: CD31
+    -   ID: '214'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '5'
+        ChannelLabel: CD45
+    -   ID: '215'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '5'
+        ChannelLabel: SORT1
+    -   ID: '216'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '5'
+        ChannelLabel: CD15
+    -   ID: '217'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '5'
+        ChannelLabel: FoxP3
+    -   ID: '218'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '5'
+        ChannelLabel: CD4
+    -   ID: '219'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '5'
+        ChannelLabel: CD204
+    -   ID: '220'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '5'
+        ChannelLabel: NKG2A
+    -   ID: '221'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '5'
+        ChannelLabel: CK7
+    -   ID: '222'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '5'
+        ChannelLabel: CD20
+    -   ID: '223'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '5'
+        ChannelLabel: CD8A
+    -   ID: '224'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '5'
+        ChannelLabel: CD27
+    -   ID: '225'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '5'
+        ChannelLabel: ARG1
+    -   ID: '226'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '5'
+        ChannelLabel: HLA_DR
+    -   ID: '227'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '5'
+        ChannelLabel: EOMES
+    -   ID: '228'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '5'
+        ChannelLabel: GRANZYME_B
+    -   ID: '229'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '5'
+        ChannelLabel: Ki_67
+    -   ID: '230'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '5'
+        ChannelLabel: CItH3
+    -   ID: '231'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '5'
+        ChannelLabel: CD3
+    -   ID: '232'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '5'
+        ChannelLabel: TRDC
+    -   ID: '233'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '5'
+        ChannelLabel: IFNg
+    -   ID: '234'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '5'
+        ChannelLabel: CD45RO
+    -   ID: '235'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '5'
+        ChannelLabel: K8_18
+    -   ID: '236'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '5'
+        ChannelLabel: CD16
+    -   ID: '237'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '5'
+        ChannelLabel: CD11c
+    -   ID: '238'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '5'
+        ChannelLabel: DNA1
+    -   ID: '239'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '5'
+        ChannelLabel: DNA2
+    -   ID: '240'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '241'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '5'
+        ChannelLabel: Vimentin
+    -   ID: '242'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '5'
+        ChannelLabel: CD68
+    -   ID: '243'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '244'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '5'
+        ChannelLabel: null
+    -   ID: '245'
+        ChannelName: X
+        OrderNumber: '0'
+        AcquisitionID: '6'
+        ChannelLabel: X
+    -   ID: '246'
+        ChannelName: Y
+        OrderNumber: '1'
+        AcquisitionID: '6'
+        ChannelLabel: Y
+    -   ID: '247'
+        ChannelName: Z
+        OrderNumber: '2'
+        AcquisitionID: '6'
+        ChannelLabel: Z
+    -   ID: '248'
+        ChannelName: In(113)
+        OrderNumber: '3'
+        AcquisitionID: '6'
+        ChannelLabel: HH3
+    -   ID: '249'
+        ChannelName: In(115)
+        OrderNumber: '4'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    -   ID: '250'
+        ChannelName: Xe(131)
+        OrderNumber: '5'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    -   ID: '251'
+        ChannelName: La(139)
+        OrderNumber: '6'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    -   ID: '252'
+        ChannelName: Pr(141)
+        OrderNumber: '7'
+        AcquisitionID: '6'
+        ChannelLabel: aSMA
+    -   ID: '253'
+        ChannelName: Nd(142)
+        OrderNumber: '8'
+        AcquisitionID: '6'
+        ChannelLabel: TNFa
+    -   ID: '254'
+        ChannelName: Nd(143)
+        OrderNumber: '9'
+        AcquisitionID: '6'
+        ChannelLabel: Iba1
+    -   ID: '255'
+        ChannelName: Nd(144)
+        OrderNumber: '10'
+        AcquisitionID: '6'
+        ChannelLabel: NE
+    -   ID: '256'
+        ChannelName: Nd(145)
+        OrderNumber: '11'
+        AcquisitionID: '6'
+        ChannelLabel: CKB
+    -   ID: '257'
+        ChannelName: Nd(146)
+        OrderNumber: '12'
+        AcquisitionID: '6'
+        ChannelLabel: PD_L1
+    -   ID: '258'
+        ChannelName: Sm(147)
+        OrderNumber: '13'
+        AcquisitionID: '6'
+        ChannelLabel: CD163
+    -   ID: '259'
+        ChannelName: Nd(148)
+        OrderNumber: '14'
+        AcquisitionID: '6'
+        ChannelLabel: CD14
+    -   ID: '260'
+        ChannelName: Sm(149)
+        OrderNumber: '15'
+        AcquisitionID: '6'
+        ChannelLabel: CD11b
+    -   ID: '261'
+        ChannelName: Nd(150)
+        OrderNumber: '16'
+        AcquisitionID: '6'
+        ChannelLabel: PD_1
+    -   ID: '262'
+        ChannelName: Eu(151)
+        OrderNumber: '17'
+        AcquisitionID: '6'
+        ChannelLabel: CD31
+    -   ID: '263'
+        ChannelName: Sm(152)
+        OrderNumber: '18'
+        AcquisitionID: '6'
+        ChannelLabel: CD45
+    -   ID: '264'
+        ChannelName: Eu(153)
+        OrderNumber: '19'
+        AcquisitionID: '6'
+        ChannelLabel: SORT1
+    -   ID: '265'
+        ChannelName: Sm(154)
+        OrderNumber: '20'
+        AcquisitionID: '6'
+        ChannelLabel: CD15
+    -   ID: '266'
+        ChannelName: Gd(155)
+        OrderNumber: '21'
+        AcquisitionID: '6'
+        ChannelLabel: FoxP3
+    -   ID: '267'
+        ChannelName: Gd(156)
+        OrderNumber: '22'
+        AcquisitionID: '6'
+        ChannelLabel: CD4
+    -   ID: '268'
+        ChannelName: Gd(158)
+        OrderNumber: '23'
+        AcquisitionID: '6'
+        ChannelLabel: CD204
+    -   ID: '269'
+        ChannelName: Tb(159)
+        OrderNumber: '24'
+        AcquisitionID: '6'
+        ChannelLabel: NKG2A
+    -   ID: '270'
+        ChannelName: Gd(160)
+        OrderNumber: '25'
+        AcquisitionID: '6'
+        ChannelLabel: CK7
+    -   ID: '271'
+        ChannelName: Dy(161)
+        OrderNumber: '26'
+        AcquisitionID: '6'
+        ChannelLabel: CD20
+    -   ID: '272'
+        ChannelName: Dy(162)
+        OrderNumber: '27'
+        AcquisitionID: '6'
+        ChannelLabel: CD8A
+    -   ID: '273'
+        ChannelName: Dy(163)
+        OrderNumber: '28'
+        AcquisitionID: '6'
+        ChannelLabel: CD27
+    -   ID: '274'
+        ChannelName: Dy(164)
+        OrderNumber: '29'
+        AcquisitionID: '6'
+        ChannelLabel: ARG1
+    -   ID: '275'
+        ChannelName: Ho(165)
+        OrderNumber: '30'
+        AcquisitionID: '6'
+        ChannelLabel: HLA_DR
+    -   ID: '276'
+        ChannelName: Er(166)
+        OrderNumber: '31'
+        AcquisitionID: '6'
+        ChannelLabel: EOMES
+    -   ID: '277'
+        ChannelName: Er(167)
+        OrderNumber: '32'
+        AcquisitionID: '6'
+        ChannelLabel: GRANZYME_B
+    -   ID: '278'
+        ChannelName: Er(168)
+        OrderNumber: '33'
+        AcquisitionID: '6'
+        ChannelLabel: Ki_67
+    -   ID: '279'
+        ChannelName: Tm(169)
+        OrderNumber: '34'
+        AcquisitionID: '6'
+        ChannelLabel: CItH3
+    -   ID: '280'
+        ChannelName: Er(170)
+        OrderNumber: '35'
+        AcquisitionID: '6'
+        ChannelLabel: CD3
+    -   ID: '281'
+        ChannelName: Yb(171)
+        OrderNumber: '36'
+        AcquisitionID: '6'
+        ChannelLabel: TRDC
+    -   ID: '282'
+        ChannelName: Yb(172)
+        OrderNumber: '37'
+        AcquisitionID: '6'
+        ChannelLabel: IFNg
+    -   ID: '283'
+        ChannelName: Yb(173)
+        OrderNumber: '38'
+        AcquisitionID: '6'
+        ChannelLabel: CD45RO
+    -   ID: '284'
+        ChannelName: Yb(174)
+        OrderNumber: '39'
+        AcquisitionID: '6'
+        ChannelLabel: K8_18
+    -   ID: '285'
+        ChannelName: Lu(175)
+        OrderNumber: '40'
+        AcquisitionID: '6'
+        ChannelLabel: CD16
+    -   ID: '286'
+        ChannelName: Yb(176)
+        OrderNumber: '41'
+        AcquisitionID: '6'
+        ChannelLabel: CD11c
+    -   ID: '287'
+        ChannelName: Ir(191)
+        OrderNumber: '42'
+        AcquisitionID: '6'
+        ChannelLabel: DNA1
+    -   ID: '288'
+        ChannelName: Ir(193)
+        OrderNumber: '43'
+        AcquisitionID: '6'
+        ChannelLabel: DNA2
+    -   ID: '289'
+        ChannelName: Pt(194)
+        OrderNumber: '44'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    -   ID: '290'
+        ChannelName: Pt(195)
+        OrderNumber: '45'
+        AcquisitionID: '6'
+        ChannelLabel: Vimentin
+    -   ID: '291'
+        ChannelName: Pt(196)
+        OrderNumber: '46'
+        AcquisitionID: '6'
+        ChannelLabel: CD68
+    -   ID: '292'
+        ChannelName: Pt(198)
+        OrderNumber: '47'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    -   ID: '293'
+        ChannelName: Pb(206)
+        OrderNumber: '48'
+        AcquisitionID: '6'
+        ChannelLabel: null
+    Acquisition:
+    -   ID: '1'
+        Description: 27_YG_X3
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '1'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '71409124'
+        DataEndOffset: '534220004'
+        StartTimeStamp: '2023-02-07T12:19:09.314059-05:00'
+        EndTimeStamp: '2023-02-07T16:10:29.8717565-05:00'
+        AfterAblationImageEndOffset: '2550377634'
+        AfterAblationImageStartOffset: '2548284141'
+        BeforeAblationImageEndOffset: '2548284141'
+        BeforeAblationImageStartOffset: '2545858360'
+        ROIStartXPosUm: '21801764'
+        ROIStartYPosUm: '15417256'
+        ROIEndXPosUm: '23372.301'
+        ROIEndYPosUm: '13919.125'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1504'
+        MaxX: '1570'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    -   ID: '2'
+        Description: 27_YG_X4
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '2'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '534220004'
+        DataEndOffset: '859797172'
+        StartTimeStamp: '2023-02-07T16:10:42.9946442-05:00'
+        EndTimeStamp: '2023-02-07T18:53:05.9365546-05:00'
+        AfterAblationImageEndOffset: '2553491910'
+        AfterAblationImageStartOffset: '2552089132'
+        BeforeAblationImageEndOffset: '2552089132'
+        BeforeAblationImageStartOffset: '2550377634'
+        ROIStartXPosUm: '21775472'
+        ROIStartYPosUm: '13118000'
+        ROIEndXPosUm: '23354.999'
+        ROIEndYPosUm: '12070.411'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1052'
+        MaxX: '1579'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    -   ID: '3'
+        Description: 27_YG_X5
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '3'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '859797172'
+        DataEndOffset: '1269015772'
+        StartTimeStamp: '2023-02-07T18:53:19.1173181-05:00'
+        EndTimeStamp: '2023-02-07T22:17:14.926482-05:00'
+        AfterAblationImageEndOffset: '2557531120'
+        AfterAblationImageStartOffset: '2555671855'
+        BeforeAblationImageEndOffset: '2555671855'
+        BeforeAblationImageStartOffset: '2553491910'
+        ROIStartXPosUm: '21749659'
+        ROIStartYPosUm: '11433056'
+        ROIEndXPosUm: '23300.193'
+        ROIEndYPosUm: '10091.424'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1347'
+        MaxX: '1550'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    -   ID: '4'
+        Description: 31_VK_X7
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '4'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '1269015772'
+        DataEndOffset: '1734869160'
+        StartTimeStamp: '2023-02-07T22:17:28.0515455-05:00'
+        EndTimeStamp: '2023-02-08T02:09:27.4786086-05:00'
+        AfterAblationImageEndOffset: '2562090443'
+        AfterAblationImageStartOffset: '2560143784'
+        BeforeAblationImageEndOffset: '2560143784'
+        BeforeAblationImageStartOffset: '2557531120'
+        ROIStartXPosUm: '21651971'
+        ROIStartYPosUm: '7792170'
+        ROIEndXPosUm: '23225.508'
+        ROIEndYPosUm: '6287.059'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1511'
+        MaxX: '1573'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    -   ID: '5'
+        Description: 31_VK_X1
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '5'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '1734869160'
+        DataEndOffset: '2197221400'
+        StartTimeStamp: '2023-02-08T02:09:40.631363-05:00'
+        EndTimeStamp: '2023-02-08T06:00:03.6152166-05:00'
+        AfterAblationImageEndOffset: '2566617178'
+        AfterAblationImageStartOffset: '2564665461'
+        BeforeAblationImageEndOffset: '2564665461'
+        BeforeAblationImageStartOffset: '2562090443'
+        ROIStartXPosUm: '19845273'
+        ROIStartYPosUm: '19217708'
+        ROIEndXPosUm: '21425.811'
+        ROIEndYPosUm: '17730.548'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1493'
+        MaxX: '1580'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    -   ID: '6'
+        Description: 31_VK_X2
+        AblationPower: '5'
+        AblationDistanceBetweenShotsX: '1'
+        AblationDistanceBetweenShotsY: '1'
+        AblationFrequency: '200'
+        AcquisitionROIID: '6'
+        OrderNumber: '0'
+        SignalType: Dual
+        DualCountStart: '1'
+        DataStartOffset: '2197221400'
+        DataEndOffset: '2545858360'
+        StartTimeStamp: '2023-02-08T06:00:16.7522901-05:00'
+        EndTimeStamp: '2023-02-08T08:55:12.0072107-05:00'
+        AfterAblationImageEndOffset: '2570027829'
+        AfterAblationImageStartOffset: '2568549611'
+        BeforeAblationImageEndOffset: '2568549611'
+        BeforeAblationImageStartOffset: '2566617178'
+        ROIStartXPosUm: '19840866'
+        ROIStartYPosUm: '17258431'
+        ROIEndXPosUm: '21061.405'
+        ROIEndYPosUm: '15806.163'
+        MovementType: XRaster
+        SegmentDataFormat: Float
+        ValueBytes: '4'
+        MaxY: '1458'
+        MaxX: '1220'
+        PlumeStart: '1850'
+        PlumeEnd: '2234'
+        Template: 20220930_Linda_Bojmar_Liver
+        ProfilingType: Global
+    AcquisitionROI:
+    -   ID: '1'
+        Description: 27_YG_X3
+        PanoramaID: '3'
+        ROIType: null
+    -   ID: '2'
+        Description: 27_YG_X4
+        PanoramaID: '3'
+        ROIType: null
+    -   ID: '3'
+        Description: 27_YG_X5
+        PanoramaID: '3'
+        ROIType: null
+    -   ID: '4'
+        Description: 31_VK_X7
+        PanoramaID: '3'
+        ROIType: null
+    -   ID: '5'
+        Description: 31_VK_X1
+        PanoramaID: '3'
+        ROIType: null
+    -   ID: '6'
+        Description: 31_VK_X2
+        PanoramaID: '3'
+        ROIType: null
+    ROIPoint:
+    -   ID: '1'
+        AcquisitionROIID: '1'
+        OrderNumber: '0'
+        SlideXPosUm: '21801.764'
+        SlideYPosUm: '15417.256'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '2'
+        AcquisitionROIID: '1'
+        OrderNumber: '1'
+        SlideXPosUm: '23371.764'
+        SlideYPosUm: '15417.256'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '3'
+        AcquisitionROIID: '1'
+        OrderNumber: '2'
+        SlideXPosUm: '23371.764'
+        SlideYPosUm: '13913.256'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '4'
+        AcquisitionROIID: '1'
+        OrderNumber: '3'
+        SlideXPosUm: '21801.764'
+        SlideYPosUm: '13913.256'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '5'
+        AcquisitionROIID: '2'
+        OrderNumber: '0'
+        SlideXPosUm: '21775.472'
+        SlideYPosUm: '13118'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '6'
+        AcquisitionROIID: '2'
+        OrderNumber: '1'
+        SlideXPosUm: '23354.472'
+        SlideYPosUm: '13118'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '7'
+        AcquisitionROIID: '2'
+        OrderNumber: '2'
+        SlideXPosUm: '23354.472'
+        SlideYPosUm: '12066'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '8'
+        AcquisitionROIID: '2'
+        OrderNumber: '3'
+        SlideXPosUm: '21775.472'
+        SlideYPosUm: '12066'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '9'
+        AcquisitionROIID: '3'
+        OrderNumber: '0'
+        SlideXPosUm: '21749.659'
+        SlideYPosUm: '11433.056'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '10'
+        AcquisitionROIID: '3'
+        OrderNumber: '1'
+        SlideXPosUm: '23299.659'
+        SlideYPosUm: '11433.056'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '11'
+        AcquisitionROIID: '3'
+        OrderNumber: '2'
+        SlideXPosUm: '23299.659'
+        SlideYPosUm: '10086.056'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '12'
+        AcquisitionROIID: '3'
+        OrderNumber: '3'
+        SlideXPosUm: '21749.659'
+        SlideYPosUm: '10086.056'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '13'
+        AcquisitionROIID: '4'
+        OrderNumber: '0'
+        SlideXPosUm: '21651.971'
+        SlideYPosUm: '7792.17'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '14'
+        AcquisitionROIID: '4'
+        OrderNumber: '1'
+        SlideXPosUm: '23224.971'
+        SlideYPosUm: '7792.17'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '15'
+        AcquisitionROIID: '4'
+        OrderNumber: '2'
+        SlideXPosUm: '23224.971'
+        SlideYPosUm: '6281.17'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '16'
+        AcquisitionROIID: '4'
+        OrderNumber: '3'
+        SlideXPosUm: '21651.971'
+        SlideYPosUm: '6281.17'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '17'
+        AcquisitionROIID: '5'
+        OrderNumber: '0'
+        SlideXPosUm: '19845.273'
+        SlideYPosUm: '19217.708'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '18'
+        AcquisitionROIID: '5'
+        OrderNumber: '1'
+        SlideXPosUm: '21425.273'
+        SlideYPosUm: '19217.708'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '19'
+        AcquisitionROIID: '5'
+        OrderNumber: '2'
+        SlideXPosUm: '21425.273'
+        SlideYPosUm: '17724.708'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '20'
+        AcquisitionROIID: '5'
+        OrderNumber: '3'
+        SlideXPosUm: '19845.273'
+        SlideYPosUm: '17724.708'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '21'
+        AcquisitionROIID: '6'
+        OrderNumber: '0'
+        SlideXPosUm: '19840.866'
+        SlideYPosUm: '17258.431'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '22'
+        AcquisitionROIID: '6'
+        OrderNumber: '1'
+        SlideXPosUm: '21060.866'
+        SlideYPosUm: '17258.431'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '23'
+        AcquisitionROIID: '6'
+        OrderNumber: '2'
+        SlideXPosUm: '21060.866'
+        SlideYPosUm: '15800.431'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    -   ID: '24'
+        AcquisitionROIID: '6'
+        OrderNumber: '3'
+        SlideXPosUm: '19840.866'
+        SlideYPosUm: '15800.431'
+        PanoramaPixelXPos: '1'
+        PanoramaPixelYPos: '1'
+    CalibrationParams:
+    -   CalibrationID: '1'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    -   CalibrationID: '2'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    -   CalibrationID: '3'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    -   CalibrationID: '4'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    -   CalibrationID: '5'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    -   CalibrationID: '6'
+        OptimalDetectorVoltage: '-1858.02699920912'
+        OptimalDetectorDualCoefficient: '0.029775814609452778'
+        OptimalMakeupGas: '0.96000000000000019'
+        OptimalCurrent: '5'
+        OptimalX: '68000'
+        OptimalY: '32000'
+        TransientStart: '1850'
+        TransientCrossTalk1: '0.082548528909683228'
+        TransientCrossTalk2: '0.015322643332183361'
+        OptimalHelium: '0.25000000000000006'
+    CalibrationChannel:
+    -   CalibrationID: '1'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '1'
+    -   CalibrationID: '1'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '2'
+    -   CalibrationID: '1'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '3'
+    -   CalibrationID: '1'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '4'
+    -   CalibrationID: '1'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '5'
+    -   CalibrationID: '1'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '6'
+    -   CalibrationID: '1'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '7'
+    -   CalibrationID: '1'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '8'
+    -   CalibrationID: '1'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '9'
+    -   CalibrationID: '1'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '10'
+    -   CalibrationID: '2'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '11'
+    -   CalibrationID: '2'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '12'
+    -   CalibrationID: '2'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '13'
+    -   CalibrationID: '2'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '14'
+    -   CalibrationID: '2'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '15'
+    -   CalibrationID: '2'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '16'
+    -   CalibrationID: '2'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '17'
+    -   CalibrationID: '2'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '18'
+    -   CalibrationID: '2'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '19'
+    -   CalibrationID: '2'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '20'
+    -   CalibrationID: '3'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '21'
+    -   CalibrationID: '3'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '22'
+    -   CalibrationID: '3'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '23'
+    -   CalibrationID: '3'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '24'
+    -   CalibrationID: '3'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '25'
+    -   CalibrationID: '3'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '26'
+    -   CalibrationID: '3'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '27'
+    -   CalibrationID: '3'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '28'
+    -   CalibrationID: '3'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '29'
+    -   CalibrationID: '3'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '30'
+    -   CalibrationID: '4'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '31'
+    -   CalibrationID: '4'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '32'
+    -   CalibrationID: '4'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '33'
+    -   CalibrationID: '4'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '34'
+    -   CalibrationID: '4'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '35'
+    -   CalibrationID: '4'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '36'
+    -   CalibrationID: '4'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '37'
+    -   CalibrationID: '4'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '38'
+    -   CalibrationID: '4'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '39'
+    -   CalibrationID: '4'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '40'
+    -   CalibrationID: '5'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '41'
+    -   CalibrationID: '5'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '42'
+    -   CalibrationID: '5'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '43'
+    -   CalibrationID: '5'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '44'
+    -   CalibrationID: '5'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '45'
+    -   CalibrationID: '5'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '46'
+    -   CalibrationID: '5'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '47'
+    -   CalibrationID: '5'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '48'
+    -   CalibrationID: '5'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '49'
+    -   CalibrationID: '5'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '50'
+    -   CalibrationID: '6'
+        Name: ArAr(80)
+        MeanDuals: '30611.570517647629'
+        ID: '51'
+    -   CalibrationID: '6'
+        Name: Y(89)
+        MeanDuals: '148.9'
+        ID: '52'
+    -   CalibrationID: '6'
+        Name: In(115)
+        MeanDuals: '186.13'
+        ID: '53'
+    -   CalibrationID: '6'
+        Name: Xe(131)
+        MeanDuals: '432.38169784103678'
+        ID: '54'
+    -   CalibrationID: '6'
+        Name: Xe(134)
+        MeanDuals: '296.98'
+        ID: '55'
+    -   CalibrationID: '6'
+        Name: Ce(140)
+        MeanDuals: '329.156619464574'
+        ID: '56'
+    -   CalibrationID: '6'
+        Name: Eu(151)
+        MeanDuals: '407.80263545382383'
+        ID: '57'
+    -   CalibrationID: '6'
+        Name: Eu(153)
+        MeanDuals: '654.07467704289218'
+        ID: '58'
+    -   CalibrationID: '6'
+        Name: Lu(175)
+        MeanDuals: '825.68361369825379'
+        ID: '59'
+    -   CalibrationID: '6'
+        Name: Os(189)
+        MeanDuals: '0.03'
+        ID: '60'
+    SlideFiducialMarks:
+    -   ID: '1'
+        SlideID: '0'
+        CoordinateX: '6162500'
+        CoordinateY: '19862500'
+    -   ID: '2'
+        SlideID: '0'
+        CoordinateX: '6162500'
+        CoordinateY: '7162500'
+    -   ID: '3'
+        SlideID: '0'
+        CoordinateX: '49162500'
+        CoordinateY: '19862500'
+    -   ID: '4'
+        SlideID: '0'
+        CoordinateX: '49162500'
+        CoordinateY: '7162500'
+    SlideProfile:
+    -   ID: '1'
+        SlideID: '0'
+        CoordinateX: '10000000'
+        CoordinateY: '19000000'
+    -   ID: '2'
+        SlideID: '0'
+        CoordinateX: '22000000'
+        CoordinateY: '19000000'
+    -   ID: '3'
+        SlideID: '0'
+        CoordinateX: '36000000'
+        CoordinateY: '19000000'
+    -   ID: '4'
+        SlideID: '0'
+        CoordinateX: '50000000'
+        CoordinateY: '19000000'
+    -   ID: '5'
+        SlideID: '0'
+        CoordinateX: '10000000'
+        CoordinateY: '13000000'
+    -   ID: '6'
+        SlideID: '0'
+        CoordinateX: '22000000'
+        CoordinateY: '13000000'
+    -   ID: '7'
+        SlideID: '0'
+        CoordinateX: '36000000'
+        CoordinateY: '13000000'
+    -   ID: '8'
+        SlideID: '0'
+        CoordinateX: '50000000'
+        CoordinateY: '13000000'
+    -   ID: '9'
+        SlideID: '0'
+        CoordinateX: '10000000'
+        CoordinateY: '7000000'
+    -   ID: '10'
+        SlideID: '0'
+        CoordinateX: '22000000'
+        CoordinateY: '7000000'
+    -   ID: '11'
+        SlideID: '0'
+        CoordinateX: '36000000'
+        CoordinateY: '7000000'
+    -   ID: '12'
+        SlideID: '0'
+        CoordinateX: '50000000'
+        CoordinateY: '7000000'

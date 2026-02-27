@@ -68,6 +68,9 @@ projects/visium/*/figures/
 projects/visium_hd/*/figures/
 projects/xenium/*/figures/
 projects/imc/*/figures/
+projects/imc/*/images/
+projects/imc/*/anndata/
+projects/imc/*/documentation/
 projects/visium/*/results/
 projects/visium_hd/*/results/
 projects/xenium/*/results/
@@ -135,8 +138,13 @@ projects/visium_hd/*/models/
 projects/visium_hd/*/metadata/qc/
 **/old code/*.ipynb
 
-# Optional: uncomment to ignore large metadata CSVs inside projects
-# projects/visium/*/metadata/*.csv
-# projects/visium_hd/*/metadata/*.csv
-# projects/xenium/*/metadata/*.csv
-# projects/imc/*/metadata/*.csv
+# Project-related metadata (inventory, notebooks, RDS usage, etc.) — do not commit
+projects/**/metadata/
+
+# Nested git repos under projects (do not add as submodules by accident)
+projects/**/.git/
+
+# Claude Code — local/personal config (not shared)
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/CLAUDE.local.md

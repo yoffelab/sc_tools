@@ -1,0 +1,43 @@
+---
+description: Use run_container.sh for all pipeline runs (OS-aware: Docker on macOS, Apptainer on Linux)
+globs: ["**/Snakefile", "**/config.yaml", "**/run_*.sh", "project_setup.md", "**/Makefile", "Dockerfile", "scripts/**"]
+alwaysApply: true
+---
+
+# Containers: OS-aware runtime via run_container.sh
+
+Full setup: see @project_setup.md
+
+## Rules
+
+- **Always use `scripts/run_container.sh`** (not `run_apptainer.sh` or `run_docker.sh` directly — those are deprecated wrappers).
+- Runtime is auto-detected: macOS → Docker; Linux → Apptainer preferred, Docker fallback.
+- Force a runtime: `SC_TOOLS_RUNTIME=docker|apptainer ./scripts/run_container.sh ...`
+- SIF path: `containers/sc_tools.sif` (or `SC_TOOLS_SIF` env var).
+- Image: `sc_tools:latest` (or `SC_TOOLS_IMAGE` env var).
+
+## One-off script run
+
+```bash
+./scripts/run_container.sh projects/visium/ggo_visium python scripts/foo.py
+./scripts/run_container.sh projects/visium/ggo_visium   # interactive
+```
+
+## Snakemake
+
+Each project Snakefile calls `run_container.sh` via the `run_container()` helper:
+```python
+def run_container(script):
+    return f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
+```
+
+## Build SIF (Linux/HPC)
+
+```bash
+docker build -t sc_tools:latest .
+apptainer build containers/sc_tools.sif docker-daemon://sc_tools:latest
+```
+
+## Environment variables set inside container
+
+- `PROJECT_DIR` — absolute path to the project directory inside the container (e.g. `/workspace/projects/visium/ggo_visium`)

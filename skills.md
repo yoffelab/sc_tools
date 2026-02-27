@@ -9,8 +9,8 @@ This document defines actionable, reproducible skills and best-practice guidelin
 ## 1. Data Ingestion, Integrity, and Multi-Modal Containers
 
 ### Core Skills
-- Load data into standardized containers: **AnnData** for single-modality and **SpatialData** for multi-modal datasets (images, masks, points, and expression).
-- **Scalability:** Utilize **Dask-backed** arrays and **Zarr** storage to handle "out-of-memory" issues common with Visium HD and Xenium.
+- Load data into standardized containers: **AnnData** for single-modality, **MuData** for multi-modal (multi-omics) in-memory, and **SpatialData** for multi-modal datasets (images, masks, points, and expression).
+- **Scalability:** Utilize **Dask-backed** arrays and **Zarr** storage to handle "out-of-memory" issues common with Visium HD and Xenium. For GPU-accelerated preprocessing and PCA, consider **rapids-singlecell** (RAPIDS) where compatible.
 - Maintain coordinate systems (physical microns vs. pixel space) for high-resolution platforms.
 - Ensure consistent cell/spot identifiers across all modalities and verify presence of expression matrices, metadata, and spatial coordinates.
 
@@ -129,10 +129,14 @@ For all statistical comparisons (boxplots, violin plots, strip plots), the follo
 
 ## 11. Reproducibility and Workflow Standards
 
+### Sandbox and local runs (defaults)
+- **Always use Snakemake as the workflow engine for all runs** (sandbox, local, and production). Each project has its own Snakefile. Run rules inside the project container image so that execution is reproducible and consistent.
+- Prefer Snakemake for one-off and development runs; use a project Snakefile unless the user or project explicitly overrides (e.g. bare Python or Makefile).
+
 ### Required Practices
 - Use version control (Git) for all analysis code and notebook checkpoints.
-- **Workflow Managers:** Adopt **Nextflow** for the phase-dependent pipeline (Phases 1–7 documented in Mission.md, Architecture.md, README). The existing phase workflow (checkpoint names, entry points, human-in-loop steps) maps to Nextflow processes; Makefile may coexist during migration. Run Nextflow in CI (e.g. `nextflow run main.nf -dry-run` or execute with fixture data) to validate the workflow. Chosen for scalability and reproducibility over Snakemake.
-- **Containerization:** Use **Docker** for local runs and **Singularity/Apptainer** for HPC. The pipeline should **auto-configure** based on environment: detect local (Docker available) vs HPC (Singularity/Apptainer available) and select the appropriate executor. Define one container image per pipeline (or per process if needed); publish to a registry (e.g. Docker Hub, GHCR) so HPC can pull via Singularity. Ensure environment parity across local and HPC runs.
+- **Workflow Manager:** **Snakemake** is the workflow engine for all environments (dev, sandbox, production, CI). Each project has a Snakefile implementing the phase-dependent pipeline (Phases 1-7 documented in Mission.md, Architecture.md, README). Makefile may coexist for convenience targets. Run Snakemake dry-run in CI to validate the workflow.
+- **Containerization:** Use **Apptainer/Singularity** as the primary container runtime (Linux/HPC). Use **Docker** as the fallback for macOS and Windows where Apptainer is not natively available. The pipeline **auto-configures** via `scripts/run_container.sh`: detect platform and select the appropriate runtime. Define one container image per pipeline; publish to a registry (e.g. Docker Hub, GHCR) so HPC can pull via Apptainer. Ensure environment parity across local and HPC runs.
 - **Packaging and distribution:** Make package compatible with pip, uv, and poetry; support **PyPI deployment** so the package can be installed via `pip install <package_name>`. Use `pyproject.toml` with build-backend and versioning; publish via GitHub Actions on release (trusted publishing or secrets), never store PyPI credentials in the repo.
 - **Linting:** Apply a consistent linter (e.g. **Ruff** or flake8) and optionally a formatter (e.g. Ruff format or Black); config in repo (`pyproject.toml` or `ruff.toml`). Do not commit code that fails the configured lint check; fix or explicitly ignore with justification.
 - **API documentation:** Generate and maintain API docs with **Sphinx** (autodoc from docstrings); public modules and functions should have docstrings that appear in the built docs. Document build command (e.g. `make docs`) and where built docs live (`docs/` source, `_build/html`, or deployed URL).
@@ -189,11 +193,14 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 - Try to generate fail-proof test samples associated with code that is generated. Try to perform unit and integration test where applicable.
 - Generate a wide coverage of inputs to generated code, including with empty, sub, and full data.
 - Always test generated code so that it **compiles, passes lint, and runs** without error.
-- **CI:** Use **GitHub Actions** to run the test suite on push/PR; the workflow should run lint (e.g. `ruff check`), the project test suite (e.g. `pytest`), and optionally Nextflow validation (e.g. `nextflow run main.nf -dry-run` or run with fixtures). Fail if any step fails. Document the workflow location (e.g. `.github/workflows/tests.yml`) and how to run the same commands locally.
+- **CI:** Use **GitHub Actions** to run the test suite on push/PR; the workflow should run lint (e.g. `ruff check`), the project test suite (e.g. `pytest`), and optionally Snakemake validation (e.g. `snakemake -n` dry-run or run with fixtures). Fail if any step fails. Document the workflow location (e.g. `.github/workflows/tests.yml`) and how to run the same commands locally.
 
 ---
 
 ## Appendix: Common Libraries
+
+### Data Containers & Multi-Modal
+- **AnnData** (single-modality), **MuData** (multi-modal, multi-omics; mudata), **SpatialData** (spatial multi-modal with images, shapes, points)
 
 ### Modeling & Integration
 - `scvi-tools`, `moscot`, `cell2location`, `harmonypy`
@@ -201,11 +208,16 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 ### Spatial Analysis & Frameworks
 - `spatialdata`, `squidpy`, `tangram`, `scvelo`
 
+### GPU-Accelerated & Scalability
+- **rapids-singlecell** (RAPIDS for single-cell: GPU-accelerated preprocessing, PCA, clustering; scanpy-like API where applicable)
+- `cuml`, `cucim` (RAPIDS ecosystem for ML and imaging)
+
 ### Visualization & Statistics
 - `scanpy`, `matplotlib`, `seaborn`, `statannotations`, `napari`, `vitessce`, `pinguoin`
 
 ### Workflow & Infrastructure
-- `snakemake`, `nextflow`, `docker`, `singularity`, `zarr`, `dask`
+- **Workflow engine:** `snakemake` (all environments). **Container:** `apptainer`/Singularity (Linux/HPC, primary); `docker` (macOS/Windows, fallback).
+- Also: `zarr`, `dask`
 
 ### CI/CD, Linting & Docs
-- `ruff` (lint + format), `pytest`, `sphinx`, `nextflow`, GitHub Actions
+- `ruff` (lint + format), `pytest`, `sphinx`, `snakemake`, GitHub Actions

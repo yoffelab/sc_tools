@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make lint)",
+      "Bash(make format)",
+      "Bash(make test)",
+      "Bash(ruff check *)",
+      "Bash(ruff format *)",
+      "Bash(pytest *)",
+      "Bash(snakemake *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(./scripts/run_container.sh *)",
+      "Bash(./scripts/run_apptainer.sh *)",
+      "Bash(./scripts/run_docker.sh *)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(echo $CLAUDE_TOOL_INPUT | python3 -c \"import sys,json; d=json.load(sys.stdin); print(d.get('file_path',''))\" 2>/dev/null); if [[ \"$file\" == */sc_tools/*.py ]]; then echo '[hook] Linting sc_tools after edit...'; ruff check \"$file\" --quiet && echo '[hook] lint OK' || echo '[hook] lint FAILED — run make lint to fix'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

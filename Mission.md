@@ -97,7 +97,7 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **Gene signature storage:** Implemented in `sc_tools.tl.score_signature`. Scores stored in **`obsm['signature_score']`** and **`obsm['signature_score_z']`** (single flat key; full-path column names). Report in `uns['signature_score_report']`. Downstream use `get_signature_df(adata)` / `get_signature_columns(adata)` (obsm-first, fallback to obs).
 - [ ] **Always apply:** Basic gene sets (e.g. Hallmark) plus any signatures provided in project `metadata/*.json`.
 - [ ] Automated cell typing (cluster → celltype); non-transformer and transformer models.
-- [ ] Optional cell-type deconvolution (Tangram, Cell2location, DestVI; batch per library/sample).
+- [x] **Cell-type deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi). `extract_reference_profiles()` for memory-optimized Cell2location. Per-library backed loading. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. Thin wrappers in ggo_visium and robin. 14 unit tests.
 - [ ] Phase 3.5b is a separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Phase 4 is skippable if automated cell typing is adequate.
 
 ---
@@ -168,7 +168,8 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
 - **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
 - **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §11 and in the skill).
-- **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io), `memory/` (profiling, gpu), `qc/` (placeholder).
+- **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io, score_signature), `memory/` (profiling, gpu), `qc/` (metrics, plots, spatial).
+- **Generic deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi), `extract_reference_profiles()`, per-library backed loading, memory profiling. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. 14 unit tests. Thin project wrappers for ggo_visium and robin.
 - **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
 - **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.
 - **Makefile project-aware:** `PROJECT ?= projects/visium/ggo_visium`; paths use `$(PROJECT)/...`.

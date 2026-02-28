@@ -117,3 +117,17 @@ This journal documents the technical evolution, parameters, and rationale behind
 
 ### Gene Signature Refinement
 - **Sanity Check:** Verify signatures do not overlap heavily with housekeeping genes; consider HLCA, MSigDB, TCGA LUAD.
+
+### [2026-02-27] - Tangram deconvolution: NaN fix and successful run
+
+- **Problem:** Tangram produced all-NaN proportions because the scRNA-seq reference (`seurat_object.h5ad`) contains SCTransform-scaled values (min=-11.3). The deconvolution module incorrectly applied `normalize_total` + `log1p` on top of already-scaled data, producing NaN.
+- **Fix:** Updated `sc_tools.tl.deconvolution()` to detect negative values and skip normalisation. Added zero-count cell filtering and NaN safety nets.
+- **Result:** 8 libraries processed (29,952 spots x 31 cell types), valid proportions (no NaN), spatial plot generated at `figures/deconvolution/spatial_proportions.tangram.pdf` (17MB).
+- **Output naming:** Changed to `results/adata.deconvolution.tangram.h5ad` (method-specific). Snakefile updated with configurable `deconv_method`.
+
+### [2026-02-27] - Cell2location deconvolution and spatial plot improvements
+
+- **Action:** Ran cell2location on CPU using `reference_profiles` (cell_state_df) shortcut to skip regression model training. Cell2location succeeded (8 libraries, 29,952 spots x 31 cell types). Output: `results/adata.deconvolution.cell2location.h5ad`.
+- **Spatial plots:** Added per-library PNGs at 300 DPI to `figures/deconvolution/{method}/`. Improved spot sizing (120000/n_spots for ~34 at Visium scale). Used 98th percentile vmax for better contrast (especially for cell2location which had washed-out colors). White background for all panels.
+- **Snakemake:** Updated Snakefile Phase 3.5b with method-specific deconvolution rules and figure output in `figures/deconvolution/{method}/`.
+- **Output:** `figures/deconvolution/tangram/` and `figures/deconvolution/cell2location/` with PDF + per-library PNGs.

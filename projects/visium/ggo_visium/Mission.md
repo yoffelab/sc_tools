@@ -64,7 +64,8 @@ Pipeline phasing is defined in root `Mission.md` (Phasing scheme) and `README.md
 - [ ] **Figure 1:** Cohort stats (piechart, violin, bar, heatmap) for manuscript.
 
 ### Phase 5: Downstream Biology
-- [ ] **Deconvolution:** Cell2location, DestVI with batch processing; identify memory limits.
+- [x] **Deconvolution (Tangram):** Tangram run successful (29,952 spots x 31 cell types) via `sc_tools.tl.deconvolution()`. Output: `results/adata.deconvolution.tangram.h5ad`.
+- [x] **Deconvolution (Cell2location):** Completed on CPU using reference_profiles shortcut (29,952 spots x 31 cell types). Output: `results/adata.deconvolution.cell2location.h5ad`. Spatial plots in `figures/deconvolution/{method}/` (PDF + per-library PNGs at 300 DPI).
 - [ ] **Gene Signature Refinement:** Update `projects/visium/ggo_visium/metadata/gene_signatures.json`; validate against HLCA, MSigDB, TCGA LUAD.
 - [ ] **Spatially Variable Genes (SVG):** Moran's I / `squidpy.gr.spatial_autocorr`; spatial plots.
 - [ ] **Cell Type Colocalization:** Pearson, Moran's I, neighborhood enrichment on deconvolution proportions.

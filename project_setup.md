@@ -50,42 +50,39 @@ See **containers/README.md** for more details.
 
 ---
 
-## 4. Running with Apptainer
+## 4. Running Scripts
 
-### One-off script (run_apptainer.sh)
+### Unified runner: run_container.sh (use this)
 
-From the repository root:
+`scripts/run_container.sh` auto-detects OS and runtime:
+- **macOS** → Docker
+- **Linux** → Apptainer preferred; Docker fallback
 
 ```bash
-./scripts/run_apptainer.sh <project_path> [command]
+# Interactive bash:
+./scripts/run_container.sh projects/visium/ggo_visium
+
+# Run a script:
+./scripts/run_container.sh projects/visium/ggo_visium python scripts/score_gene_signatures.py
+
+# Override runtime:
+SC_TOOLS_RUNTIME=docker|apptainer ./scripts/run_container.sh projects/visium/ggo_visium python scripts/foo.py
+
+# Override SIF:
+SC_TOOLS_SIF=/path/to/sc_tools.sif ./scripts/run_container.sh projects/visium/ggo_visium python scripts/foo.py
 ```
-
-Examples:
-
-- Interactive bash in project dir:
-  ```bash
-  ./scripts/run_apptainer.sh projects/visium/ggo_visium
-  ```
-
-- Run a script:
-  ```bash
-  ./scripts/run_apptainer.sh projects/visium/ggo_visium python scripts/score_gene_signatures.py
-  ```
-
-- Override SIF path:
-  ```bash
-  SC_TOOLS_SIF=/path/to/sc_tools.sif ./scripts/run_apptainer.sh projects/visium/ggo_visium python scripts/foo.py
-  ```
 
 | Project    | Path                         | Example |
 |------------|------------------------------|---------|
-| ggo_visium | projects/visium/ggo_visium   | `./scripts/run_apptainer.sh projects/visium/ggo_visium python scripts/score_gene_signatures.py` |
-| robin      | projects/visium_hd/robin     | `./scripts/run_apptainer.sh projects/visium_hd/robin python scripts/run_signature_scoring.py` |
-| ggo-imc    | projects/imc/ggo-imc         | `./scripts/run_apptainer.sh projects/imc/ggo-imc python scripts/download_yaml.py` |
+| ggo_visium | projects/visium/ggo_visium   | `./scripts/run_container.sh projects/visium/ggo_visium python scripts/score_gene_signatures.py` |
+| robin      | projects/visium_hd/robin     | `./scripts/run_container.sh projects/visium_hd/robin python scripts/run_signature_scoring.py` |
+| ggo-imc    | projects/imc/ggo-imc         | `./scripts/run_container.sh projects/imc/ggo-imc python scripts/download_yaml.py` |
+
+`run_apptainer.sh` and `run_docker.sh` are deprecated wrappers that force a runtime; use `run_container.sh` for new work.
+
+All projects get `PROJECT_DIR` set inside the container (e.g. `/workspace/projects/visium/ggo_visium`).
 
 ### Snakemake (canonical pipeline)
-
-From the repository root, run a project pipeline:
 
 ```bash
 snakemake -d projects/visium/ggo_visium -s projects/visium/ggo_visium/Snakefile all
@@ -95,11 +92,10 @@ snakemake -d projects/visium/ggo_visium -s projects/visium/ggo_visium/Snakefile 
 Or from the project directory:
 
 ```bash
-cd projects/visium/ggo_visium
-snakemake -d . -s Snakefile all
+cd projects/visium/ggo_visium && snakemake -d . -s Snakefile all
 ```
 
-Snakemake runs each rule by invoking `run_apptainer.sh` (as defined in each project Snakefile). The project `config.yaml` sets `repo_root` and `project_rel` so the runner finds the repo and SIF.
+Each project Snakefile calls `run_container.sh` (auto-detects runtime). The `config.yaml` sets `repo_root` and `project_rel`.
 
 **Repo-root targets (lint, format, test):**
 
@@ -119,21 +115,27 @@ snakemake -s Snakefile all
 
 ## 6. Local Development (Non-Container)
 
-### Conda
+Each project has a `pyproject.toml` for project identity. All Python deps come from the root `sc-tools` package. Create a per-project conda env once (from repo root):
 
 ```bash
-conda env create -f environment.yml
-conda activate sc_tools
-pip install -e ".[deconvolution]"
+# Replace <env_name> with your project (ggo_visium | robin | ggo_imc)
+conda create -n <env_name> python=3.10 -y
+conda activate <env_name>
+uv pip install -e ".[deconvolution]"
 ```
 
-Or create manually:
+Run without a container:
 
 ```bash
-conda create -n sc_tools python=3.10 -y
-conda activate sc_tools
-pip install -e ".[deconvolution]"
+conda activate <env_name>
+SC_TOOLS_RUNTIME=none snakemake -d <project_path> -s <project_path>/Snakefile <target>
 ```
+
+| Project    | Env name     |
+|------------|--------------|
+| ggo_visium | `ggo_visium` |
+| robin      | `robin`      |
+| ggo-imc    | `ggo_imc`    |
 
 ### UV (without conda)
 
@@ -142,8 +144,6 @@ uv venv
 source .venv/bin/activate
 uv pip install -e ".[deconvolution]"
 ```
-
-For Snakemake without Apptainer, you would run rules locally (edit the Snakefile to call `python scripts/...` instead of `run_apptainer.sh` when not using the container).
 
 ---
 

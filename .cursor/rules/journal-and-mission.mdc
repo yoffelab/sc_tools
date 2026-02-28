@@ -6,19 +6,21 @@ alwaysApply: true
 
 # Journal Summary and Mission Progress
 
+Full workflow: see @.claude/skills/journal-and-mission/SKILL.md
+
 ## Long-term memory
 
-- **Journal.md** = full decision log (can be long).
-- **journal_summary.md** = short summary of Journal for context; keep it updated when Journal gains new entries so context stays short.
-
-Both serve as long-term memory; the summary is for shortening the context window.
+- **Journal.md** = full decision log (can be long)
+- **journal_summary.md** = short summary for context; update when Journal gains new entries
 
 ## Mission as todo list
 
-- **Mission.md** is the project todo list. Keep it structured with checkboxes (`[ ]` / `[x]`), clear "Current Status" or "Active Tasks", and next steps.
-- When working in **work mode** (implementing, running code, making concrete changes), **update Mission.md after each prompt**: mark completed steps, set current step, add blockers or next tasks. Do not skip this.
-- In **plan mode** (only discussing or planning), updating Mission is optional until execution begins.
+- **Mission.md** is the project todo list. Use checkboxes (`[ ]` / `[x]`), clear "Active Tasks" section.
+- **Work mode** (implementing, running code): update Mission.md after EACH prompt — mark completed, set current step, add blockers.
+- **Plan mode** (discussing only): updating Mission optional until execution starts.
 
 ## Sync before major work
 
-Read mission.md, journal_summary.md (and Journal.md if needed), and architecture.md to align with current state and conventions.
+Read in order: `Mission.md` → `journal_summary.md` → `Architecture.md`
+
+For subprojects: also read `projects/<platform>/<project>/Mission.md` and `journal_summary.md`.

@@ -21,7 +21,7 @@ pip install -e ".[deconvolution]"
 pip install -e ".[deconvolution,gpu]"
 ```
 
-Conda users can use `conda env create -f environment.yml` and then `pip install -e ".[deconvolution]"` inside that environment. See [project_setup.md](project_setup.md) for details.
+For a per-project conda env: `conda create -n <project> python=3.10 -y && conda activate <project> && uv pip install -e ".[deconvolution]"`. See [project_setup.md](project_setup.md) for details.
 
 **Lint (required before commit):** `make lint` runs Ruff check and format on `sc_tools`. Fix violations with `make format` and manual edits. See `skills.md` Section 11.
 
@@ -179,7 +179,7 @@ Processed outputs (e.g. `results/`, `figures/`) live at root or under a project 
 
 ## Setup (environments)
 
-- **Conda:** `conda env create -f environment.yml`, then `conda activate ggo_visium` and `pip install -e .` to install the package.
+- **Conda (per-project env):** `conda create -n <project> python=3.10 -y && conda activate <project> && uv pip install -e ".[deconvolution]"` from repo root.
 - **pip only:** `python -m venv venv`, activate, then `pip install -e ".[deconvolution]"` (or `pip install -r requirements.txt` for a non-package install).
 
 See `ENVIRONMENT_SETUP.md` for details. Core stack: **scanpy**, **squidpy**, **anndata**; optional **scvi-tools**, **tangram**, **cell2location** for deconvolution.

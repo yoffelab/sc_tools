@@ -5,23 +5,34 @@ channels:
   - defaults
 dependencies:
   - python=3.10
+  # Core scientific
   - numpy
   - pandas
+  - scipy
+  - scikit-learn
+  - statsmodels
+  # Visualization and statistics
   - matplotlib
   - seaborn
-  - scipy
+  # Utilities
   - tqdm
   - dask
   - pillow
   - tifffile
-  - scikit-learn
+  # HDF5 support (for AnnData/h5py)
+  - h5py
+  - hdf5
   - pip
   - pip:
+    # Single-cell / spatial stack
     - scanpy
     - squidpy
     - anndata
-    - tangram-sc
+    # Statistical annotation for figures
+    - statannotations>=0.6
+    - pingouin>=0.5
+    # Deconvolution (heavy GPU-optional deps; comment out if not needed locally)
     - scvi-tools
-    # Note: sthd may be a custom package - install separately if needed
-    # pip install sthd  # or however it's installed
-
+    - tangram-sc
+    # sc_tools package (editable install from repo root)
+    - -e .

@@ -45,6 +45,9 @@ dependencies = [
     "Pillow>=10.0",
     "tifffile>=2023.1.0",
     "statsmodels>=0.14",
+    "statannotations>=0.6",
+    "pingouin>=0.5",
+    "dask>=2023.0",
 ]
 
 [project.optional-dependencies]

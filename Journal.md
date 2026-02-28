@@ -10,6 +10,18 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-02-27] - Deconvolution spatial plots: PNG output, Snakemake integration, and figure quality improvements
+- **Action:** (1) Updated `scripts/plot_deconvolution_spatial.py` to save per-library PNGs at 300 DPI alongside the PDF, with filenames `{library_id}.png` in the same folder. (2) Added deconvolution rules to both ggo_visium and robin Snakefiles under Phase 3.5b, with method-specific output directories (`figures/deconvolution/{method}/`), configurable via `config.get("deconv_method", "cell2location")`. PNG outputs tracked via `touch()` sentinel files. (3) Fixed spot sizing formula from `5000/n_spots` to `120000/n_spots` (Visium ~34, Visium HD ~2.4). (4) Improved contrast using 98th percentile for vmax instead of max. (5) Added white background to all panels.
+- **Rationale:** PDFs were too large for review; per-library PNGs at 300 DPI provide quick access to individual libraries. Snakemake integration ensures deconvolution and figures are part of the reproducible pipeline. Spot sizes and contrast needed tuning for both Visium and Visium HD datasets.
+
+### [2026-02-26] - Generic cell-type deconvolution module in sc_tools
+- **Action:** Implemented `sc_tools.tl.deconvolution()` as a generic entry point with pluggable backend registry pattern. Three backends: Cell2location (default, GPU-accelerated), Tangram (OT-based), DestVI (scvi-tools). Added `extract_reference_profiles()` for memory optimization (computes mean expression per cell type, ~100x smaller than full reference; Cell2location can use this via `cell_state_df` to skip regression training). Per-library backed loading with `sc_tools.memory.profiling` integration. Output stored in `obsm['cell_type_proportions']` (DataFrame, n_spots x n_celltypes) and `obs['{method}_argmax']`. Created 14 unit tests with synthetic data and mock backend. Thin project wrappers for ggo_visium (~30 lines) and robin (~25 lines) replace the 1066-line and 282-line scripts respectively. All tests pass (31/31), lint clean.
+- **Rationale:** Eliminated duplicated memory management, reference loading, and proportion extraction logic across projects. Backend registry enables adding new methods without modifying orchestration. `extract_reference_profiles` addresses ggo_visium memory issues with its large scRNA-seq reference.
+
+### [2026-02-26] - sc_tools skills as Cursor skill; Docker + Snakemake defaults for sandbox
+- **Action:** (1) Added Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md` that instructs the agent to read and follow repository root `skills.md` when doing single-cell/spatial analysis, pipelines, or sandbox runs. (2) Updated `skills.md` Section 11: new subsection "Sandbox and local runs (defaults)" requiring **Docker setup and Snakemake as defaults for all sandbox runs**; clarified that Snakemake is default for sandbox/local development and Nextflow for production/CI when adopted. (3) Appendix Workflow & Infrastructure now states defaults for sandbox/local: snakemake, docker. (4) Mission.md Completed section updated to record the new skill and skills.md defaults.
+- **Rationale:** Make skills.md discoverable as a Cursor skill; align agent behavior with repo standards; ensure sandbox and local pipeline runs consistently use Docker + Snakemake unless overridden.
+
 ### [2026-02-17] - Docker + conda + UV integration; project_setup.md
 - **Action:** (1) Switched Dockerfile base from `python:3.10-slim` to `continuumio/miniconda3`; added conda env `sc_tools` with Python 3.10. (2) Install sc_tools via `uv pip install --python /opt/conda/envs/sc_tools/bin/python -e ".[deconvolution]"` (uv requires explicit --python for conda envs). (3) ENV PATH set to conda env bin so CMD/bash use sc_tools env. (4) Created `project_setup.md` at repo root: build, run, per-project table (ggo_visium, robin, lymph_dlbcl), local dev, verification. (5) Renamed `environment.yml` env from ggo_visium to sc_tools. (6) Added `run_docker.sh` for Robin. (7) run_docker.sh header note; README links to project_setup.md.
 - **Rationale:** Conda env sc_tools inside container for HPC/consistency; single image + runtime project selection; UV for fast install; project_setup.md centralizes setup docs.
@@ -118,3 +130,16 @@ This journal documents **repository-level** technical and structural decisions. 
 - **Action:** Deleted `ggo_analysis/` and `ggo_tools/` folders.
 - **Rationale:** ggo_analysis was only a placeholder (no code). ggo_tools contained only `memory/profiling.py`, which is already present in `sc_tools/memory/profiling.py` (same API: get_memory_usage, log_memory, aggressive_cleanup, estimate_adata_memory, check_memory_threshold). No merge needed; use `sc_tools.memory` for all memory utilities.
 - **Result:** Single toolkit package: `sc_tools` only. Architecture.md, README.md, and .gitignore updated to drop references to ggo_tools and ggo_analysis.
+
+### [2026-02-27] - Generic deconvolution module: NaN fix and method-specific output naming
+
+- **Action:** Fixed `sc_tools.tl.deconvolution()` to handle already-normalised scRNA-seq references (Seurat SCTransform data with negative values). Added method-specific output file naming (`adata.deconvolution.{method}.h5ad`).
+- **Root cause:** ggo_visium reference (`seurat_object.h5ad`) has negative values from SCTransform scaling (min=-11.3). The `max_val > 100` check triggered double normalisation, and `log1p` on negative values produced NaN throughout the expression matrix, causing Tangram mapping to return all-NaN.
+- **Fixes in `sc_tools/tl/deconvolution.py`:**
+  1. Detect negative values in reference X and skip normalisation (already scaled).
+  2. Filter zero-count cells before normalisation (safety for raw count references).
+  3. Replace any remaining NaN/Inf in X after normalisation (safety net).
+  4. In TangramBackend: check for NaN in inputs before mapping, detect all-NaN mapping matrix and return None early.
+- **Output naming:** Both wrapper scripts and Snakefiles now use `adata.deconvolution.{method}.h5ad` (e.g. `adata.deconvolution.tangram.h5ad`). Snakefiles accept `--config deconv_method=tangram` to select method.
+- **Results:** ggo_visium Tangram: 29,952 spots x 31 cell types (valid, no NaN). Robin Tangram: 567,456 spots x 39 cell types (already worked). Both spatial proportion PDFs generated.
+- **Note:** Cell2location is user-preferred method but requires NVIDIA GPU (not available on macOS ARM). Tangram used as CPU fallback. Wrapper defaults set to cell2location for GPU environments.

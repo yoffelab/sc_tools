@@ -6,9 +6,11 @@
 #   ./projects/create_project.sh <project_name> <data_type>
 #
 # Example:
-#   ./projects/create_project.sh ggo_visium visium
-#   -> creates ./projects/visium/ggo_visium/ with data/, figures/, metadata/,
-#      scripts/, results/, outputs/, Mission.md, Journal.md
+#   ./projects/create_project.sh my_project visium
+#   -> creates ./projects/visium/my_project/ with:
+#      data/, figures/, metadata/, scripts/, results/, outputs/, tests/
+#      Mission.md, Journal.md, journal_summary.md
+#      CLAUDE.md, Snakefile, config.yaml, pyproject.toml
 #
 # Valid data_type: visium | visium_hd | xenium | imc | cosmx
 # =============================================================================
@@ -16,7 +18,6 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# If script lives in projects/, repo root is parent; else script is at repo root
 if [[ "$(basename "$SCRIPT_DIR")" == "projects" ]]; then
   REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 else
@@ -32,21 +33,22 @@ if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
 fi
 
 PROJECT_ROOT="${REPO_ROOT}/projects/${DATA_TYPE}/${PROJECT_NAME}"
-SUBDIRS=(data figures metadata scripts results outputs)
+SUBDIRS=(data figures metadata scripts results outputs tests)
 
 mkdir -p "$PROJECT_ROOT"
 for d in "${SUBDIRS[@]}"; do
   mkdir -p "${PROJECT_ROOT}/${d}"
 done
 
-# Project-specific Mission and Journal (study-specific goals and decision log)
+# ---- Mission.md ----
 cat > "${PROJECT_ROOT}/Mission.md" << MISSION_EOF
 # Mission: ${PROJECT_NAME} (${DATA_TYPE})
 
-**Project:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`  
-**Last Updated:** (fill in)
+**Project:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`
+**Current Status:** Setup
+**Last Updated:** $(date +%Y-%m-%d)
 
-This file holds **project-specific** goals. Repository-level pipeline and toolkit goals are in the root \`Mission.md\`.
+Project-specific goals. Repository-level pipeline and toolkit goals are in the root \`Mission.md\`.
 
 ---
 
@@ -55,63 +57,224 @@ This file holds **project-specific** goals. Repository-level pipeline and toolki
 
 ---
 
-## 2. Completed Tasks
-- [ ] (Add as tasks are completed.)
+## 2. Phase Alignment
+
+| Phase | Status | Key Tasks |
+|-------|--------|-----------|
+| **1** | Pending | Data ingestion, QC |
+| **2** | Pending | Metadata attachment |
+| **3** | Pending | Preprocessing, clustering |
+| **3.5** | Pending | Demographics |
+| **3.5b** | Pending | Gene scoring, cell typing, deconvolution |
+| **4** | Pending | Manual cell typing |
+| **5** | Pending | Downstream biology |
+| **6-7** | Pending | Meta analysis |
 
 ---
 
-## 3. Active Tasks (Roadmap)
-(Organize by phase or theme; reference scripts under this project's \`scripts/\`.)
+## 3. Active Tasks
+
+- [ ] Phase 1: data ingestion
 
 ---
 
 ## 4. Blockers and Sanity Checks
-(Project-specific blockers and statistical/data checks.)
+(Project-specific blockers and checks.)
 
 ---
 
-## 5. Technical Decision Log (Reference this project's Journal.md)
-(Key parameter and method choices for this study.)
+## 5. Technical Decisions
+(Key parameter and method choices — reference Journal.md for full log.)
 MISSION_EOF
 
+# ---- Journal.md ----
 cat > "${PROJECT_ROOT}/Journal.md" << JOURNAL_EOF
-# Research Journal & Decision Log: ${PROJECT_NAME} (${DATA_TYPE})
+# Research Journal: ${PROJECT_NAME} (${DATA_TYPE})
 
-This journal documents the technical evolution and rationale behind **project-specific** analytical decisions. Repository-level decisions (architecture, script sanity check, scalable layout) are in the root \`Journal.md\`.
-
-**Project:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`  
-**Reference:** Root \`Mission.md\` (toolkit); this project's \`Mission.md\` (study aims).
+**Project:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`
 
 ---
 
 ## Log Entries
-(Add dated entries for analysis decisions, parameter choices, and fixes specific to this project.)
+
+### $(date +%Y-%m-%d) — Project created
+- Scaffolded with create_project.sh.
 JOURNAL_EOF
 
+# ---- journal_summary.md ----
 cat > "${PROJECT_ROOT}/journal_summary.md" << SUMMARY_EOF
 # Journal Summary: ${PROJECT_NAME} (${DATA_TYPE})
 
-Condensed summary of \`Journal.md\` for this project. Full entries are in \`Journal.md\`.
+Condensed summary of \`Journal.md\`. Full entries in Journal.md.
 
 ## Project scope
-(One short paragraph.)
+(One short paragraph on scientific goal and current phase.)
 
 ## Recent phase
-(Bullets or one paragraph on latest decisions and outcomes.)
+(Bullets on latest decisions and outcomes.)
 
 ## Key conventions
-(One line each if needed.)
+(One line each: panel names, checkpoint names, etc.)
 SUMMARY_EOF
 
-# run_docker.sh: wrapper to run pipeline in Docker
-cat > "${PROJECT_ROOT}/run_docker.sh" << RUN_DOCKER_EOF
-#!/usr/bin/env bash
-# Run Docker for ${PROJECT_NAME}. From repo root: ./projects/${DATA_TYPE}/${PROJECT_NAME}/run_docker.sh [command]
-SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="\$(cd "\$SCRIPT_DIR/../../.." && pwd)"
-exec "\$REPO_ROOT/scripts/run_docker.sh" projects/${DATA_TYPE}/${PROJECT_NAME} "\$@"
-RUN_DOCKER_EOF
-chmod +x "${PROJECT_ROOT}/run_docker.sh"
+# ---- CLAUDE.md ----
+cat > "${PROJECT_ROOT}/CLAUDE.md" << CLAUDE_EOF
+# ${PROJECT_NAME} — Claude Code Configuration
+
+## Sync Before Work
+
+1. @Mission.md — current todo list and phase status
+2. @journal_summary.md — recent decisions
+
+For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
+
+---
+
+## Project Context
+
+**Platform:** ${DATA_TYPE}
+**Path:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`
+
+(Describe scientific objective here.)
+
+---
+
+## Running This Project
+
+\`\`\`bash
+# From repo root:
+./scripts/run_container.sh projects/${DATA_TYPE}/${PROJECT_NAME} python scripts/<script>.py
+snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile <target>
+
+# Local conda (no container):
+conda activate ${PROJECT_NAME}
+SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile <target>
+
+# Tests:
+pytest projects/${DATA_TYPE}/${PROJECT_NAME}/tests/ -v
+
+# Create conda env (one-time setup, from repo root):
+#   conda create -n ${PROJECT_NAME} python=3.10 -y && conda activate ${PROJECT_NAME}
+#   uv pip install -e ".[deconvolution]"
+\`\`\`
+
+---
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+| \`results/adata.raw.p1.h5ad\` | Phase 1 output |
+| \`results/adata.normalized.scored.p35.h5ad\` | Phase 3.5b output (primary analysis input) |
+| \`metadata/gene_signatures.json\` | Gene signatures |
+| \`figures/manuscript/\` | Publication figures |
+CLAUDE_EOF
+
+# ---- config.yaml ----
+cat > "${PROJECT_ROOT}/config.yaml" << CONFIG_EOF
+# ${PROJECT_NAME} Snakemake config
+repo_root: "../../.."
+project_rel: "projects/${DATA_TYPE}/${PROJECT_NAME}"
+container_sif: "containers/sc_tools.sif"
+CONFIG_EOF
+
+# ---- Snakefile ----
+cat > "${PROJECT_ROOT}/Snakefile" << SNAKEFILE_EOF
+# ${PROJECT_NAME} (${DATA_TYPE}) Snakemake pipeline
+# Run from repo root: snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile [target]
+# Or from project dir: snakemake -d . -s Snakefile [target]
+# Runtime: auto-detected via run_container.sh (Docker on macOS, Apptainer on Linux).
+# Local conda: conda activate ${PROJECT_NAME} && SC_TOOLS_RUNTIME=none snakemake -d . -s Snakefile <target>
+
+configfile: "config.yaml"
+
+ROOT = config["repo_root"]
+PROJECT = config["project_rel"]
+
+def run_container(script, args=""):
+    cmd = f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
+    return cmd + (f' {args}' if args else '')
+
+# ---- Phase 1: Data Ingestion & QC ----
+rule adata_raw_p1:
+    output: "results/adata.raw.p1.h5ad"
+    input: "scripts/ingest.py"
+    shell: run_container("scripts/ingest.py")
+
+rule phase1:
+    input: "results/adata.raw.p1.h5ad"
+
+# ---- Phase 2: Metadata Attachment ----
+rule adata_annotated_p2:
+    output: "results/adata.annotated.p2.h5ad"
+    input: "results/adata.raw.p1.h5ad", "metadata/sample_metadata.csv"
+    shell: run_container("scripts/attach_metadata.py")
+
+rule phase2:
+    input: "results/adata.annotated.p2.h5ad"
+
+# ---- Phase 3: Preprocessing ----
+rule adata_normalized_p3:
+    output: "results/adata.normalized.p3.h5ad"
+    input: "results/adata.annotated.p2.h5ad", "scripts/preprocess.py"
+    shell: run_container("scripts/preprocess.py")
+
+rule phase3:
+    input: "results/adata.normalized.p3.h5ad"
+
+# ---- Phase 3.5b: Gene Scoring ----
+rule adata_p35:
+    output: "results/adata.normalized.scored.p35.h5ad"
+    input: "results/adata.normalized.p3.h5ad", "metadata/gene_signatures.json", "scripts/score_signatures.py"
+    shell: run_container("scripts/score_signatures.py")
+
+rule phase35b:
+    input: "results/adata.normalized.scored.p35.h5ad"
+
+# ---- Phase 4: Cell Typing ----
+rule adata_celltyped_p4:
+    output: "results/adata.celltyped.p4.h5ad"
+    input: "results/adata.normalized.scored.p35.h5ad", "metadata/celltype_map.json", "scripts/apply_celltype.py"
+    shell: run_container("scripts/apply_celltype.py")
+
+rule phase4:
+    input: "results/adata.celltyped.p4.h5ad"
+
+# ---- Default ----
+rule all:
+    input: "results/adata.normalized.scored.p35.h5ad"
+SNAKEFILE_EOF
+
+# ---- pyproject.toml (per-project package descriptor) ----
+cat > "${PROJECT_ROOT}/pyproject.toml" << PYPROJECT_EOF
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "${PROJECT_NAME}"
+version = "0.1.0"
+description = "${PROJECT_NAME} (${DATA_TYPE}) analysis (scripts only)"
+requires-python = ">=3.10"
+# Add project-specific deps here (beyond sc-tools base + deconvolution extra).
+# Most deps come from root: uv pip install -e ".[deconvolution]"
+dependencies = []
+
+[tool.setuptools]
+packages = []  # scripts-only project; no Python packages to install
+PYPROJECT_EOF
 
 echo "Created project: ${PROJECT_ROOT}"
-echo "  with: ${SUBDIRS[*]}, Mission.md, Journal.md, journal_summary.md, run_docker.sh"
+echo "  dirs:  ${SUBDIRS[*]}"
+echo "  files: Mission.md, Journal.md, journal_summary.md, CLAUDE.md"
+echo "         Snakefile, config.yaml, pyproject.toml"
+echo ""
+echo "Next steps:"
+echo "  1. Edit Mission.md with your scientific objective"
+echo "  2. Add ingestion script: ${PROJECT_ROOT}/scripts/ingest.py"
+echo "  3. Create conda env:"
+echo "       conda create -n ${PROJECT_NAME} python=3.10 -y"
+echo "       conda activate ${PROJECT_NAME}"
+echo "       uv pip install -e '.[deconvolution]'   # from repo root"
+echo "  4. Run (container): snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile phase1"
+echo "  5. Run (local):     conda activate ${PROJECT_NAME} && SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile phase1"

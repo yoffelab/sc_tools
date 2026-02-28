@@ -12,7 +12,7 @@ PROJECT = config["project_rel"]
 def run_container(script):
     return f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
 
-# ---- Phase I ----
+# ---- Phase 1: Data Ingestion & QC ----
 rule adata_annotation:
     output: "results/adata.annotation.h5ad"
     input: "scripts/loupe2adata.py"
@@ -26,7 +26,10 @@ rule adata_annotated_p2:
 rule phase1:
     input: "results/adata.annotated.p2.h5ad"
 
-# ---- Phase II ----
+# ---- Phase 2: Metadata Attachment ----
+# (metadata already joined in Phase 1 for this project)
+
+# ---- Phase 3: Preprocessing ----
 rule scvi_h5ad:
     output: "results/scvi.h5ad"
     input: "results/adata.annotated.p2.h5ad", "scripts/preprocessing.py"
@@ -37,10 +40,10 @@ rule scvi_leiden:
     input: "results/scvi.h5ad", "scripts/clustering.py"
     shell: run_container("scripts/clustering.py")
 
-rule phase2:
+rule phase3:
     input: "results/scvi.leiden.h5ad"
 
-# ---- Phase 3.5b ----
+# ---- Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution ----
 rule scvi_leiden_phenotyped:
     output: "results/scvi.leiden.phenotyped.h5ad"
     input: "results/scvi.leiden.h5ad", "scripts/celltyping.py"
@@ -51,13 +54,37 @@ rule adata_p35:
     input: "results/adata.annotated.p2.h5ad", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
     shell: run_container("scripts/score_gene_signatures.py")
 
+DECONV_METHOD = config.get("deconv_method", "cell2location")
+
 rule adata_deconvolution:
-    output: "results/adata.deconvolution.h5ad"
-    input: "results/adata.normalized.scored.p35.h5ad", "results/seurat_object.h5ad", "scripts/celltype_deconvolution_phase3.py"
-    shell: run_container("scripts/celltype_deconvolution_phase3.py")
+    output: f"results/adata.deconvolution.{DECONV_METHOD}.h5ad"
+    input: "results/adata.normalized.scored.p35.h5ad", "results/seurat_object.h5ad", "scripts/celltype_deconvolution.py"
+    shell: run_container("scripts/celltype_deconvolution.py") + f" --method {DECONV_METHOD}"
+
+rule deconvolution_spatial_plot:
+    output:
+        pdf=f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
+        done=touch(f"figures/deconvolution/{DECONV_METHOD}/.pngs.done"),
+    input: f"results/adata.deconvolution.{DECONV_METHOD}.h5ad"
+    shell:
+        (
+            run_container(ROOT + "/scripts/plot_deconvolution_spatial.py")
+            + f" --input results/adata.deconvolution.{DECONV_METHOD}.h5ad"
+            + f" --output figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf"
+            + " --batch-key library_id"
+        )
+
+rule deconvolution:
+    input:
+        f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
+        f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
 
 rule phase35b:
-    input: "results/scvi.leiden.phenotyped.h5ad", "results/adata.normalized.scored.p35.h5ad"
+    input:
+        "results/scvi.leiden.phenotyped.h5ad",
+        "results/adata.normalized.scored.p35.h5ad",
+        f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
+        f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
 
 # ---- QC report (Phase 1 style: 2x2, 2x4, multipage, violin, scatter, HVG, SVG) ----
 rule qc_report:
@@ -69,7 +96,7 @@ rule qc_report:
         + " && touch figures/QC/qc_report.done"
     )
 
-# ---- Phase IV ----
+# ---- Phase 4: Manual Cell Typing (skippable) ----
 rule tls_clustered:
     output: "results/tls_clustered.h5ad"
     input: "results/adata.normalized.scored.p35.h5ad", "scripts/create_tls_anndata.py"
@@ -124,7 +151,7 @@ rule spatial_multipage_colocalization:
     input: "results/adata.normalized.scored.p35.h5ad", "scripts/spatial_multipage_colocalization.py"
     shell: run_container("scripts/spatial_multipage_colocalization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/manuscript/neutrophil_cytotoxic_tcell_localization && touch figures/manuscript/spatial_multipage_colocalization.done"
 
-# ---- Phase V ----
+# ---- Phase 5: Downstream Biology ----
 rule spatial_plots:
     output: touch("figures/manuscript/spatial_plots/.done")
     input: "results/adata.normalized.scored.p35.h5ad", "scripts/manuscript_spatial_plots.py"
@@ -145,4 +172,16 @@ rule phase5:
 
 # ---- Default: full pipeline ----
 rule all:
-    input: "results/adata.annotated.p2.h5ad", "results/scvi.leiden.h5ad", "results/scvi.leiden.phenotyped.h5ad", "results/adata.normalized.scored.p35.h5ad", "figures/manuscript/tumor_differences/.done", "figures/manuscript/macrophage_localization/.done", "figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done", "figures/process_colocalization/.done", "figures/manuscript/spatial_plots/.done", "figures/manuscript/signature_heatmaps/.done"
+    input:
+        "results/adata.annotated.p2.h5ad",
+        "results/scvi.leiden.h5ad",
+        "results/scvi.leiden.phenotyped.h5ad",
+        "results/adata.normalized.scored.p35.h5ad",
+        f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
+        f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
+        "figures/manuscript/tumor_differences/.done",
+        "figures/manuscript/macrophage_localization/.done",
+        "figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done",
+        "figures/process_colocalization/.done",
+        "figures/manuscript/spatial_plots/.done",
+        "figures/manuscript/signature_heatmaps/.done",

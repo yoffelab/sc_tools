@@ -110,7 +110,7 @@ Gene signature scoring uses `sc_tools.tl.score_signature` and writes **obsm** (`
 
 **Note:** Robin builds p35 from **p3** (normalized adata). ggo_visium builds p35 from **p2** (annotated adata). Downstream scripts in both projects read p35.
 
-**Nextflow + containers:** The pipeline will use Nextflow with Docker (local) and Singularity/Apptainer (HPC). Auto-configure based on environment detection; publish container image(s) to a registry for HPC pull. See Mission.md CI/CD Roadmap.
+**Snakemake + containers:** The pipeline uses Snakemake as the workflow engine with Apptainer/Singularity (Linux/HPC, primary) and Docker (macOS/Windows, fallback). Auto-configure via `scripts/run_container.sh`; publish container image(s) to a registry for HPC pull. See Mission.md CI/CD Roadmap.
 
 ---
 

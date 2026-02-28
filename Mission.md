@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2026-02-26
+**Last Updated:** 2026-02-28
 
 ---
 
@@ -95,7 +95,10 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 ### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
 
 - [x] **Gene signature storage:** Implemented in `sc_tools.tl.score_signature`. Scores stored in **`obsm['signature_score']`** and **`obsm['signature_score_z']`** (single flat key; full-path column names). Report in `uns['signature_score_report']`. Downstream use `get_signature_df(adata)` / `get_signature_columns(adata)` (obsm-first, fallback to obs).
-- [ ] **Always apply:** Basic gene sets (e.g. Hallmark) plus any signatures provided in project `metadata/*.json`.
+- [x] **Multi-method scoring:** `score_signature(method=...)` supports `"scanpy"` (default), `"ucell"` (rank-based AUC; pyucell soft dep), `"ssgsea"` (gseapy soft dep). Records `uns["scoring_method"]`. 80 unit tests total.
+- [x] **Gene set loaders:** `sc_tools.tl.gene_sets` — `load_hallmark()` (50 bundled MSigDB Hallmark sets; stripped from robin metadata; offline), `load_msigdb_json()`, `load_gmt()`, `list_gene_sets()`. Curation: `validate_gene_signatures()`, `merge_gene_signatures()`, `update_gene_symbols()`, `save_gene_signatures()`.
+- [x] **Group-level enrichment testing:** `sc_tools.tl.run_ora()` (Fisher exact + BH FDR), `sc_tools.tl.run_gsea_pseudobulk()` (pseudobulk prerank via gseapy; soft dep). Plotting: `sc_tools.pl.plot_gsea_dotplot()`. Optional deps: `pip install sc-tools[geneset]`.
+- [x] **Always apply:** Use `merge_gene_signatures(project_sigs, load_hallmark())` before calling `score_signature`. Project JSON + bundled Hallmark combined in one pass.
 - [ ] Automated cell typing (cluster → celltype); non-transformer and transformer models.
 - [x] **Cell-type deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi). `extract_reference_profiles()` for memory-optimized Cell2location. Per-library backed loading. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. Thin wrappers in ggo_visium and robin. 14 unit tests.
 - [ ] Phase 3.5b is a separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Phase 4 is skippable if automated cell typing is adequate.
@@ -168,8 +171,10 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
 - **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
 - **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §11 and in the skill).
-- **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save), `tl/` (testing, colocalization, deconvolution, io, score_signature), `memory/` (profiling, gpu), `qc/` (metrics, plots, spatial).
+- **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save, gsea), `tl/` (testing, colocalization, deconvolution, io, score_signature, gene_sets, gsea), `memory/` (profiling, gpu), `qc/` (metrics, plots, spatial).
+- **Gene set scoring redesign (Phase 3.5b):** Full overhaul. (1) `sc_tools/data/hallmark_human.json`: 50 bundled MSigDB Hallmark sets (offline). (2) `sc_tools.tl.gene_sets`: `load_hallmark`, `load_msigdb_json`, `load_gmt`, `list_gene_sets`, `validate_gene_signatures`, `merge_gene_signatures`, `update_gene_symbols`, `save_gene_signatures`. (3) `score_signature(method=...)`: scanpy (default), ucell (pyucell), ssgsea (gseapy). (4) `sc_tools.tl.gsea`: `run_ora` (Fisher exact + BH), `run_gsea_pseudobulk` (prerank). (5) `sc_tools.pl.gsea`: `plot_gsea_dotplot`. Optional deps: `pip install sc-tools[geneset]`. 80 tests pass.
 - **Generic deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi), `extract_reference_profiles()`, per-library backed loading, memory profiling. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. 14 unit tests. Thin project wrappers for ggo_visium and robin.
+- **Deconvolution spatial plots:** `scripts/plot_deconvolution_spatial.py` saves per-library PNGs at 300 DPI alongside PDF. Method-specific output dirs (`figures/deconvolution/{method}/`). Spot sizing `120000/n_spots`; 98th percentile vmax; white background. Both Snakefiles updated (Phase 3.5b rules).
 - **projects layout:** `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`; each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`.
 - **create_project.sh:** `./projects/create_project.sh <project_name> <data_type>`.
 - **Makefile project-aware:** `PROJECT ?= projects/visium/ggo_visium`; paths use `$(PROJECT)/...`.

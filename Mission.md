@@ -62,6 +62,20 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] Spatially variable genes plot: mean/rank vs Moran's I; per-library when `library_id` present (`spatially_variable_genes_per_library`). Skip SVG only when library_id missing. `sc_tools.qc.plots.plot_spatially_variable_genes`.
 - [x] Save under `projects/<platform>/<project>/figures/QC/raw/` (pre) and `figures/QC/post/` (post). Caller passes output_dir or output_path.
 - [x] Single QC report script: `scripts/run_qc_report.py` produces all QC figures; Snakemake rule `qc_report` → `figures/QC/qc_report.done`.
+- [x] Cross-sample comparison plots: `qc_sample_comparison_bar`, `qc_sample_violin_grouped`, `qc_sample_scatter_matrix` with pass/fail coloring.
+
+#### Sample-Level QC (sc_tools.qc.sample_qc)
+- [x] `filter_spots()`: modality-aware spot filtering with conservative defaults (visium/visium_hd/xenium/cosmx/imc).
+- [x] `compute_sample_metrics()`: per-sample aggregate QC (n_spots, median counts/genes, %MT stats, n_genes_detected, Space Ranger metrics).
+- [x] `classify_samples()`: absolute thresholds + adaptive MAD outlier detection; conservative defaults minimize drops.
+- [x] `save_pass_fail_lists()`: write `qc_sample_pass.csv` and `qc_sample_fail.csv`.
+- [x] `apply_qc_filter()`: backup + spot filter + sample removal + save.
+
+#### QC HTML Report (sc_tools.qc.report)
+- [x] `generate_qc_report()`: self-contained HTML with summary cards, per-sample metrics table, embedded plots. Jinja2 template at `sc_tools/data/qc_report_template.html`.
+- [x] Integrated into `scripts/run_qc_report.py` with `--modality`, `--mad-multiplier`, `--thresholds`, `--apply-filter` CLI args.
+- [x] 15 new unit tests (28 total in test_qc.py); all pass, lint clean.
+
 - [ ] **Future:** MA plots (per gene/protein across samples).
 
 ---
@@ -77,9 +91,11 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ### Phase 3: Preprocessing
 
-- [ ] **Before any modification:** Backup `adata.raw`.
-- [ ] Filter cells, genes, proteins, samples failing QC (project-specific thresholds).
-- [ ] Normalize, batch correct (e.g. scVI), run automated clustering.
+- [x] **sc_tools.pp module:** Modality-aware preprocessing with GPU auto-detection (rapids-singlecell fallback to scanpy).
+- [x] **Normalization:** `backup_raw`, `normalize_total`, `log_transform`, `scale`, `arcsinh_transform` (IMC), `filter_genes_by_pattern` (MT/RP/HB).
+- [x] **Integration:** `run_scvi` (default for Visium), `run_harmony` (PCA-based), `run_cytovi` (IMC protein data). All soft dependencies with install hints.
+- [x] **Reduction/Clustering:** `pca`, `neighbors` (auto-detects use_rep), `umap`, `leiden`, `cluster` (convenience wrapper). `run_utag` for spatial-aware clustering (soft dep).
+- [x] **Recipes:** `preprocess(adata, modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc", integration=..., ...)` dispatches to modality-specific pipelines. 38 unit tests, lint clean.
 - [ ] Post-normalization QC report → `figures/QC/post/`.
 - [ ] **No automated cell typing here** (moved to Phase 3.5b).
 
@@ -181,6 +197,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Metadata moved:** Root `metadata/` moved to `projects/visium/ggo_visium/metadata/`.
 - **Legacy merged:** `scripts/old_code/` (read-only reference).
 - **Spatial multipage refactor (ggo_visium):** Logic moved from repo-root `scripts/spatial_multipage.py` into `projects/visium/ggo_visium/scripts/spatial_multipage_colocalization.py` using sc_tools: scores from obsm via `get_signature_df`, `multipage_spatial_pdf` and `truncated_similarity` in sc_tools; outputs to `figures/manuscript/macrophage_localization/` and `figures/manuscript/neutrophil_cytotoxic_tcell_localization/`. Repo-root script deprecated (docstring). Makefile target: `make spatial-multipage-colocalization`.
+- **Phase 3 preprocessing module (sc_tools.pp):** Modality-aware preprocessing with GPU auto-detection (rapids-singlecell/scanpy). Normalization (`normalize_total`, `log_transform`, `scale`, `arcsinh_transform`, `filter_genes_by_pattern`, `backup_raw`). Integration (`run_scvi`, `run_harmony`, `run_cytovi`; all soft deps). Reduction/clustering (`pca`, `neighbors` with auto use_rep detection, `umap`, `leiden`, `cluster`, `run_utag`). Recipes: `preprocess(modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc")`. 38 unit tests pass, lint clean. skills.md updated with modality-specific preprocessing standards.
 
 ### In Progress — Next immediate steps
 

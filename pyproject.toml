@@ -56,9 +56,27 @@ deconvolution = [
     "scvi-tools>=1.0",
     "tangram-sc>=1.0",
 ]
+# Gene set scoring and enrichment testing
+geneset = [
+    "gseapy>=1.0",
+    "pyucell>=0.1",
+]
+# Transcription factor / signaling pathway activity (decoupleR)
+decoupler = [
+    "decoupler>=1.4",
+]
+# Batch integration
+integration = [
+    "harmonypy",
+]
+# Spatial clustering
+spatial = [
+    "utag",
+]
 # Extra for large-scale / GPU workflows
 gpu = [
     "torch",
+    "rapids-singlecell",
 ]
 # Development and testing
 dev = [

@@ -45,6 +45,21 @@ This document defines actionable, reproducible skills and best-practice guidelin
 - **scVI-tools:** Use raw counts for training Variational Autoencoders (VAEs) to learn a latent space that accounts for technical noise and library size without manual scaling.
 - Ensure normalization logic does not introduce spatial artifacts or over-correct biological variance.
 
+### Modality-Specific Normalization (Phase 3)
+
+| Modality | Normalization | Integration | Feature Selection | Special Notes |
+|----------|--------------|-------------|-------------------|---------------|
+| Visium / Visium HD | Raw counts to scVI (no manual norm for VAE path); `normalize_total` + `log1p` for non-VAE | scVI (default) | HVG with `batch_key`; optionally intersect with SVG | Backup `adata.raw`; filter MT/RP/HB genes |
+| Xenium | `normalize_total` + `log1p` | Standard PCA or Harmony/scVI for multi-sample | HVG on log-normalized data | Tune normalization per dataset; n_PCs critical for KNN |
+| CosMx | `normalize_total` + `log1p` | Standard or Harmony/scVI | HVG | Detection algorithm changed 2023-2024 |
+| IMC | `arcsinh(X/5)` -- NOT `log1p` | CytoVI (scvi-tools, totalVI-inspired) | All markers (30-50 proteins); no HVG step | Segmentation quality is critical upstream step |
+
+**Implementation:** `sc_tools.pp.preprocess(adata, modality=..., integration=..., ...)` dispatches to modality-specific recipes. Individual steps (`backup_raw`, `normalize_total`, `log_transform`, `arcsinh_transform`, `filter_genes_by_pattern`, `pca`, `cluster`, etc.) are all importable from `sc_tools.pp` for fine-grained control.
+
+### GPU Acceleration
+- **rapids-singlecell:** Drop-in scanpy replacement with 5-100x speedups for preprocessing, PCA, neighbors, clustering. `sc_tools.pp` auto-detects GPU availability via `get_backend()` and uses rapids-singlecell when present, scanpy otherwise. No API change.
+- Install: `pip install rapids-singlecell`
+
 ---
 
 ## 4. Feature Selection
@@ -53,6 +68,7 @@ This document defines actionable, reproducible skills and best-practice guidelin
 - Identify highly variable genes (HVGs) prior to dimensionality reduction.
 - Tune feature counts based on dataset size and biological complexity.
 - Utilize spatially aware methods (e.g., `squidpy.gr.spatial_autocorr`) for discovering spatially variable genes.
+- For scVI integration: use `seurat_v3` HVG flavor (works on raw counts). For non-VAE pipelines: use `seurat` flavor on log-normalized data.
 
 ---
 
@@ -60,8 +76,12 @@ This document defines actionable, reproducible skills and best-practice guidelin
 
 ### Core Steps
 - **scVI:** Prioritize deep generative modeling for dimensionality reduction and batch integration.
+- **Harmony:** Fast PCA-based correction (`harmonypy`); use when scVI is too slow or not applicable.
 - **PCA:** Use for initial visualization or as input for traditional graph construction if VAEs are not applicable.
 - Choose components based on variance explained (elbow plots) or reconstruction error.
+
+### Auto-detection of Representation
+`sc_tools.pp.neighbors()` auto-detects `use_rep` in priority order: `X_scVI` > `X_cytovi` > `X_pca_harmony` > `X_pca`.
 
 ### Validation
 - Inspect latent space mixing using metrics like ASW (Average Silhouette Width) or iLISI.
@@ -73,8 +93,14 @@ This document defines actionable, reproducible skills and best-practice guidelin
 
 ### Core Skills
 - Use graph-based methods (Leiden or Louvain).
-- **Spatial Clustering:** Incorporate spatial proximity into clustering using **Banksy** or **GraphST** to identify distinct tissue domains.
+- **Spatial Clustering (UTAG):** Unsupervised Tissue Architecture with Graphs -- graph-based message passing on spatial adjacency to identify microanatomical domains. Runs *after* standard Leiden as an optional complement. `max_dist`: 10-20 for IMC, 10-100 for transcriptomics. `slide_key` for multi-image batch processing. Install: `pip install git+https://github.com/ElementoLab/utag.git@main`.
 - **Automated Validation:** Cross-reference identified marker genes against established cell-type databases (e.g., CellTypist) to assign biological meaning.
+
+### Key References
+- [sc-best-practices: Integration](https://www.sc-best-practices.org/cellular_structure/integration.html)
+- [rapids-singlecell docs](https://rapids-singlecell.readthedocs.io/en/latest/)
+- [scvi-tools models](https://scvi-tools.org/)
+- [UTAG: Nature Methods (2022)](https://www.nature.com/articles/s41592-022-01657-2)
 
 ---
 

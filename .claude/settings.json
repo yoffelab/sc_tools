@@ -20,6 +20,17 @@
     "deny": []
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(echo \"$CLAUDE_TOOL_INPUT\" | python3 -c \"import sys,json; print(json.load(sys.stdin).get('command',''))\" 2>/dev/null); if echo \"$cmd\" | grep -qE '^python3?\\s+projects/'; then proj=$(echo \"$cmd\" | grep -oE 'projects/[^/]+/[^/]+'); echo '[hook] BLOCKED: Run project scripts inside a container:'; echo \"  ./scripts/run_container.sh $proj python <script>\"; exit 2; fi; if echo \"$cmd\" | grep -qE '^python3?\\s+scripts/[^o]'; then echo '[hook] BLOCKED: Run shared scripts inside a container:'; echo '  ./scripts/run_container.sh <project_path> python scripts/<script>'; exit 2; fi; if echo \"$cmd\" | grep -qE '^(python|pytest|make)\\b'; then if [ \"$CONDA_DEFAULT_ENV\" != \"sc_tools\" ] && [ -z \"$APPTAINER_CONTAINER\" ]; then echo '[hook] WARNING: conda env sc_tools is not active. Run: conda activate sc_tools'; fi; fi"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

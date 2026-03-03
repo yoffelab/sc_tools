@@ -5,12 +5,16 @@ Provides functions for tracking memory usage, performing cleanup,
 and estimating memory requirements for AnnData objects.
 """
 
+from __future__ import annotations
+
 import gc
 import logging
 import os
 import sys
+from typing import TYPE_CHECKING
 
-import anndata as ad
+if TYPE_CHECKING:
+    import anndata as ad
 
 logger = logging.getLogger(__name__)
 

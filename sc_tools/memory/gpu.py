@@ -24,17 +24,17 @@ def check_gpu_available() -> bool:
             device_props = torch.cuda.get_device_properties(0)
             total_memory_gb = device_props.total_memory / 1e9
 
-            logger.info(f"   ✅ GPU available: {device_name}")
+            logger.info(f"   [OK] GPU available: {device_name}")
             logger.info(f"   GPU memory: {total_memory_gb:.2f} GB")
             return True
         else:
-            logger.info("   ⚠️  GPU not available, using CPU")
+            logger.info("   [WARN] GPU not available, using CPU")
             return False
     except ImportError:
-        logger.info("   ⚠️  PyTorch not available, using CPU")
+        logger.info("   [WARN] PyTorch not available, using CPU")
         return False
     except Exception as e:
-        logger.warning(f"   ⚠️  Error checking GPU: {e}, using CPU")
+        logger.warning(f"   [WARN] Error checking GPU: {e}, using CPU")
         return False
 
 

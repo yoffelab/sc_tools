@@ -7,9 +7,9 @@ categorical and continuous overlays). Built on scanpy.
 
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 __all__ = [
@@ -242,7 +242,9 @@ def plot_spatial_continuous(
             vmax=vmax,
             **kwargs,
         )
-        display_title = (title or (color if color_use == color else "Score")).replace("_", " ").title()
+        display_title = (
+            (title or (color if color_use == color else "Score")).replace("_", " ").title()
+        )
         ax.set_title(display_title, fontsize=12, fontweight="bold")
     finally:
         if cleanup and "_st_continuous_plot" in adata.obs.columns:
@@ -268,12 +270,12 @@ def multipage_spatial_pdf(
     library_id_col : str
         Column in adata.obs that identifies the library/sample.
     panels : list of dict
-        List of panel specs. Each dict has:
-        - "type": "he" | "categorical" | "continuous"
-        - For "he": no extra keys (uses full adata for images).
-        - For "categorical": "obs_col", "title", optional "palette".
-        - For "continuous": "title", and either "obs_col" or "values" (Series/array
-          aligned to adata.obs_names); optional "cmap", "vmin", "vmax".
+        List of panel specs. Each dict must have a ``"type"`` key
+        (``"he"``, ``"categorical"``, or ``"continuous"``).
+        ``"he"`` needs no extra keys. ``"categorical"`` needs ``"obs_col"`` and
+        ``"title"`` (optional ``"palette"``). ``"continuous"`` needs ``"title"``
+        and either ``"obs_col"`` or ``"values"`` (optional ``"cmap"``,
+        ``"vmin"``, ``"vmax"``).
     output_path : str
         Path to the output PDF file.
     figsize : tuple

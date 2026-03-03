@@ -1,0 +1,6 @@
+/* sc_tools documentation — style overrides */
+
+/* Slightly tighter autosummary tables */
+.autosummary td:first-child {
+    white-space: nowrap;
+}

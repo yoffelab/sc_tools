@@ -157,7 +157,7 @@ Separate branch from Phase 3 (parallel to 3.5b). sc_tools helpers: piechart, his
 
 ### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
 
-Separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Always apply basic gene sets (e.g. Hallmark) and any project-provided signatures from `metadata/{signature_name}.json`. Store scores in **`adata.obsm['sig:hallmark']`**, **`adata.obsm['sig:{signature_name}']`** (not in `obs` by default). Automated cell typing (cluster → celltype). Optional cell-type deconvolution (DestVI, Cell2location, Tangram) → `$(PROJECT)/results/adata.deconvolution.h5ad`.
+Separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Always apply basic gene sets (e.g. Hallmark, loaded via `sc_tools.tl.load_hallmark()`) and any project-provided signatures from `metadata/{signature_name}.json`. Store scores in **`adata.obsm['signature_score']`** (raw) and **`adata.obsm['signature_score_z']`** (z-scored) via `sc_tools.tl.score_signature`; column names are full paths (e.g. `Hallmark/HYPOXIA`, `Myeloid/Macrophage_Core`). Scores are **not** stored in `obs` by default. Automated cell typing (cluster → celltype). Optional cell-type deconvolution (DestVI, Cell2location, Tangram) → `$(PROJECT)/results/adata.deconvolution.h5ad`.
 
 **Outputs:** `$(PROJECT)/results/adata.normalized.scored.p35.h5ad` (must satisfy Section 2.2); optional `adata.deconvolution.h5ad`. Required for Phase 5.
 

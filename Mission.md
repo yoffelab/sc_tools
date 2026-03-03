@@ -217,11 +217,11 @@ Work through in sequence; each builds on the previous. See **skills.md** Section
 
 1. **[x] Linting** — Ruff configured in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check` on `sc_tools`; all violations fixed. Scripts/ to be added once fixed.
 2. **[x] Snakemake** — Already adopted as THE workflow engine. Each project has its own Snakefile. **Containerization:** Apptainer (Linux/HPC, primary); Docker (macOS/Windows, fallback). Auto-detect via `scripts/run_container.sh`. Publish container image to registry (Docker Hub, GHCR) for HPC pull.
-3. **[ ] Sphinx API docs** — Add `docs/` with Sphinx, autodoc for `sc_tools`; `make docs` or equivalent; document where built docs live.
+3. **[x] Sphinx API docs** — `docs/` with pydata-sphinx-theme + myst-nb + sphinx-design; autodoc per module (pp, pl, tl, qc, memory, utils); 6 tutorial notebooks (static, no execution); `make docs` builds HTML; `.readthedocs.yaml` for RTD; `.github/workflows/docs.yml` for CI artifact. `build succeeded` with zero warnings.
 4. **[ ] PyPI deployment** — Ensure `pyproject.toml` builds wheel/sdist; add GitHub Action to publish to PyPI on release (trusted publishing or secrets); no credentials in repo.
 5. **[ ] GitHub Actions** — `.github/workflows/tests.yml` runs lint + pytest + Snakemake dry-run; fail on push/PR if any step fails. Last, because testing setup is complex.
 
-**Status:** Linting (1) and Snakemake (2) done. Next: Sphinx docs (3).
+**Status:** Linting (1), Snakemake (2), and Sphinx docs (3) done. Next: PyPI deployment (4).
 
 ### To Do (later)
 

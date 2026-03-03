@@ -6,6 +6,10 @@ Condensed summary of root `Journal.md` for context. Full entries and rationale a
 
 - **sc_tools** is a reusable spatial omics toolkit and pipeline. Project-specific work lives under `projects/<data_type>/<project_name>/`. Root Journal covers repo structure, phasing, checkpoint names, and script roles only.
 
+## Recent phase (2026-03)
+
+- **Sphinx documentation site (2026-03-03):** CI/CD step 3 complete. `docs/` with pydata-sphinx-theme + myst-nb + sphinx-design. Six API pages (pp, pl, tl, qc, memory, utils) using `.. autofunction::` inline (no autosummary stub generation — hangs on heavy deps). Six tutorial notebooks (synthetic data, static outputs, `nb_execution_mode="off"`). `.readthedocs.yaml` for RTD, `.github/workflows/docs.yml` for CI. `autodoc_mock_imports = []` (empty): mocking cupy/torch caused anndata 0.11.4 singledispatch/find_spec failures; all soft deps use try/except guards so no mocks needed. Fixed `sc_tools/memory/profiling.py` anndata import to `TYPE_CHECKING` guard. `build succeeded` with zero warnings. `make docs` target added. Next CI/CD step: PyPI deployment (4).
+
 ## Recent phase (2026-02)
 
 - **Phase 3 preprocessing module (2026-02-28):** `sc_tools.pp` -- modality-aware preprocessing with GPU auto-detection (rapids-singlecell/scanpy). `normalize.py`: `backup_raw`, `normalize_total`, `log_transform`, `scale`, `arcsinh_transform` (IMC), `filter_genes_by_pattern` (MT/RP/HB). `integrate.py`: `run_scvi`, `run_harmony`, `run_cytovi` (all soft deps). `reduce.py`: `pca`, `neighbors` (auto use_rep: X_scVI > X_cytovi > X_pca_harmony > X_pca), `umap`, `leiden`, `cluster`, `run_utag` (spatial clustering, soft dep). `recipes.py`: `preprocess(modality=visium|visium_hd|xenium|cosmx|imc)` dispatches to modality-specific pipelines. Visium: scVI on raw counts (seurat_v3 HVG) or normalize+log1p+seurat HVG for non-VAE. IMC: arcsinh(X/5) not log1p. 38 unit tests, 130 total pass, lint clean. `skills.md` updated with modality tables and GPU notes. `pyproject.toml`: added `[integration]` (harmonypy), `[spatial]` (utag), expanded `[gpu]` (rapids-singlecell).

@@ -148,3 +148,34 @@ projects/**/.git/
 .claude/settings.local.json
 CLAUDE.local.md
 .claude/CLAUDE.local.md
+
+# Sphinx documentation build artifacts
+docs/_build/
+docs/api/generated/
+
+# FST files (R data serialization; always large)
+*.fst
+
+# Claude Code — local worktrees (session-specific, not shared)
+.claude/worktrees/
+
+# IMC projects: project-root-level data files not under data/ subdirectory
+# (these projects predate the standard layout; all raw/processed data excluded)
+projects/imc/aapc/
+projects/imc/clonevo/
+projects/imc/ggo-imc/
+projects/imc/ggo_human/
+projects/imc/healthy_lung/
+projects/imc/imc_data/
+projects/imc/imc_utuc/
+projects/imc/jj_tmp/
+projects/imc/pancreas_liver_meta/
+projects/imc/pancreas_liver_meta_backup/
+projects/imc/*/processed/
+projects/imc/bcg_bladder/*.csv
+projects/imc/brca-unet/*.csv
+projects/imc/brca-unet/*.tsv
+projects/imc/brca-unet/*.txt
+projects/imc/brca-unet/Code/
+projects/imc/lymph_dlbcl/notebooks/
+projects/imc/lymph_dlbcl/run_docker.sh

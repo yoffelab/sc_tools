@@ -41,9 +41,13 @@ fi
 PROJECT_PATH="$(cd "$PROJECT_PATH" 2>/dev/null && pwd)" || {
   echo "Error: Project path does not exist: $1" >&2; exit 1
 }
-PROJECT_REL="${PROJECT_PATH#"$REPO_ROOT"/}"
-if [[ "$PROJECT_REL" == "$PROJECT_PATH" ]]; then
-  echo "Error: Project must be under repo root: $REPO_ROOT" >&2; exit 1
+if [[ "$PROJECT_PATH" == "$REPO_ROOT" ]]; then
+  PROJECT_REL="."
+else
+  PROJECT_REL="${PROJECT_PATH#"$REPO_ROOT"/}"
+  if [[ "$PROJECT_REL" == "$PROJECT_PATH" ]]; then
+    echo "Error: Project must be under repo root: $REPO_ROOT" >&2; exit 1
+  fi
 fi
 
 # =============================================================================
@@ -116,8 +120,23 @@ run_docker() {
     docker build -t "$IMAGE" "$REPO_ROOT"
   fi
 
-  local OPTS=(-v "$REPO_ROOT:/workspace" -w "/workspace/$PROJECT_REL"
-              -e "PROJECT_DIR=/workspace/$PROJECT_REL")
+  local OPTS=()
+  if [[ "$PROJECT_REL" == "." || "$PROJECT_REL" == sc_tools* ]]; then
+    # sc_tools development: full repo access
+    OPTS=(-v "$REPO_ROOT:/workspace" -w "/workspace"
+          -e "PROJECT_DIR=/workspace")
+  else
+    # Project execution: scoped mounts (project RW, sc_tools + scripts RO)
+    OPTS=(
+      -v "$PROJECT_PATH:/workspace/project"
+      -v "$REPO_ROOT/sc_tools:/workspace/sc_tools:ro"
+      -v "$REPO_ROOT/scripts:/workspace/scripts:ro"
+      -v "$REPO_ROOT/pyproject.toml:/workspace/pyproject.toml:ro"
+      -v "$REPO_ROOT/skills.md:/workspace/skills.md:ro"
+      -w "/workspace/project"
+      -e "PROJECT_DIR=/workspace/project"
+    )
+  fi
 
   if [[ ${#USER_CMD[@]} -eq 0 ]]; then
     exec docker run -it --rm "${OPTS[@]}" "$IMAGE" bash
@@ -143,8 +162,16 @@ run_apptainer() {
     exit 1
   fi
 
-  local BIND="$REPO_ROOT:/workspace"
-  local WORKDIR="/workspace/$PROJECT_REL"
+  local BIND WORKDIR
+  if [[ "$PROJECT_REL" == "." || "$PROJECT_REL" == sc_tools* ]]; then
+    # sc_tools development: full repo access
+    BIND="$REPO_ROOT:/workspace"
+    WORKDIR="/workspace"
+  else
+    # Project execution: scoped mounts (project RW, sc_tools + scripts RO)
+    BIND="$PROJECT_PATH:/workspace/project,$REPO_ROOT/sc_tools:/workspace/sc_tools:ro,$REPO_ROOT/scripts:/workspace/scripts:ro,$REPO_ROOT/pyproject.toml:/workspace/pyproject.toml:ro,$REPO_ROOT/skills.md:/workspace/skills.md:ro"
+    WORKDIR="/workspace/project"
+  fi
 
   export APPTAINERENV_PROJECT_DIR="$WORKDIR"
   export SINGULARITYENV_PROJECT_DIR="$WORKDIR"  # singularity compat

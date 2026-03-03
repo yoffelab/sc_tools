@@ -13,7 +13,7 @@
 #   make test        - Run pytest for sc_tools (sc_tools/tests/)
 # ============================================================================
 
-.PHONY: lint format test
+.PHONY: lint format test docs docs-clean docs-open
 
 # Lint: check sc_tools (package). Scripts: add once fixed.
 lint:
@@ -28,3 +28,15 @@ format:
 # Uses python -m pytest so the active Python env (conda/venv) is used
 test:
 	python -m pytest sc_tools/tests -v
+
+# Docs: build Sphinx HTML documentation (treat warnings as errors)
+docs:
+	sphinx-build -b html docs docs/_build/html -W --keep-going
+
+# Docs clean: remove build artifacts and autosummary stubs
+docs-clean:
+	rm -rf docs/_build docs/api/generated
+
+# Docs open: build then open in browser (macOS)
+docs-open: docs
+	open docs/_build/html/index.html

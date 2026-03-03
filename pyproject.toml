@@ -84,10 +84,20 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.1.0",
 ]
+# Documentation
+docs = [
+    "sphinx>=7.2",
+    "pydata-sphinx-theme>=0.15",
+    "sphinx-autodoc-typehints>=2.0",
+    "sphinx-copybutton>=0.5",
+    "sphinx-design>=0.5",
+    "myst-nb>=1.0",
+    "ipykernel",
+]
 
 [project.urls]
 Repository = "https://github.com/yoffelab/sc_tools"
-Documentation = "https://github.com/yoffelab/sc_tools#readme"
+Documentation = "https://sc-tools.readthedocs.io"
 
 [tool.setuptools.packages.find]
 where = ["."]

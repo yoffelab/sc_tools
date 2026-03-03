@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 # Backend protocol and registry
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class DeconvolutionBackend(Protocol):
     """Protocol every deconvolution backend must satisfy."""
@@ -80,15 +81,14 @@ def get_backend(name: str) -> type[DeconvolutionBackend]:
     """Retrieve a registered backend by *name*."""
     if name not in _BACKENDS:
         available = ", ".join(sorted(_BACKENDS)) or "(none)"
-        raise ValueError(
-            f"Unknown deconvolution method {name!r}. Available: {available}"
-        )
+        raise ValueError(f"Unknown deconvolution method {name!r}. Available: {available}")
     return _BACKENDS[name]
 
 
 # ---------------------------------------------------------------------------
 # Reference profile extraction (memory optimisation)
 # ---------------------------------------------------------------------------
+
 
 def extract_reference_profiles(
     sc_adata: ad.AnnData,
@@ -202,6 +202,7 @@ def extract_reference_profiles(
 # Backend: Tangram
 # ---------------------------------------------------------------------------
 
+
 class TangramBackend:
     """Tangram (OT-based) deconvolution backend."""
 
@@ -232,7 +233,9 @@ class TangramBackend:
             sp_copy = spatial_adata_lib[:, shared_genes].copy()
             log_memory("Tangram: after gene subset", sp_copy, logger_instance=log)
 
-            if not check_memory_threshold(threshold_mb=50000, threshold_percent=92.0, logger_instance=log):
+            if not check_memory_threshold(
+                threshold_mb=50000, threshold_percent=92.0, logger_instance=log
+            ):
                 log.warning("Memory too high for Tangram, aborting")
                 del sc_copy, sp_copy
                 aggressive_cleanup()
@@ -252,6 +255,7 @@ class TangramBackend:
                     )
                     _Xc = np.nan_to_num(_Xc, nan=0.0, posinf=0.0, neginf=0.0)
                     import scipy.sparse as _spt
+
                     if _spt.issparse(_ad.X):
                         _ad.X = _spt.csr_matrix(_Xc)
                     else:
@@ -363,6 +367,7 @@ def _extract_tangram_proportions(
 # Backend: Cell2location
 # ---------------------------------------------------------------------------
 
+
 class Cell2locationBackend:
     """Cell2location deconvolution backend (GPU-recommended)."""
 
@@ -399,7 +404,11 @@ class Cell2locationBackend:
 
             mem_threshold_mb = kwargs.get("memory_threshold_mb", 50000)
             mem_threshold_pct = kwargs.get("memory_threshold_pct", 92.0)
-            if not check_memory_threshold(threshold_mb=mem_threshold_mb, threshold_percent=mem_threshold_pct, logger_instance=log):
+            if not check_memory_threshold(
+                threshold_mb=mem_threshold_mb,
+                threshold_percent=mem_threshold_pct,
+                logger_instance=log,
+            ):
                 log.warning("Memory too high for Cell2location, aborting")
                 return None
 
@@ -410,7 +419,9 @@ class Cell2locationBackend:
 
             # --- Memory-optimised path: use pre-computed reference profiles ---
             if reference_profiles is not None:
-                log.info("Cell2location: using pre-computed reference profiles (skipping regression)")
+                log.info(
+                    "Cell2location: using pre-computed reference profiles (skipping regression)"
+                )
                 # Align genes
                 common_genes = [g for g in shared_genes if g in reference_profiles.index]
                 cell_state_df = reference_profiles.loc[common_genes]
@@ -437,7 +448,9 @@ class Cell2locationBackend:
 
                 # Adaptive epoch reduction under memory pressure
                 actual_epochs = max_epochs
-                if not check_memory_threshold(threshold_mb=50000, threshold_percent=90.0, logger_instance=log):
+                if not check_memory_threshold(
+                    threshold_mb=50000, threshold_percent=90.0, logger_instance=log
+                ):
                     actual_epochs = min(max_epochs, 15000)
                     num_samples = min(num_samples, 500)
                     batch_size = min(batch_size, 1500)
@@ -458,7 +471,9 @@ class Cell2locationBackend:
 
             # Adaptive epoch reduction
             actual_epochs = max_epochs
-            if not check_memory_threshold(threshold_mb=50000, threshold_percent=90.0, logger_instance=log):
+            if not check_memory_threshold(
+                threshold_mb=50000, threshold_percent=90.0, logger_instance=log
+            ):
                 actual_epochs = min(max_epochs, 15000)
                 log.info(f"Cell2location: reducing spatial epochs to {actual_epochs}")
 
@@ -482,9 +497,7 @@ class Cell2locationBackend:
             return None
 
 
-def _extract_c2l_proportions(
-    spatial_lib_sig: ad.AnnData, log: Logger
-) -> np.ndarray | None:
+def _extract_c2l_proportions(spatial_lib_sig: ad.AnnData, log: Logger) -> np.ndarray | None:
     """Normalise Cell2location abundance to row-sum-one proportions."""
     for key in ("q05_cell_abundance_w_sf", "means_cell_abundance_w_sf"):
         if key in spatial_lib_sig.obsm:
@@ -508,6 +521,7 @@ def _extract_c2l_proportions(
 # ---------------------------------------------------------------------------
 # Backend: DestVI
 # ---------------------------------------------------------------------------
+
 
 class DestVIBackend:
     """DestVI (scvi-tools) deconvolution backend."""
@@ -536,7 +550,9 @@ class DestVIBackend:
         try:
             log_memory("DestVI: start", logger_instance=log)
 
-            if not check_memory_threshold(threshold_mb=50000, threshold_percent=92.0, logger_instance=log):
+            if not check_memory_threshold(
+                threshold_mb=50000, threshold_percent=92.0, logger_instance=log
+            ):
                 log.warning("Memory too high for DestVI, aborting")
                 return None
 
@@ -550,7 +566,9 @@ class DestVIBackend:
 
             # Adaptive epochs
             actual_epochs = max_epochs
-            if not check_memory_threshold(threshold_mb=50000, threshold_percent=90.0, logger_instance=log):
+            if not check_memory_threshold(
+                threshold_mb=50000, threshold_percent=90.0, logger_instance=log
+            ):
                 actual_epochs = min(max_epochs, 10000)
                 log.info(f"DestVI: reducing epochs to {actual_epochs}")
 
@@ -591,6 +609,7 @@ register_backend("destvi", DestVIBackend)
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def deconvolution(
     spatial_adata: ad.AnnData | str | Path,
@@ -739,12 +758,11 @@ def deconvolution(
         n_nan = int(np.isnan(_X_dense).sum())
         n_inf = int(np.isinf(_X_dense).sum())
         if n_nan > 0 or n_inf > 0:
-            log.warning(
-                f"Replacing {n_nan} NaN and {n_inf} Inf values in reference X with 0"
-            )
+            log.warning(f"Replacing {n_nan} NaN and {n_inf} Inf values in reference X with 0")
             _X_dense = np.nan_to_num(_X_dense, nan=0.0, posinf=0.0, neginf=0.0)
             if _sp.issparse(sc_adata_obj.X):
                 import scipy.sparse as sp2
+
                 sc_adata_obj.X = sp2.csr_matrix(_X_dense)
             else:
                 sc_adata_obj.X = _X_dense
@@ -789,7 +807,11 @@ def deconvolution(
             if hasattr(_x_sample, "toarray"):
                 _x_sample = _x_sample.toarray()
             _x_sample = np.asarray(_x_sample)
-            if np.allclose(_x_sample, np.round(_x_sample)) and _x_sample.min() >= 0 and _x_sample.max() > 100:
+            if (
+                np.allclose(_x_sample, np.round(_x_sample))
+                and _x_sample.min() >= 0
+                and _x_sample.max() > 100
+            ):
                 _has_raw_counts = True
 
         _use_profiles = False
@@ -900,10 +922,7 @@ def deconvolution(
                 aggressive_cleanup()
 
             # Find shared genes
-            shared_genes = list(
-                set(candidate_genes)
-                .intersection(spatial_adata_lib.var_names)
-            )
+            shared_genes = list(set(candidate_genes).intersection(spatial_adata_lib.var_names))
             if sc_adata_obj is not None:
                 shared_genes = [g for g in shared_genes if g in sc_adata_obj.var_names]
             shared_genes = shared_genes[:n_signature_genes]
@@ -914,7 +933,12 @@ def deconvolution(
                 continue
 
             # Reduce genes if memory is tight
-            if not check_memory_threshold(threshold_mb=50000, threshold_percent=90.0, logger_instance=log) and len(shared_genes) > 1000:
+            if (
+                not check_memory_threshold(
+                    threshold_mb=50000, threshold_percent=90.0, logger_instance=log
+                )
+                and len(shared_genes) > 1000
+            ):
                 shared_genes = shared_genes[:1000]
                 log.info(f"Reduced to {len(shared_genes)} genes due to memory pressure")
                 aggressive_cleanup()
@@ -1000,6 +1024,7 @@ def deconvolution(
 # ---------------------------------------------------------------------------
 # Existing helper: select_signature_genes (unchanged)
 # ---------------------------------------------------------------------------
+
 
 def select_signature_genes(
     sc_adata: ad.AnnData,

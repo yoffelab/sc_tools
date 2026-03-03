@@ -132,7 +132,9 @@ def morans_i(
     sig_df = get_signature_df(adata)
     if sig_column not in sig_df.columns and sig_column not in adata.obs.columns:
         raise ValueError(f"Signature column '{sig_column}' not found in obsm or adata.obs")
-    sig_values = sig_df[sig_column].values if sig_column in sig_df.columns else adata.obs[sig_column].values
+    sig_values = (
+        sig_df[sig_column].values if sig_column in sig_df.columns else adata.obs[sig_column].values
+    )
 
     # Check for NaN values
     if np.isnan(sig_values).all():

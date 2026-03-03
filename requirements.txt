@@ -20,6 +20,13 @@ anndata>=0.10.0
 # scvi-tools>=1.0.0
 # tangram-sc>=1.0.0
 
+# Gene set scoring and enrichment testing (optional; use [geneset] extra)
+# gseapy>=1.0
+# pyucell>=0.1
+
+# Transcription factor / pathway activity (optional; use [decoupler] extra)
+# decoupler>=1.4
+
 # Utilities
 tqdm>=4.65.0
 dask>=2023.0.0

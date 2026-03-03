@@ -3,10 +3,12 @@ sc_tools.qc: Quality control utilities for spatial and single-cell omics.
 
 - metrics: calculate_qc_metrics, filter_cells, filter_genes, highly_variable_genes (scanpy)
 - spatial: spatially_variable_genes (squidpy); % mt / % hb per spot via calculate_qc_metrics
-- plots: qc_2x2_grid, qc_spatial_multipage (2x2 metric grid; multipage spatial total_count, log1p, %mt)
+- plots: qc_2x2_grid, qc_spatial_multipage, cross-sample comparison plots
+- sample_qc: per-sample metrics, pass/fail classification, spot filtering
+- report: HTML QC report generation
 """
 
-from . import metrics, plots, spatial
+from . import metrics, plots, report, sample_qc, spatial
 from .metrics import (
     calculate_qc_metrics,
     filter_cells,
@@ -18,9 +20,20 @@ from .plots import (
     plot_spatially_variable_genes,
     qc_2x2_grid,
     qc_2x4_pre_post,
+    qc_sample_comparison_bar,
+    qc_sample_scatter_matrix,
+    qc_sample_violin_grouped,
     qc_scatter_counts_genes,
     qc_spatial_multipage,
     qc_violin_metrics,
+)
+from .report import generate_qc_report
+from .sample_qc import (
+    apply_qc_filter,
+    classify_samples,
+    compute_sample_metrics,
+    filter_spots,
+    save_pass_fail_lists,
 )
 from .spatial import spatially_variable_genes, spatially_variable_genes_per_library
 
@@ -28,6 +41,8 @@ __all__ = [
     "metrics",
     "spatial",
     "plots",
+    "sample_qc",
+    "report",
     "calculate_qc_metrics",
     "filter_cells",
     "filter_genes",
@@ -41,4 +56,13 @@ __all__ = [
     "qc_scatter_counts_genes",
     "plot_highly_variable_genes",
     "plot_spatially_variable_genes",
+    "qc_sample_comparison_bar",
+    "qc_sample_violin_grouped",
+    "qc_sample_scatter_matrix",
+    "filter_spots",
+    "compute_sample_metrics",
+    "classify_samples",
+    "save_pass_fail_lists",
+    "apply_qc_filter",
+    "generate_qc_report",
 ]

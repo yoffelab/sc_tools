@@ -25,6 +25,7 @@ from sc_tools.tl.deconvolution import (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_sc_adata(n_obs=200, n_vars=100, n_celltypes=4, seed=42):
     """Synthetic scRNA-seq reference with cell-type labels and batch."""
     rng = np.random.default_rng(seed)
@@ -60,6 +61,7 @@ def _make_spatial_adata(n_obs=300, n_vars=100, n_libs=3, seed=99):
 # Mock backend for testing orchestration
 # ---------------------------------------------------------------------------
 
+
 class MockBackend:
     """Backend that returns uniform proportions without any real model."""
 
@@ -86,6 +88,7 @@ class MockBackend:
 # Tests: extract_reference_profiles
 # ---------------------------------------------------------------------------
 
+
 class TestExtractReferenceProfiles:
     def test_basic(self):
         sc_adata = _make_sc_adata(n_obs=100, n_vars=50, n_celltypes=3)
@@ -105,9 +108,7 @@ class TestExtractReferenceProfiles:
     def test_qc_labels(self):
         sc_adata = _make_sc_adata(n_obs=100, n_vars=50, n_celltypes=4)
         df_full = extract_reference_profiles(sc_adata, "celltype")
-        df_filtered = extract_reference_profiles(
-            sc_adata, "celltype", qc_labels=["CT0"]
-        )
+        df_filtered = extract_reference_profiles(sc_adata, "celltype", qc_labels=["CT0"])
         assert "CT0" not in df_filtered.columns
         assert df_filtered.shape[1] == df_full.shape[1] - 1
 
@@ -123,6 +124,7 @@ class TestExtractReferenceProfiles:
 # ---------------------------------------------------------------------------
 # Tests: backend registry
 # ---------------------------------------------------------------------------
+
 
 class TestBackendRegistry:
     def test_builtin_backends(self):
@@ -144,6 +146,7 @@ class TestBackendRegistry:
 # ---------------------------------------------------------------------------
 # Tests: deconvolution() with mock backend
 # ---------------------------------------------------------------------------
+
 
 class TestDeconvolutionOrchestrator:
     def setup_method(self):
@@ -246,12 +249,11 @@ class TestDeconvolutionOrchestrator:
 # Tests: select_signature_genes
 # ---------------------------------------------------------------------------
 
+
 class TestSelectSignatureGenes:
     def test_basic(self):
         sc_adata = _make_sc_adata(n_obs=100, n_vars=100, n_celltypes=3)
-        genes = select_signature_genes(
-            sc_adata, "celltype", "batch", n_genes_max=50, skip_hvg=True
-        )
+        genes = select_signature_genes(sc_adata, "celltype", "batch", n_genes_max=50, skip_hvg=True)
         assert isinstance(genes, list)
         assert len(genes) > 0
         assert len(genes) <= 100  # cannot exceed n_vars

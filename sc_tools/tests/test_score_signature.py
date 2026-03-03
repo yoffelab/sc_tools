@@ -32,7 +32,11 @@ def _minimal_adata(n_obs: int = 50, n_vars: int = 100):
     np.random.seed(42)
     X = np.random.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
     var_names = [f"G{i}" for i in range(1, n_vars + 1)]
-    adata = sc.AnnData(X, obs=pd.DataFrame(index=[f"cell_{i}" for i in range(n_obs)]), var=pd.DataFrame(index=var_names))
+    adata = sc.AnnData(
+        X,
+        obs=pd.DataFrame(index=[f"cell_{i}" for i in range(n_obs)]),
+        var=pd.DataFrame(index=var_names),
+    )
     adata.raw = adata.copy()
     return adata
 
@@ -88,7 +92,7 @@ def _collect_first_genes_from_json(json_path: Path, max_genes: int = 25):
     for k, v in data.items():
         if k == "_meta" or not isinstance(v, dict):
             continue
-        for sub, val in v.items():
+        for _sub, val in v.items():
             if isinstance(val, list):
                 for g in val:
                     if isinstance(g, str) and g not in genes:
@@ -186,3 +190,68 @@ def test_score_signature_ggo_visium_real():
     report = adata.uns["signature_score_report"]
     assert len(report) >= 1
     assert not any(c.startswith("_tmp_sig_") for c in adata.obs.columns)
+
+
+# ---------------------------------------------------------------------------
+# Tests for method= parameter
+# ---------------------------------------------------------------------------
+
+
+def test_score_signature_method_scanpy_explicit():
+    """method='scanpy' is the default; verify uns["scoring_method"] is recorded."""
+    adata = _minimal_adata(n_obs=50, n_vars=100)
+    signatures = {"GroupA": {"Sig1": ["G1", "G2", "G3"]}}
+    score_signature(adata, signatures, method="scanpy", use_raw=True, copy=False)
+    assert adata.uns.get("scoring_method") == "scanpy"
+
+
+def test_score_signature_invalid_method():
+    adata = _minimal_adata(n_obs=20, n_vars=50)
+    with pytest.raises(ValueError, match="method="):
+        score_signature(adata, {"A": {"Sig": ["G1", "G2", "G3"]}}, method="invalid_method")
+
+
+def test_score_signature_method_ucell():
+    """method='ucell': scores written to obsm; scoring_method recorded."""
+    pytest.importorskip("pyucell")
+    adata = _minimal_adata(n_obs=50, n_vars=100)
+    # Remove raw since ucell does not use it
+    signatures = {"GroupA": {"Sig1": ["G1", "G2", "G3", "G4", "G5"]}}
+    score_signature(adata, signatures, method="ucell", copy=False)
+    assert "signature_score" in adata.obsm
+    assert "signature_score_z" in adata.obsm
+    assert adata.uns.get("scoring_method") == "ucell"
+    df = adata.obsm["signature_score"]
+    assert df.shape == (50, 1)
+    assert "GroupA/Sig1" in df.columns
+
+
+def test_score_signature_method_ssgsea():
+    """method='ssgsea': scores written to obsm; scoring_method recorded."""
+    pytest.importorskip("gseapy")
+    adata = _minimal_adata(n_obs=20, n_vars=100)
+    signatures = {"GroupA": {"Sig1": ["G1", "G2", "G3", "G4", "G5"]}}
+    score_signature(adata, signatures, method="ssgsea", use_raw=False, copy=False)
+    assert "signature_score" in adata.obsm
+    assert "signature_score_z" in adata.obsm
+    assert adata.uns.get("scoring_method") == "ssgsea"
+
+
+def test_score_signature_ucell_import_error(monkeypatch):
+    """method='ucell' raises ImportError with install hint when pyucell is missing."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "pyucell", None)
+    adata = _minimal_adata(n_obs=20, n_vars=50)
+    with pytest.raises((ImportError, TypeError)):
+        score_signature(adata, {"A": {"Sig": ["G1", "G2", "G3"]}}, method="ucell")
+
+
+def test_score_signature_ssgsea_import_error(monkeypatch):
+    """method='ssgsea' raises ImportError with install hint when gseapy is missing."""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "gseapy", None)
+    adata = _minimal_adata(n_obs=20, n_vars=50)
+    with pytest.raises((ImportError, TypeError)):
+        score_signature(adata, {"A": {"Sig": ["G1", "G2", "G3"]}}, method="ssgsea")

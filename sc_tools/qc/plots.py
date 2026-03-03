@@ -20,7 +20,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-
 from anndata import AnnData
 
 __all__ = [
@@ -31,6 +30,9 @@ __all__ = [
     "qc_scatter_counts_genes",
     "plot_highly_variable_genes",
     "plot_spatially_variable_genes",
+    "qc_sample_comparison_bar",
+    "qc_sample_violin_grouped",
+    "qc_sample_scatter_matrix",
 ]
 
 
@@ -86,11 +88,20 @@ def qc_2x2_grid(
     if total_counts_col in adata.obs.columns:
         x = adata.obs[total_counts_col].values
         x = x[~np.isnan(x) & np.isfinite(x)]
-        axes[0, 0].hist(x, bins=min(80, max(20, len(x) // 20)), color="steelblue", edgecolor="white")
+        axes[0, 0].hist(
+            x, bins=min(80, max(20, len(x) // 20)), color="steelblue", edgecolor="white"
+        )
         axes[0, 0].set_title("Total counts", fontsize=12, fontweight="bold")
         axes[0, 0].set_xlabel(total_counts_col)
     else:
-        axes[0, 0].text(0.5, 0.5, f"{total_counts_col} not in obs", ha="center", va="center", transform=axes[0, 0].transAxes)
+        axes[0, 0].text(
+            0.5,
+            0.5,
+            f"{total_counts_col} not in obs",
+            ha="center",
+            va="center",
+            transform=axes[0, 0].transAxes,
+        )
         axes[0, 0].set_title("Total counts", fontsize=12, fontweight="bold")
 
     # (1,2) n_genes_by_counts
@@ -101,14 +112,23 @@ def qc_2x2_grid(
         axes[0, 1].set_title("Genes per spot/cell", fontsize=12, fontweight="bold")
         axes[0, 1].set_xlabel(n_genes_col)
     else:
-        axes[0, 1].text(0.5, 0.5, f"{n_genes_col} not in obs", ha="center", va="center", transform=axes[0, 1].transAxes)
+        axes[0, 1].text(
+            0.5,
+            0.5,
+            f"{n_genes_col} not in obs",
+            ha="center",
+            va="center",
+            transform=axes[0, 1].transAxes,
+        )
         axes[0, 1].set_title("Genes per spot/cell", fontsize=12, fontweight="bold")
 
     # (2,1) log1p(total_counts)
     if total_counts_col in adata.obs.columns:
         x = np.log1p(adata.obs[total_counts_col].values.astype(float))
         x = x[~np.isnan(x) & np.isfinite(x)]
-        axes[1, 0].hist(x, bins=min(80, max(20, len(x) // 20)), color="seagreen", edgecolor="white", alpha=0.8)
+        axes[1, 0].hist(
+            x, bins=min(80, max(20, len(x) // 20)), color="seagreen", edgecolor="white", alpha=0.8
+        )
         axes[1, 0].set_title("log1p(total counts)", fontsize=12, fontweight="bold")
         axes[1, 0].set_xlabel("log1p(total_counts)")
     else:
@@ -118,17 +138,28 @@ def qc_2x2_grid(
     if pct_mt_col in adata.obs.columns:
         x = adata.obs[pct_mt_col].values
         x = x[~np.isnan(x) & np.isfinite(x)]
-        axes[1, 1].hist(x, bins=min(80, max(20, len(x) // 20)), color="purple", edgecolor="white", alpha=0.7)
+        axes[1, 1].hist(
+            x, bins=min(80, max(20, len(x) // 20)), color="purple", edgecolor="white", alpha=0.7
+        )
         axes[1, 1].set_title("% mitochondrial", fontsize=12, fontweight="bold")
         axes[1, 1].set_xlabel(pct_mt_col)
     elif n_genes_col in adata.obs.columns:
         x = np.log1p(adata.obs[n_genes_col].values.astype(float))
         x = x[~np.isnan(x) & np.isfinite(x)]
-        axes[1, 1].hist(x, bins=min(80, max(20, len(x) // 20)), color="gray", edgecolor="white", alpha=0.7)
+        axes[1, 1].hist(
+            x, bins=min(80, max(20, len(x) // 20)), color="gray", edgecolor="white", alpha=0.7
+        )
         axes[1, 1].set_title("log1p(genes per spot)", fontsize=12, fontweight="bold")
         axes[1, 1].set_xlabel("log1p(n_genes_by_counts)")
     else:
-        axes[1, 1].text(0.5, 0.5, "No pct_mt or n_genes", ha="center", va="center", transform=axes[1, 1].transAxes)
+        axes[1, 1].text(
+            0.5,
+            0.5,
+            "No pct_mt or n_genes",
+            ha="center",
+            va="center",
+            transform=axes[1, 1].transAxes,
+        )
         axes[1, 1].set_title("(optional)", fontsize=12, fontweight="bold")
 
     plt.tight_layout()
@@ -282,7 +313,9 @@ def qc_2x4_pre_post(
     else:
         axes[1, 3].set_title("Post: % mt (missing)", fontsize=11)
 
-    fig.suptitle("QC: Pre-filter (left) vs Post-filter (right)", fontsize=14, fontweight="bold", y=1.02)
+    fig.suptitle(
+        "QC: Pre-filter (left) vs Post-filter (right)", fontsize=14, fontweight="bold", y=1.02
+    )
     plt.tight_layout(rect=[0, 0, 1, 0.98])
 
     if output_dir is not None:
@@ -336,7 +369,9 @@ def qc_spatial_multipage(
         spots so every page uses the same color scale (default True).
     """
     if total_counts_col not in adata.obs.columns:
-        raise ValueError(f"adata.obs[{total_counts_col!r}] required. Run calculate_qc_metrics first.")
+        raise ValueError(
+            f"adata.obs[{total_counts_col!r}] required. Run calculate_qc_metrics first."
+        )
 
     tc = adata.obs[total_counts_col].values.astype(float)
     tc = tc[~np.isnan(tc) & np.isfinite(tc)]
@@ -352,7 +387,10 @@ def qc_spatial_multipage(
         if pct_mt_col in adata.obs.columns:
             pmt = adata.obs[pct_mt_col].values.astype(float)
             pmt = pmt[~np.isnan(pmt) & np.isfinite(pmt)]
-            vmin_mt, vmax_mt = 0.0, float(np.nanpercentile(pmt, 99)) if len(pmt) > 0 else (0.0, 100.0)
+            vmin_mt, vmax_mt = (
+                0.0,
+                float(np.nanpercentile(pmt, 99)) if len(pmt) > 0 else (0.0, 100.0),
+            )
         else:
             vmin_mt, vmax_mt = 0.0, 100.0
     else:
@@ -379,24 +417,28 @@ def qc_spatial_multipage(
     ]
 
     if pct_mt_col in adata.obs.columns:
-        panels.append({
-            "type": "continuous",
-            "title": "% mitochondrial",
-            "obs_col": pct_mt_col,
-            "cmap": cmap,
-            "vmin": vmin_mt,
-            "vmax": vmax_mt,
-        })
+        panels.append(
+            {
+                "type": "continuous",
+                "title": "% mitochondrial",
+                "obs_col": pct_mt_col,
+                "cmap": cmap,
+                "vmin": vmin_mt,
+                "vmax": vmax_mt,
+            }
+        )
     else:
-        panels.append({
-            "type": "continuous",
-            "title": "N/A",
-            "values": pd.Series(0.0, index=adata.obs_names),
-            "obs_col": "",
-            "cmap": "gray",
-            "vmin": 0,
-            "vmax": 1,
-        })
+        panels.append(
+            {
+                "type": "continuous",
+                "title": "N/A",
+                "values": pd.Series(0.0, index=adata.obs_names),
+                "obs_col": "",
+                "cmap": "gray",
+                "vmin": 0,
+                "vmax": 1,
+            }
+        )
 
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -457,7 +499,14 @@ def qc_violin_metrics(
     keys = [k for k in keys if k in adata.obs.columns]
     if not keys:
         fig, ax = plt.subplots(figsize=figsize or (6, 4))
-        ax.text(0.5, 0.5, "No QC metric columns in obs", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "No QC metric columns in obs",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         if output_dir is not None:
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -526,7 +575,14 @@ def qc_scatter_counts_genes(
     for col in (x, y, color):
         if col not in adata.obs.columns:
             fig, ax = plt.subplots(figsize=figsize)
-            ax.text(0.5, 0.5, f"Missing obs column: {col}", ha="center", va="center", transform=ax.transAxes)
+            ax.text(
+                0.5,
+                0.5,
+                f"Missing obs column: {col}",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+            )
             if output_dir is not None:
                 output_dir_p = Path(output_dir)
                 output_dir_p.mkdir(parents=True, exist_ok=True)
@@ -583,7 +639,14 @@ def plot_highly_variable_genes(
 
     if "highly_variable" not in adata.var.columns:
         fig, ax = plt.subplots(figsize=figsize)
-        ax.text(0.5, 0.5, "highly_variable not in adata.var", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "highly_variable not in adata.var",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         if output_dir is not None:
             output_dir_p = Path(output_dir)
             output_dir_p.mkdir(parents=True, exist_ok=True)
@@ -633,7 +696,9 @@ def _plot_svg_single(
         cbar = plt.colorbar(scatter, ax=ax, ticks=[0.25, 0.75])
         cbar.ax.set_yticklabels(["False", "True"])
     elif color_vals is not None:
-        scatter = ax.scatter(x_vals[valid], spatial_i[valid], c=color_vals[valid], cmap="viridis", s=8, alpha=0.7)
+        scatter = ax.scatter(
+            x_vals[valid], spatial_i[valid], c=color_vals[valid], cmap="viridis", s=8, alpha=0.7
+        )
         plt.colorbar(scatter, ax=ax, label=color_by)
     else:
         ax.scatter(x_vals[valid], spatial_i[valid], c="gray", s=8, alpha=0.7)
@@ -687,18 +752,32 @@ def plot_spatially_variable_genes(
         nrow = (nlib + ncol - 1) // ncol
         fig, axes = plt.subplots(nrow, ncol, figsize=(figsize[0] * ncol, figsize[1] * nrow))
         axes = np.atleast_1d(axes).flat
-        means_global = adata.var["means"].values.astype(float) if "means" in adata.var.columns else None
+        means_global = (
+            adata.var["means"].values.astype(float) if "means" in adata.var.columns else None
+        )
         if means_global is None and hasattr(adata.X, "toarray"):
             means_global = np.asarray(adata.X.mean(axis=0)).ravel()
         elif means_global is None:
             means_global = np.asarray(adata.X.mean(axis=0)).ravel()
         for idx, (lib_id, df) in enumerate(per_lib.items()):
             ax = axes[idx]
-            si = df["spatial_i"].reindex(adata.var_names).values.astype(float) if "spatial_i" in df.columns else None
+            si = (
+                df["spatial_i"].reindex(adata.var_names).values.astype(float)
+                if "spatial_i" in df.columns
+                else None
+            )
             if si is None or not np.any(np.isfinite(si)):
-                ax.text(0.5, 0.5, f"{lib_id}: no data", ha="center", va="center", transform=ax.transAxes)
+                ax.text(
+                    0.5, 0.5, f"{lib_id}: no data", ha="center", va="center", transform=ax.transAxes
+                )
                 continue
-            x_vals = means_global if x_axis == "mean" else np.argsort(np.nan_to_num(means_global, nan=np.nanmin(means_global) - 1)).astype(float)
+            x_vals = (
+                means_global
+                if x_axis == "mean"
+                else np.argsort(
+                    np.nan_to_num(means_global, nan=np.nanmin(means_global) - 1)
+                ).astype(float)
+            )
             c_vals = None
             c_bool = False
             if color_by in df.columns:
@@ -717,7 +796,9 @@ def plot_spatially_variable_genes(
 
     if "spatial_i" not in adata.var.columns:
         fig, ax = plt.subplots(figsize=figsize)
-        ax.text(0.5, 0.5, "spatial_i not in adata.var", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5, "spatial_i not in adata.var", ha="center", va="center", transform=ax.transAxes
+        )
         if output_dir is not None:
             output_dir_p = Path(output_dir)
             output_dir_p.mkdir(parents=True, exist_ok=True)
@@ -791,4 +872,272 @@ def plot_spatially_variable_genes(
         fig.savefig(output_dir / f"{basename}.pdf", bbox_inches="tight", dpi=dpi)
         fig.savefig(output_dir / f"{basename}.png", bbox_inches="tight", dpi=dpi)
 
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Cross-sample comparison plots
+# ---------------------------------------------------------------------------
+
+
+def _save_fig(fig: plt.Figure, output_dir: str | Path | None, basename: str, dpi: int) -> None:
+    """Save figure as PDF + PNG if output_dir is provided."""
+    if output_dir is not None:
+        od = Path(output_dir)
+        od.mkdir(parents=True, exist_ok=True)
+        fig.savefig(od / f"{basename}.pdf", bbox_inches="tight", dpi=dpi)
+        fig.savefig(od / f"{basename}.png", bbox_inches="tight", dpi=dpi)
+
+
+def qc_sample_comparison_bar(
+    metrics: pd.DataFrame,
+    metric_cols: list[str] | None = None,
+    classified: pd.DataFrame | None = None,
+    output_dir: str | Path | None = None,
+    basename: str = "qc_sample_comparison",
+    dpi: int = 300,
+) -> plt.Figure:
+    """
+    Bar chart per metric, one bar per sample, sorted by value.
+
+    Failed samples (from ``classified``) are highlighted in red.
+
+    Parameters
+    ----------
+    metrics : pd.DataFrame
+        Output of ``compute_sample_metrics`` (indexed by sample).
+    metric_cols : list of str or None
+        Columns to plot (default: n_genes_median, total_counts_median,
+        pct_mt_median, n_spots).
+    classified : pd.DataFrame or None
+        If provided (output of ``classify_samples``), failed samples shown in red.
+    output_dir : str or Path or None
+        If set, save PDF and PNG.
+    basename : str
+        Base filename.
+    dpi : int
+        DPI for PNG.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    if metric_cols is None:
+        metric_cols = [
+            c
+            for c in ["n_genes_median", "total_counts_median", "pct_mt_median", "n_spots"]
+            if c in metrics.columns
+        ]
+    if not metric_cols:
+        fig, ax = plt.subplots()
+        ax.text(
+            0.5,
+            0.5,
+            "No metric columns available",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    n_metrics = len(metric_cols)
+    fig, axes = plt.subplots(n_metrics, 1, figsize=(max(8, len(metrics) * 0.5), 4 * n_metrics))
+    if n_metrics == 1:
+        axes = [axes]
+
+    fail_set = set()
+    if classified is not None and "qc_pass" in classified.columns:
+        fail_set = set(classified.index[~classified["qc_pass"]])
+
+    for ax, col in zip(axes, metric_cols, strict=False):
+        sorted_df = metrics[[col]].dropna().sort_values(col)
+        colors = ["#d62728" if s in fail_set else "#1f77b4" for s in sorted_df.index]
+        ax.bar(range(len(sorted_df)), sorted_df[col].values, color=colors)
+        ax.set_xticks(range(len(sorted_df)))
+        labels = [str(s) for s in sorted_df.index]
+        ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+        ax.set_ylabel(col)
+        ax.set_title(col, fontweight="bold")
+
+    fig.suptitle("Cross-sample QC comparison", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    _save_fig(fig, output_dir, basename, dpi)
+    return fig
+
+
+def qc_sample_violin_grouped(
+    adata: AnnData,
+    sample_col: str = "library_id",
+    keys: list[str] | None = None,
+    classified: pd.DataFrame | None = None,
+    output_dir: str | Path | None = None,
+    basename: str = "qc_sample_violin",
+    dpi: int = 300,
+) -> plt.Figure:
+    """
+    Violin plots grouped by sample for direct distribution comparison.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data with QC columns in obs.
+    sample_col : str
+        Column in obs identifying samples.
+    keys : list of str or None
+        Obs columns to plot (default: n_genes_by_counts, total_counts, pct_counts_mt).
+    classified : pd.DataFrame or None
+        If provided, failed sample names are marked with ``(FAIL)`` suffix.
+    output_dir : str or Path or None
+        If set, save PDF and PNG.
+    basename : str
+        Base filename.
+    dpi : int
+        DPI for PNG.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    if sample_col not in adata.obs.columns:
+        fig, ax = plt.subplots()
+        ax.text(
+            0.5, 0.5, f"{sample_col} not in obs", ha="center", va="center", transform=ax.transAxes
+        )
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    if keys is None:
+        keys = ["n_genes_by_counts", "total_counts", "pct_counts_mt"]
+    keys = [k for k in keys if k in adata.obs.columns]
+    if not keys:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, "No QC columns", ha="center", va="center", transform=ax.transAxes)
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    fail_set = set()
+    if classified is not None and "qc_pass" in classified.columns:
+        fail_set = set(classified.index[~classified["qc_pass"]])
+
+    samples = sorted(adata.obs[sample_col].dropna().unique())
+    n_keys = len(keys)
+    fig, axes = plt.subplots(n_keys, 1, figsize=(max(8, len(samples) * 0.7), 4 * n_keys))
+    if n_keys == 1:
+        axes = [axes]
+
+    for ax, key in zip(axes, keys, strict=False):
+        data_per_sample = []
+        labels = []
+        for s in samples:
+            vals = adata.obs.loc[adata.obs[sample_col] == s, key].dropna().values
+            data_per_sample.append(vals)
+            label = f"{s} (FAIL)" if s in fail_set else str(s)
+            labels.append(label)
+
+        non_empty = [(i, d) for i, d in enumerate(data_per_sample) if len(d) > 0]
+        if non_empty:
+            parts = ax.violinplot(
+                [d for _, d in non_empty],
+                positions=[i for i, _ in non_empty],
+                showmeans=True,
+                showmedians=True,
+            )
+            for pc in parts.get("bodies", []):
+                pc.set_alpha(0.7)
+
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+        ax.set_ylabel(key)
+        ax.set_title(key, fontweight="bold")
+
+    fig.suptitle("Per-sample QC distributions", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    _save_fig(fig, output_dir, basename, dpi)
+    return fig
+
+
+def qc_sample_scatter_matrix(
+    metrics: pd.DataFrame,
+    metric_cols: list[str] | None = None,
+    classified: pd.DataFrame | None = None,
+    output_dir: str | Path | None = None,
+    basename: str = "qc_sample_scatter_matrix",
+    dpi: int = 300,
+) -> plt.Figure:
+    """
+    Pairwise scatter of sample-level metrics with pass/fail coloring.
+
+    Parameters
+    ----------
+    metrics : pd.DataFrame
+        Output of ``compute_sample_metrics``.
+    metric_cols : list of str or None
+        Columns for scatter matrix (default: n_spots, n_genes_median,
+        total_counts_median, pct_mt_median).
+    classified : pd.DataFrame or None
+        If provided, color points by pass (blue) / fail (red).
+    output_dir : str or Path or None
+        If set, save PDF and PNG.
+    basename : str
+        Base filename.
+    dpi : int
+        DPI for PNG.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    if metric_cols is None:
+        metric_cols = [
+            c
+            for c in ["n_spots", "n_genes_median", "total_counts_median", "pct_mt_median"]
+            if c in metrics.columns
+        ]
+    metric_cols = [c for c in metric_cols if c in metrics.columns]
+
+    if len(metric_cols) < 2:
+        fig, ax = plt.subplots()
+        ax.text(
+            0.5, 0.5, "Need >= 2 metric columns", ha="center", va="center", transform=ax.transAxes
+        )
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    n = len(metric_cols)
+    fig, axes = plt.subplots(n, n, figsize=(4 * n, 4 * n))
+
+    fail_set = set()
+    if classified is not None and "qc_pass" in classified.columns:
+        fail_set = set(classified.index[~classified["qc_pass"]])
+
+    colors = ["#d62728" if s in fail_set else "#1f77b4" for s in metrics.index]
+
+    for i in range(n):
+        for j in range(n):
+            ax = axes[i, j] if n > 1 else axes
+            if i == j:
+                vals = metrics[metric_cols[i]].dropna().values
+                ax.hist(
+                    vals, bins=max(5, len(vals) // 3), color="#1f77b4", edgecolor="white", alpha=0.7
+                )
+                ax.set_xlabel(metric_cols[i])
+            else:
+                ax.scatter(
+                    metrics[metric_cols[j]].values,
+                    metrics[metric_cols[i]].values,
+                    c=colors,
+                    s=40,
+                    alpha=0.8,
+                    edgecolors="white",
+                    linewidths=0.5,
+                )
+                if j == 0:
+                    ax.set_ylabel(metric_cols[i])
+                if i == n - 1:
+                    ax.set_xlabel(metric_cols[j])
+
+    fig.suptitle("Sample QC scatter matrix", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    _save_fig(fig, output_dir, basename, dpi)
     return fig

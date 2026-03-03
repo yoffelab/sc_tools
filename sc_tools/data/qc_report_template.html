@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: #333; background: #f8f9fa; line-height: 1.5; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  header { background: #2c3e50; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px; }
+  header h1 { font-size: 1.6rem; margin-bottom: 8px; }
+  header .meta { font-size: 0.9rem; opacity: 0.85; }
+  header .meta span { margin-right: 24px; }
+  .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          flex: 1; min-width: 180px; text-align: center; }
+  .card .value { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
+  .card .label { font-size: 0.85rem; color: #666; margin-top: 4px; }
+  .card.pass .value { color: #27ae60; }
+  .card.fail .value { color: #e74c3c; }
+  section { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  section h2 { font-size: 1.2rem; color: #2c3e50; margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  tr.fail-row { background: #fde8e8; }
+  tr.pass-row:hover { background: #f0f7f0; }
+  tr.fail-row:hover { background: #f8d0d0; }
+  .fail-badge { display: inline-block; background: #e74c3c; color: #fff; padding: 2px 8px;
+                border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .pass-badge { display: inline-block; background: #27ae60; color: #fff; padding: 2px 8px;
+                border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 16px; }
+  .plot-item img { width: 100%; border: 1px solid #eee; border-radius: 4px; }
+  .plot-item .caption { font-size: 0.8rem; color: #888; margin-top: 4px; text-align: center; }
+  .fail-reasons { font-size: 0.8rem; color: #c0392b; }
+  .footer { text-align: center; font-size: 0.8rem; color: #999; padding: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>{{ title }}</h1>
+  <div class="meta">
+    <span>Date: {{ date }}</span>
+    <span>Modality: {{ modality }}</span>
+    <span>Samples: {{ n_samples }}</span>
+    <span>Total spots/cells: {{ n_spots_total | int }}</span>
+  </div>
+</header>
+
+<div class="summary-cards">
+  <div class="card pass">
+    <div class="value">{{ n_pass }}</div>
+    <div class="label">Samples passed</div>
+  </div>
+  <div class="card fail">
+    <div class="value">{{ n_fail }}</div>
+    <div class="label">Samples failed</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ n_spots_total | int }}</div>
+    <div class="label">Total spots/cells</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ median_genes }}</div>
+    <div class="label">Median genes (cohort)</div>
+  </div>
+</div>
+
+<!-- Metrics Table -->
+<section>
+  <h2>Per-Sample QC Metrics</h2>
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Sample</th>
+        <th>Status</th>
+        <th>n_spots</th>
+        <th>Median counts</th>
+        <th>Median genes</th>
+        <th>Genes detected</th>
+        {% if has_mt %}<th>Median %MT</th><th>%MT &gt; 5%</th>{% endif %}
+        <th>Fail reasons</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table_rows %}
+      <tr class="{{ 'fail-row' if not row.qc_pass else 'pass-row' }}">
+        <td><strong>{{ row.sample }}</strong></td>
+        <td>{% if row.qc_pass %}<span class="pass-badge">PASS</span>{% else %}<span class="fail-badge">FAIL</span>{% endif %}</td>
+        <td>{{ row.n_spots }}</td>
+        <td>{{ "%.1f" | format(row.total_counts_median) if row.total_counts_median is not none else "N/A" }}</td>
+        <td>{{ "%.1f" | format(row.n_genes_median) if row.n_genes_median is not none else "N/A" }}</td>
+        <td>{{ row.n_genes_detected if row.n_genes_detected is not none else "N/A" }}</td>
+        {% if has_mt %}
+        <td>{{ "%.1f%%" | format(row.pct_mt_median) if row.pct_mt_median is not none else "N/A" }}</td>
+        <td>{{ "%.1f%%" | format(row.pct_mt_gt5 * 100) if row.pct_mt_gt5 is not none else "N/A" }}</td>
+        {% endif %}
+        <td class="fail-reasons">{{ row.qc_fail_reasons if row.qc_fail_reasons else "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- Failed samples detail -->
+{% if n_fail > 0 %}
+<section>
+  <h2>Failed Samples</h2>
+  <ul>
+    {% for row in table_rows if not row.qc_pass %}
+    <li><strong>{{ row.sample }}</strong>: {{ row.qc_fail_reasons }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<!-- Comparison plots -->
+{% if plots %}
+<section>
+  <h2>Cross-Sample Comparison Plots</h2>
+  <div class="plot-grid">
+    {% for plot in plots %}
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ plot.data }}" alt="{{ plot.caption }}">
+      <div class="caption">{{ plot.caption }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="footer">
+  Generated by sc_tools QC report &mdash; {{ date }}
+</div>
+
+</div>
+</body>
+</html>

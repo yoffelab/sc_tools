@@ -34,5 +34,10 @@ dependencies:
     # Deconvolution (heavy GPU-optional deps; comment out if not needed locally)
     - scvi-tools
     - tangram-sc
+    # Gene set scoring and enrichment testing (optional; comment out if not needed)
+    # - gseapy>=1.0
+    # - pyucell>=0.1
+    # Transcription factor / pathway activity (optional)
+    # - decoupler>=1.4
     # sc_tools package (editable install from repo root)
     - -e .

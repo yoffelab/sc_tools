@@ -12,8 +12,6 @@ and store it so all plotting stays consistent.
 from typing import Any
 
 import matplotlib.colors as mcolors
-
-from sc_tools.utils.signatures import get_signature_df
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -21,6 +19,8 @@ import seaborn as sns
 from matplotlib.patches import Patch
 from scipy.cluster.hierarchy import leaves_list, linkage
 from scipy.spatial.distance import pdist
+
+from sc_tools.utils.signatures import get_signature_df
 
 __all__ = [
     "hex_to_rgb",
@@ -267,7 +267,7 @@ def signature_score_heatmap(
     sig_df = get_signature_df(adata)
     cols = [c for c in sig_columns if c in sig_df.columns]
     sig_df = sig_df[cols]
-    sig_labels = [c.replace(sig_prefix, "").replace(sig_suffix, "") for c in sig_df.columns]
+    [c.replace(sig_prefix, "").replace(sig_suffix, "") for c in sig_df.columns]
 
     # Order for each sort dimension
     orders = {}

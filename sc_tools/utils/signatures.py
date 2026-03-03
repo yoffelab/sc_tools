@@ -2,11 +2,8 @@
 Signature utility functions.
 """
 
-from typing import Optional
-
-import pandas as pd
-
 import anndata as ad
+import pandas as pd
 
 
 def get_signature_columns_from_obsm(
@@ -64,7 +61,7 @@ def get_signature_columns(adata: ad.AnnData, prefix: str = "sig:", suffix: str =
 def get_signature_df(
     adata: ad.AnnData,
     use_z: bool = True,
-    obsm_key: Optional[str] = None,
+    obsm_key: str | None = None,
 ) -> pd.DataFrame:
     """
     Return a DataFrame of signature scores. Prefer obsm; fall back to obs for backward compatibility.

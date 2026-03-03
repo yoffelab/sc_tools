@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any
 
 import pandas as pd
-
 from anndata import AnnData
 
 __all__ = ["spatially_variable_genes", "spatially_variable_genes_per_library"]
@@ -189,7 +188,11 @@ def spatially_variable_genes_per_library(
             )
         except Exception:
             continue
-        cols = [c for c in ["spatial_i", "spatial_pval", "spatially_variable"] if c in subset.var.columns]
+        cols = [
+            c
+            for c in ["spatial_i", "spatial_pval", "spatially_variable"]
+            if c in subset.var.columns
+        ]
         if cols:
             out[str(lib)] = subset.var[cols].copy()
 

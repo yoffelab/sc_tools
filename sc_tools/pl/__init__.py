@@ -6,32 +6,39 @@ Following scanpy's API pattern, this module provides plotting functions:
 - heatmaps: Heatmap/clustermap utilities
 - statistical: Statistical annotations (bars, asterisks)
 - volcano: Volcano plot utilities
+- gsea: Enrichment result dot plots
 - QC plots: qc_2x2_grid, qc_spatial_multipage (from sc_tools.qc.plots)
 """
 
 # Import plotting functions
-from . import heatmaps, spatial, statistical, volcano
-from . import save as save_figs
-from .save import save_figure
-
 # QC plots (Phase 1): re-export from sc_tools.qc.plots for st.pl.qc_* usage
 from sc_tools.qc.plots import (
     plot_highly_variable_genes,
     plot_spatially_variable_genes,
     qc_2x2_grid,
     qc_2x4_pre_post,
+    qc_sample_comparison_bar,
+    qc_sample_scatter_matrix,
+    qc_sample_violin_grouped,
     qc_scatter_counts_genes,
     qc_spatial_multipage,
     qc_violin_metrics,
 )
+
+from . import gsea, heatmaps, spatial, statistical, volcano
+from . import save as save_figs
+from .gsea import plot_gsea_dotplot
+from .save import save_figure
 
 __all__ = [
     "spatial",
     "heatmaps",
     "statistical",
     "volcano",
+    "gsea",
     "save_figs",
     "save_figure",
+    "plot_gsea_dotplot",
     "qc_2x2_grid",
     "qc_2x4_pre_post",
     "qc_spatial_multipage",
@@ -39,4 +46,7 @@ __all__ = [
     "qc_scatter_counts_genes",
     "plot_highly_variable_genes",
     "plot_spatially_variable_genes",
+    "qc_sample_comparison_bar",
+    "qc_sample_violin_grouped",
+    "qc_sample_scatter_matrix",
 ]

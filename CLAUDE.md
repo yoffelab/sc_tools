@@ -52,6 +52,7 @@ Plan mode (discussing only): updating Mission optional until execution begins.
 
 | Phase | Name | Checkpoint |
 |-------|------|------------|
+| 0 | Upstream Raw Data Processing | `data/{sample_id}/outs/` |
 | 1 | Data Ingestion & QC | `adata.raw.p1.h5ad` |
 | 2 | Metadata Attachment (HIL) | `adata.annotated.p2.h5ad` |
 | 3 | Preprocessing | `adata.normalized.p3.h5ad` |
@@ -101,6 +102,7 @@ Full standards: @skills.md. Quick reference:
 - Group comparisons: 2 groups = pairwise; >2 groups = 1-vs-rest (default), all-pairwise as option
 - Deconvolution: batch per `library_id` to avoid OOM
 - Linting: Ruff (`make lint`) — never commit failing lint
+- **Publication figures** (skills.md §12): 300+ DPI, Helvetica/Arial 5-8pt, color-blind safe palettes (Okabe-Ito default, no jet/rainbow), bold panel labels (lowercase for Nature, uppercase for Cell/Science), scale bars on spatial plots, exact P-values preferred. Use `marsilea` for complex composite figures.
 
 ---
 

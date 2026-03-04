@@ -6,6 +6,12 @@ This document defines actionable, reproducible skills and best-practice guidelin
 
 ---
 
+# Part I: Analysis Pipeline
+
+Core computational steps in execution order (Phases 1-6 of the pipeline).
+
+---
+
 ## 1. Data Ingestion, Integrity, and Multi-Modal Containers
 
 ### Core Skills
@@ -96,11 +102,11 @@ This document defines actionable, reproducible skills and best-practice guidelin
 - **Spatial Clustering (UTAG):** Unsupervised Tissue Architecture with Graphs -- graph-based message passing on spatial adjacency to identify microanatomical domains. Runs *after* standard Leiden as an optional complement. `max_dist`: 10-20 for IMC, 10-100 for transcriptomics. `slide_key` for multi-image batch processing. Install: `pip install git+https://github.com/ElementoLab/utag.git@main`.
 - **Automated Validation:** Cross-reference identified marker genes against established cell-type databases (e.g., CellTypist) to assign biological meaning.
 
-### Key References
-- [sc-best-practices: Integration](https://www.sc-best-practices.org/cellular_structure/integration.html)
-- [rapids-singlecell docs](https://rapids-singlecell.readthedocs.io/en/latest/)
-- [scvi-tools models](https://scvi-tools.org/)
-- [UTAG: Nature Methods (2022)](https://www.nature.com/articles/s41592-022-01657-2)
+---
+
+# Part II: Spatial and Integrative Analysis
+
+Spatial-specific methods, multi-modal integration, and imaging modality considerations.
 
 ---
 
@@ -122,14 +128,29 @@ This document defines actionable, reproducible skills and best-practice guidelin
 
 ---
 
-## 9. Differential and Spatially Variable Features
+## 9. Imaging-Based Spatial Modalities (IMC, CosMx, Xenium)
+
+### Core Skills
+- Validate segmentation masks/quality prior to expression analysis.
+- Handle "binless" or subcellular data by linking molecular coordinates to cell identifiers or neighborhood grids.
+- Perform biological sanity checks using known tissue structures (e.g., Keratin in epithelium).
+
+---
+
+# Part III: Statistical Analysis and Visualization
+
+Differential expression, statistical testing, color standards, and publication figure production.
+
+---
+
+## 10. Differential Expression and Spatially Variable Features
 
 ### Differential Expression (DE)
 - Use non-parametric tests or model-based DE (e.g., `model.differential_expression()` in `scvi-tools`).
 - **Strict Correction:** Always apply Benjamini-Hochberg (FDR) adjustment for multiple hypothesis testing.
 - Report effect sizes (log-fold change) alongside adjusted p-values.
 
-### Robust Statistical Visualization
+### Statistical Visualization
 For all statistical comparisons (boxplots, violin plots, strip plots), the following must be enforced:
 - **Visual Annotation:** Draw significance bars and asterisks strictly following:
   - $* < 0.05$
@@ -144,16 +165,225 @@ For all statistical comparisons (boxplots, violin plots, strip plots), the follo
 
 ---
 
-## 10. Imaging-Based Spatial Modalities (IMC, CosMx, Xenium)
+## 11. Colors and Palettes
 
-### Core Skills
-- Validate segmentation masks/quality prior to expression analysis.
-- Handle "binless" or subcellular data by linking molecular coordinates to cell identifiers or neighborhood grids.
-- Perform biological sanity checks using known tissue structures (e.g., Keratin in epithelium).
+### 11.1. Categorical Variables in AnnData (Scanpy Convention)
+
+For any categorical column `{name}` in `adata.obs`, use the same color convention as Scanpy for all figures:
+
+- **Storage:** Colors are stored in `adata.uns[f'{name}_colors']` as a **list of hex strings** (e.g. `['#FFFFFF', '#66c2a5', ...]`) with **length equal to the number of categories**, in **category order** (same order as `adata.obs[name].cat.categories`).
+- **Usage:** When producing a figure that colors by a categorical obs column:
+  - If `adata.uns[f'{name}_colors']` **already exists** and has the correct length, **use those colors** and do not overwrite.
+  - If it **does not exist** (or length does not match), **create** a default palette (e.g. qualitative colormap), assign one color per category in order, **save** the hex list to `adata.uns[f'{name}_colors']`, and use those colors for the figure.
+- **Consistency:** This ensures the same categorical variable is colored identically across all plots and scripts. Prefer setting `adata.uns[f'{name}_colors']` explicitly in project code when a specific palette is desired (e.g. tumor type: Normal / Non-Solid / Solid).
+
+**Implementation:** In `sc_tools.pl.heatmaps`, use `get_obs_category_colors(adata, obs_col, store_if_missing=True)` to obtain a mapping from category value to RGB; it reads or creates `adata.uns[f'{obs_col}_colors']` as above. Apply this pattern in any plotting code that colors by a categorical obs column (heatmaps, scatter, legends).
+
+### 11.2. Color-Blind Safe Palettes
+
+All figures must use color-blind safe palettes. Never rely on red-green contrast alone.
+
+#### Categorical: Okabe-Ito / Wong palette (default for <= 8 categories)
+
+| Color | Name | Hex |
+|-------|------|-----|
+| ![](.) | Black | `#000000` |
+| ![](.) | Orange | `#E69F00` |
+| ![](.) | Sky Blue | `#56B4E9` |
+| ![](.) | Bluish Green | `#009E73` |
+| ![](.) | Yellow | `#F0E442` |
+| ![](.) | Blue | `#0072B2` |
+| ![](.) | Vermillion | `#D55E00` |
+| ![](.) | Reddish Purple | `#CC79A7` |
+
+```python
+OKABE_ITO = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000"]
+```
+
+#### Categorical: Paul Tol palettes (for more categories)
+
+- **Bright (7):** `#4477AA`, `#EE6677`, `#228833`, `#CCBB44`, `#66CCEE`, `#AA3377`, `#BBBBBB`
+- **Vibrant (7):** `#EE7733`, `#0077BB`, `#33BBEE`, `#EE3377`, `#CC3311`, `#009988`, `#BBBBBB`
+- **Muted (10):** `#CC6677`, `#332288`, `#DDCC77`, `#117733`, `#88CCEE`, `#882255`, `#44AA99`, `#999933`, `#AA4499`, `#DDDDDD`
+
+### 11.3. Sequential and Diverging Colormaps
+
+| Use case | Recommended | Avoid |
+|----------|-------------|-------|
+| Sequential (expression, counts) | `viridis`, `mako`, `cividis` | `jet`, `rainbow`, `hot` |
+| Diverging (fold change, z-score) | `RdBu_r`, `coolwarm`, `PiYG` | `bwr` (poor perceptual uniformity) |
+| Spatial heatmaps | `magma`, `inferno`, `viridis` | `jet` |
+
+**Rule:** Never use `jet` or `rainbow` colormaps. These are not perceptually uniform and are inaccessible to colorblind viewers. Use `viridis` (default), `cividis` (deuteranopia-safe), or `mako`/`magma` for sequential data.
 
 ---
 
-## 11. Reproducibility and Workflow Standards
+## 12. Publication-Quality Figure Production
+
+Guidelines for producing manuscript-ready figures for Nature family, Cell family, and Science/AAAS journals. All projects generating figures for `figures/manuscript/` must follow these standards. For color palette selection, see Section 11.
+
+### 12.1. Dimensions and Resolution
+
+| Property | Nature | Cell | Science |
+|----------|--------|------|---------|
+| **Single column** | 89 mm (3.5 in) | 85 mm (3.35 in) | 57 mm (2.24 in) |
+| **1.5 column** | 120 mm (4.7 in) | — | 121 mm (4.76 in) |
+| **Double column (full width)** | 183 mm (7.2 in) | 174 mm (6.85 in) | 184 mm (7.24 in) |
+| **Max height** | 247 mm (9.7 in) | 229 mm (9 in) | 229 mm (9 in) |
+| **Min DPI (raster/photo)** | 300 | 300 | 300 |
+| **Min DPI (line art)** | 600-1000 | 600 | 600 |
+| **Preferred format** | EPS, PDF, TIFF | EPS, PDF, TIFF | PDF, EPS |
+| **Color mode** | RGB (not CMYK) | RGB | RGB |
+
+**Default in sc_tools:** Save figures at **300 DPI** (raster) or vector (PDF/SVG) at **single-column width (89 mm)**. Use `plt.savefig(path, dpi=300, bbox_inches="tight")` and set figure size explicitly in inches.
+
+### 12.2. Typography
+
+| Property | Nature | Cell | Science |
+|----------|--------|------|---------|
+| **Font family** | Helvetica, Arial, or sans-serif | Helvetica, Arial | Helvetica, Arial |
+| **Axis labels / text** | 5-7 pt | 6-8 pt | 7 pt min |
+| **Panel labels** | 8 pt, **bold lowercase** (a, b, c) | 8 pt, **bold UPPERCASE** (A, B, C) | 8 pt, **bold UPPERCASE** (A, B, C) |
+| **Title text** | 8 pt max | 8-10 pt | 8 pt max |
+
+**Matplotlib defaults for sc_tools:**
+
+```python
+import matplotlib as mpl
+
+mpl.rcParams.update({
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
+    "font.size": 7,                # Base font size (7 pt)
+    "axes.titlesize": 8,           # Subplot titles
+    "axes.labelsize": 7,           # Axis labels
+    "xtick.labelsize": 6,          # Tick labels
+    "ytick.labelsize": 6,
+    "legend.fontsize": 6,
+    "figure.titlesize": 8,
+    "pdf.fonttype": 42,            # TrueType (editable text in PDF)
+    "ps.fonttype": 42,
+    "svg.fonttype": "none",        # Keep text as text in SVG
+})
+```
+
+**Panel labeling convention:** Default to **bold lowercase** (a, b, c) for Nature-family submissions. Switch to **bold UPPERCASE** (A, B, C) for Cell/Science. Place panel labels in the **top-left corner** outside the plot area. Use `fig.text(x, y, "a", fontsize=8, fontweight="bold")` or equivalent annotation.
+
+### 12.3. Statistical Reporting in Figures
+
+For significance bar definitions and comparison modes, see Section 10.
+
+#### General requirements (all journals)
+
+- **Report exact P-values** when possible (e.g., P = 0.003), not just thresholds.
+- **Define error bars** explicitly in figure legends: SD, SEM, 95% CI, or IQR.
+- **Report sample sizes** (n) for each group in the figure legend or on the plot.
+- **Name the statistical test** in the legend (e.g., two-sided Wilcoxon rank-sum, one-way ANOVA with Tukey HSD).
+- **Multiple testing correction:** Always Benjamini-Hochberg FDR for multi-gene/multi-comparison analyses (see Section 10).
+
+#### Journal-specific notes
+
+| Requirement | Nature | Cell | Science |
+|-------------|--------|------|---------|
+| P-value reporting | Exact values preferred; asterisks acceptable with definition | Exact values in text; asterisks in figures | Exact values preferred |
+| Error bars | Must define in legend (SD, SEM, or CI) | Must define; 95% CI preferred | Must define |
+| Sample size | n for each group in legend | n in figure or legend | n in legend |
+| Effect size | Encouraged (e.g., Cohen d, log2FC) | Required for key comparisons | Encouraged |
+
+When using `statannotations`, configure: `annotator.configure(test="Mann-Whitney", text_format="star", loc="inside")`.
+
+### 12.4. Line Weights, Borders, and Whitespace
+
+| Element | Specification |
+|---------|---------------|
+| **Axis lines** | 0.5-1.0 pt |
+| **Plot borders** | 0.5 pt or remove (borderless preferred for spatial plots) |
+| **Tick marks** | 0.5 pt, outward |
+| **Error bar caps** | 0.5-1.0 pt |
+| **Scale bars** | 1.0 pt, solid black, with text label (e.g., "100 um") |
+| **Grid lines** | Remove or use 0.25 pt light gray (`#CCCCCC`) |
+| **Whitespace** | Minimize; use `plt.tight_layout()` or `bbox_inches="tight"` |
+
+**Scale bars for spatial plots:** Required for all spatial/tissue images. Place in the **bottom-right** corner. Label with physical units (um or mm). Never rely on axis ticks alone for spatial scale.
+
+### 12.5. Multi-Panel Figure Assembly
+
+#### Using marsilea (recommended for complex composite figures)
+
+**Marsilea** is a declarative, composable visualization library built on matplotlib for assembling multi-panel figures with cross-layout alignment. Recommended for heatmaps with side annotations, grouped comparisons, and composite biological figures.
+
+Key capabilities:
+- **Heatmap composites:** `Heatmap`, `CatHeatmap`, `SizedHeatmap` with aligned side plots (dendrograms, bar charts, labels)
+- **Cross-layout paradigm:** Central plot with top/bottom/left/right annotation layers via `.add_top()`, `.add_left()`, etc.
+- **Multi-dataset alignment:** `ClusterBoard` for side-by-side heatmaps sharing row/column groupings
+- **Biological plots:** OncoPrint, UpSet plots, stacked bars, arc diagrams
+- **Scanpy integration:** Works with AnnData for expression heatmaps
+
+```python
+import marsilea as ma
+import marsilea.plotter as mp
+
+# Example: heatmap with dendrogram and grouped annotations
+h = ma.Heatmap(data, cmap="viridis", width=4, height=6)
+h.add_left(mp.Labels(row_labels))
+h.add_top(mp.Dendrogram(linkage))
+h.add_right(mp.Bar(scores, color="#0072B2"))
+h.render()
+```
+
+Install: `pip install marsilea` or `pip install sc-tools[viz]`.
+
+#### Manual assembly with matplotlib
+
+For simpler layouts, use `matplotlib.gridspec` or `fig.subfigures()`:
+
+```python
+fig = plt.figure(figsize=(7.2, 9.0))  # Full width, near max height (Nature)
+gs = fig.add_gridspec(2, 3, hspace=0.3, wspace=0.3)
+ax_a = fig.add_subplot(gs[0, 0])
+# ... add panels
+# Panel labels
+for ax, label in zip(axes, "abcdef"):
+    ax.text(-0.1, 1.1, label, transform=ax.transAxes, fontsize=8, fontweight="bold")
+```
+
+### 12.6. Supplementary Figure Standards
+
+Supplementary figures follow the same quality requirements as main figures:
+- Same DPI (300+ for raster, vector preferred)
+- Same font sizes and families
+- Same color-blind safe palettes
+- Same statistical annotation standards
+- Panel labels continue from main figures or restart with "S" prefix (e.g., S1a, S1b or per journal convention)
+- Maximum page size: typically **letter** (8.5 x 11 in) or **A4** (210 x 297 mm)
+
+### 12.7. Figure Checklist (pre-submission)
+
+Before placing any figure in `figures/manuscript/`:
+
+- [ ] Resolution >= 300 DPI (raster) or vector format (PDF/SVG/EPS)
+- [ ] Fonts are Helvetica/Arial, 5-8 pt range
+- [ ] Panel labels present (bold, correct case for target journal)
+- [ ] Color palette is color-blind safe (no red-green only contrast; no jet/rainbow)
+- [ ] Scale bars on all spatial/tissue images with physical unit labels
+- [ ] Axis labels include units where applicable
+- [ ] Error bars defined in legend (SD, SEM, CI)
+- [ ] Sample sizes (n) reported per group
+- [ ] Statistical test named in legend
+- [ ] P-values shown (exact preferred) or significance bars defined
+- [ ] White background (no gray figure background)
+- [ ] No unnecessary gridlines or chart junk
+- [ ] Figure saved with `bbox_inches="tight"` to minimize whitespace
+
+---
+
+# Part IV: Engineering, Reproducibility, and CI
+
+Workflow standards, metadata management, testing, and continuous improvement.
+
+---
+
+## 13. Reproducibility and Workflow Standards
 
 ### Sandbox and local runs (defaults)
 - **Always use Snakemake as the workflow engine for all runs** (sandbox, local, and production). Each project has its own Snakefile. Run rules inside the project container image so that execution is reproducible and consistent.
@@ -172,24 +402,7 @@ For all statistical comparisons (boxplots, violin plots, strip plots), the follo
 
 ---
 
-## 11.5. Categorical Variables and Colors in AnnData (Scanpy Convention)
-
-### Rule
-For any categorical column `{name}` in `adata.obs`, use the same color convention as Scanpy for all figures:
-
-- **Storage:** Colors are stored in `adata.uns[f'{name}_colors']` as a **list of hex strings** (e.g. `['#FFFFFF', '#66c2a5', ...]`) with **length equal to the number of categories**, in **category order** (same order as `adata.obs[name].cat.categories`).
-- **Usage:** When producing a figure that colors by a categorical obs column:
-  - If `adata.uns[f'{name}_colors']` **already exists** and has the correct length, **use those colors** and do not overwrite.
-  - If it **does not exist** (or length does not match), **create** a default palette (e.g. qualitative colormap), assign one color per category in order, **save** the hex list to `adata.uns[f'{name}_colors']`, and use those colors for the figure.
-- **Consistency:** This ensures the same categorical variable is colored identically across all plots and scripts. Prefer setting `adata.uns[f'{name}_colors']` explicitly in project code when a specific palette is desired (e.g. tumor type: Normal / Non-Solid / Solid).
-
-### Implementation
-- In `sc_tools.pl.heatmaps`, use `get_obs_category_colors(adata, obs_col, store_if_missing=True)` to obtain a mapping from category value to RGB; it reads or creates `adata.uns[f'{obs_col}_colors']` as above.
-- Apply this pattern in any plotting code that colors by a categorical obs column (heatmaps, scatter, legends).
-
----
-
-## 12. Metadata and Data Sharing
+## 14. Metadata and Data Sharing
 
 ### Core Skills
 - Maintain complete, machine-readable metadata in a structured format (e.g., CSV or YAML).
@@ -198,7 +411,7 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 
 ---
 
-## 13. Validation and Interpretation
+## 15. Validation and Interpretation
 
 ### Best Practices
 - Cross-validate computational findings across different platforms or orthogonal modalities (IHC/IF).
@@ -207,15 +420,8 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 
 ---
 
-## 14. Continuous Improvement
+## 16. Testing and CI
 
-- Track the evolution of community standards (e.g., Scverse updates).
-- Revisit and update pipelines as new benchmarks and probabilistic models emerge.
-- Treat all analysis pipelines as evolving, versioned software products.
-
----
-
-## 15. Fail-proof Testing and CI
 - Try to generate fail-proof test samples associated with code that is generated. Try to perform unit and integration test where applicable.
 - Generate a wide coverage of inputs to generated code, including with empty, sub, and full data.
 - Always test generated code so that it **compiles, passes lint, and runs** without error.
@@ -223,7 +429,17 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 
 ---
 
-## Appendix: Common Libraries
+## 17. Continuous Improvement
+
+- Track the evolution of community standards (e.g., Scverse updates).
+- Revisit and update pipelines as new benchmarks and probabilistic models emerge.
+- Treat all analysis pipelines as evolving, versioned software products.
+
+---
+
+# Appendix
+
+## Common Libraries
 
 ### Data Containers & Multi-Modal
 - **AnnData** (single-modality), **MuData** (multi-modal, multi-omics; mudata), **SpatialData** (spatial multi-modal with images, shapes, points)
@@ -240,6 +456,7 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 
 ### Visualization & Statistics
 - `scanpy`, `matplotlib`, `seaborn`, `statannotations`, `napari`, `vitessce`, `pinguoin`
+- **marsilea** (composable multi-panel figures: heatmaps with side annotations, cross-layout alignment, OncoPrint, UpSet; built on matplotlib)
 
 ### Workflow & Infrastructure
 - **Workflow engine:** `snakemake` (all environments). **Container:** `apptainer`/Singularity (Linux/HPC, primary); `docker` (macOS/Windows, fallback).
@@ -247,3 +464,10 @@ For any categorical column `{name}` in `adata.obs`, use the same color conventio
 
 ### CI/CD, Linting & Docs
 - `ruff` (lint + format), `pytest`, `sphinx`, `snakemake`, GitHub Actions
+
+## Key References
+
+- [sc-best-practices: Integration](https://www.sc-best-practices.org/cellular_structure/integration.html)
+- [rapids-singlecell docs](https://rapids-singlecell.readthedocs.io/en/latest/)
+- [scvi-tools models](https://scvi-tools.org/)
+- [UTAG: Nature Methods (2022)](https://www.nature.com/articles/s41592-022-01657-2)

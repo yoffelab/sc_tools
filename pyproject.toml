@@ -78,6 +78,18 @@ gpu = [
     "torch",
     "rapids-singlecell",
 ]
+# Publication-quality composite figures
+viz = [
+    "marsilea>=0.4",
+]
+# Benchmarking (segmentation and integration comparison)
+benchmark = [
+    "scikit-image>=0.21",
+    "scib-metrics>=0.4",
+    "plotly>=5.18",
+    "cellpose>=3.0,<4.0",
+    "stardist>=0.9",
+]
 # Development and testing
 dev = [
     "pytest>=7.0",

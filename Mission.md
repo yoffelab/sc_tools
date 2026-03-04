@@ -2,13 +2,13 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-04
 
 ---
 
 ## 1. Toolkit and Pipeline (General)
 
-- **Pipeline phases (1–7):** Non-linear workflow with human-in-loop steps. See `README.md` for the diagram and phase summary.
+- **Pipeline phases (0–7):** Non-linear workflow with human-in-loop steps. See `README.md` for the diagram and phase summary.
 - **sc_tools:** Reusable package (`sc_tools.pl`, `sc_tools.tl`, `sc_tools.qc`, etc.) for QC, plotting, testing, colocalization, I/O. Keep generic; project-specific logic stays in project scripts.
 - **Reproducibility:** Makefile is project-aware (`PROJECT ?= projects/visium/ggo_visium`). Each project has `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/` under `projects/<platform>/<project_name>/`.
 - **Standards:** All projects follow `skills.md` (statistics, significance bars, FDR). Documentation avoids apostrophes.
@@ -43,7 +43,8 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **Space Ranger command builder:** `sc_tools.ingest.spaceranger` — `build_spaceranger_count_cmd()`, `build_batch_commands()`. Supports Visium (--image) and Visium HD (--cytaimage).
 - [x] **Xenium Ranger command builder:** `sc_tools.ingest.xenium` — `build_xenium_ranger_cmd()`.
 - [x] **IMC pipeline command builder:** `sc_tools.ingest.imc` — `build_imc_pipeline_cmd()`.
-- [x] **Modality loaders:** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_xenium_sample()`, `load_imc_sample()`, `concat_samples()`. Standardized Phase 1 obs/obsm keys.
+- [x] **Modality loaders:** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`, `concat_samples()`. Standardized Phase 1 obs/obsm keys.
+- [x] **visium_hd_cell modality:** SpaceRanger 4 cell segmentation support. `load_visium_hd_cell_sample()` reads from `outs/cell_segmentation/`. Cell-level QC thresholds (like xenium). Routes to xenium recipe in `preprocess()`. `create_project.sh` accepts `visium_hd_cell` as valid data type.
 - [x] **Snakemake Phase 0 rules:** `spaceranger_count` and `phase0` target in robin, ggo_visium, and create_project.sh template. Driven by `metadata/phase0/all_samples.tsv`.
 
 ### Checkpoint Validation
@@ -55,9 +56,14 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 ### Phase 1: Data Ingestion & QC
 
 #### Ingestion (Platform-Specific)
-- [ ] **Visium / Visium HD:** fastq + H&E images + Cytassist images → Space Ranger → cloupe. Convert cloupe to AnnData. Keep H&E images when concatenating.
-- [ ] **IMC:** mcd, txt files → segmentation and concatenation → h5ad.
-- [ ] **Xenium:** Assume preprocessed; load into AnnData.
+
+Phase 0 produces `data/{sample_id}/outs/` via Space Ranger / Xenium Ranger / IMC pipeline. Phase 1 loads those outputs into AnnData using `sc_tools.ingest.loaders`.
+
+- [ ] **Visium / Visium HD:** `load_visium_sample()` or `load_visium_hd_sample()` from Phase 0 Space Ranger output. Keep H&E images when concatenating.
+- [ ] **Visium HD Cell:** `load_visium_hd_cell_sample()` from SpaceRanger 4 cell segmentation output (`outs/cell_segmentation/`).
+- [ ] **IMC:** `load_imc_sample()` from segmented h5ad.
+- [ ] **Xenium:** `load_xenium_sample()` from Xenium output (spatialdata-io or scanpy fallback).
+- [ ] **Concatenation:** `concat_samples()` merges per-sample AnnData with QC metrics.
 - [ ] **Required annotations:** `adata.obs['sample']` (sample of origin), `adata.obs['raw_data_dir']` (backup path for original data). Spatial coords in `adata.obsm['spatial']`.
 
 #### QC Metrics (sc_tools.qc)
@@ -202,7 +208,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 
 - **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
 - **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
-- **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §11 and in the skill).
+- **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §13 and in the skill).
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save, gsea), `tl/` (testing, colocalization, deconvolution, io, score_signature, gene_sets, gsea), `memory/` (profiling, gpu), `qc/` (metrics, plots, spatial).
 - **Gene set scoring redesign (Phase 3.5b):** Full overhaul. (1) `sc_tools/data/hallmark_human.json`: 50 bundled MSigDB Hallmark sets (offline). (2) `sc_tools.tl.gene_sets`: `load_hallmark`, `load_msigdb_json`, `load_gmt`, `list_gene_sets`, `validate_gene_signatures`, `merge_gene_signatures`, `update_gene_symbols`, `save_gene_signatures`. (3) `score_signature(method=...)`: scanpy (default), ucell (pyucell), ssgsea (gseapy). (4) `sc_tools.tl.gsea`: `run_ora` (Fisher exact + BH), `run_gsea_pseudobulk` (prerank). (5) `sc_tools.pl.gsea`: `plot_gsea_dotplot`. Optional deps: `pip install sc-tools[geneset]`. 80 tests pass.
 - **Generic deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi), `extract_reference_profiles()`, per-library backed loading, memory profiling. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. 14 unit tests. Thin project wrappers for ggo_visium and robin.
@@ -216,6 +222,8 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Phase 3 preprocessing module (sc_tools.pp):** Modality-aware preprocessing with GPU auto-detection (rapids-singlecell/scanpy). Normalization (`normalize_total`, `log_transform`, `scale`, `arcsinh_transform`, `filter_genes_by_pattern`, `backup_raw`). Integration (`run_scvi`, `run_harmony`, `run_cytovi`; all soft deps). Reduction/clustering (`pca`, `neighbors` with auto use_rep detection, `umap`, `leiden`, `cluster`, `run_utag`). Recipes: `preprocess(modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc")`. 38 unit tests pass, lint clean. skills.md updated with modality-specific preprocessing standards.
 - **Phase 0 ingestion module (sc_tools.ingest):** Batch manifest system (`config.py`), Space Ranger / Xenium / IMC command builders (`spaceranger.py`, `xenium.py`, `imc.py`), modality-specific AnnData loaders (`loaders.py`). Snakemake Phase 0 rules and validation sentinels in robin, ggo_visium, and create_project.sh template. 26 unit tests pass, lint clean.
 - **Checkpoint validation (sc_tools.validate):** `validate_p1` through `validate_p4` with auto-fix support. CLI wrapper `scripts/validate_checkpoint.py` for Snakemake integration. Validation sentinels enforce Architecture.md Section 2.2 metadata contracts. 30 unit tests pass, lint clean.
+- **Publication figure guidelines (skills.md §12):** Journal-specific standards for Nature/Cell/Science families. Dimension/DPI/font tables, Okabe-Ito and Paul Tol color-blind safe palettes, statistical reporting requirements, line weights, scale bars, marsilea for composite figures, pre-submission checklist. `pyproject.toml [viz]` extra for marsilea.
+- **skills.md reorganization:** Restructured into 4 logical parts: (I) Analysis Pipeline §1-6, (II) Spatial and Integrative Analysis §7-9, (III) Statistical Analysis and Visualization §10-12, (IV) Engineering and CI §13-17. Colors (old §11.5) merged with palettes into §11. References consolidated into Appendix.
 
 ### In Progress — Next immediate steps
 
@@ -225,21 +233,21 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - [ ] Add pytest to pyproject.toml / requirements.
 
 **Makefile & scripts**
-- [ ] Align Makefile targets with Phases 1–7 (see README Pipeline Workflow).
+- [ ] Align Makefile targets with Phases 0–7 (see README Pipeline Workflow).
 - [ ] Update scripts to use `$(PROJECT)/metadata/` instead of `metadata/`. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
 - [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
 
-### CI/CD Roadmap (order: 1 → 2 → 3 → 4 → 5)
+### CI/CD Roadmap
 
-Work through in sequence; each builds on the previous. See **skills.md** Section 11 and 15. **GitHub Actions last** (testing setup will be complex).
+Sequential; each step builds on the previous. See skills.md Sections 13 and 16.
 
-1. **[x] Linting** — Ruff configured in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check` on `sc_tools`; all violations fixed. Scripts/ to be added once fixed.
-2. **[x] Snakemake** — Already adopted as THE workflow engine. Each project has its own Snakefile. **Containerization:** Apptainer (Linux/HPC, primary); Docker (macOS/Windows, fallback). Auto-detect via `scripts/run_container.sh`. Publish container image to registry (Docker Hub, GHCR) for HPC pull.
-3. **[x] Sphinx API docs** — `docs/` with pydata-sphinx-theme + myst-nb + sphinx-design; autodoc per module (pp, pl, tl, qc, memory, utils); 6 tutorial notebooks (static, no execution); `make docs` builds HTML; `.readthedocs.yaml` for RTD; `.github/workflows/docs.yml` for CI artifact. `build succeeded` with zero warnings.
-4. **[ ] PyPI deployment** — Ensure `pyproject.toml` builds wheel/sdist; add GitHub Action to publish to PyPI on release (trusted publishing or secrets); no credentials in repo.
-5. **[ ] GitHub Actions** — `.github/workflows/tests.yml` runs lint + pytest + Snakemake dry-run; fail on push/PR if any step fails. Last, because testing setup is complex.
-
-**Status:** Linting (1), Snakemake (2), and Sphinx docs (3) done. Next: PyPI deployment (4).
+| Step | Task | Status | Notes |
+|------|------|--------|-------|
+| 1 | **Linting** | Done | Ruff in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check`. |
+| 2 | **Snakemake** | Done | Per-project Snakefiles. Apptainer (Linux/HPC) / Docker (macOS) via `run_container.sh`. |
+| 3 | **Sphinx docs** | Done | `docs/` with pydata-sphinx-theme + myst-nb; `make docs`; `.readthedocs.yaml`; zero warnings. |
+| 4 | **PyPI deployment** | Next | `pyproject.toml` wheel/sdist; GitHub Action on release (trusted publishing). |
+| 5 | **GitHub Actions** | Pending | `.github/workflows/tests.yml`: lint + pytest + Snakemake dry-run. Last (complex setup). |
 
 ### To Do (later)
 
@@ -251,7 +259,7 @@ Work through in sequence; each builds on the previous. See **skills.md** Section
 ### Operational notes
 
 - **API:** `st.pl.*`, `st.tl.*`, `st.qc.*`, `st.memory.*` (scanpy-style).
-- **New project:** `./projects/create_project.sh <project_name> visium|visium_hd|xenium|imc|cosmx`. Run make with `PROJECT=projects/<type>/<name>`.
+- **New project:** `./projects/create_project.sh <project_name> visium|visium_hd|visium_hd_cell|xenium|imc|cosmx`. Run make with `PROJECT=projects/<type>/<name>`.
 - **Legacy:** `scripts/old_code/` is read-only. Do not modify; refactor into new scripts or `sc_tools` if needed.
 
 ---

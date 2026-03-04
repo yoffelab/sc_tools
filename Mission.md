@@ -17,8 +17,8 @@
 
 | Phase | Name | Notes |
 |-------|------|--------|
-| **0** | Upstream Raw Data Processing | Space Ranger / Xenium Ranger / IMC pipeline on HPC; batch manifests under `metadata/phase0/`. |
-| **1** | Data Ingestion & QC | Platform-specific ingestion; QC metrics and reports. |
+| **0** | Upstream Raw Data Processing | (0a) Space Ranger / Xenium Ranger / IMC pipeline on HPC → `data/{sample_id}/outs/`. (0b) Load per-sample into AnnData/SpatialData → `data/{sample_id}/adata.p0.h5ad`. |
+| **1** | QC and Concatenation | Load Phase 0 per-sample AnnData; per-sample QC; filter; concat via `concat_samples()`; QC reports. |
 | **2** | Metadata Attachment | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. |
 | **3** | Preprocessing | Backup `adata.raw`; filter; normalize; batch correct (e.g. scVI); cluster. No automated cell typing. |
 | **3.5** | Demographics | Branch from Phase 3 (parallel to 3.5b). Cohort stats, Figure 1. |
@@ -39,13 +39,22 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ### Phase 0: Upstream Raw Data Processing
 
+#### Phase 0a: Platform tools (HPC)
+
 - [x] **Batch manifest system:** `sc_tools.ingest.config` — `load_batch_manifest()`, `collect_all_batches()`, `validate_manifest()`. Per-batch TSVs under `metadata/phase0/`; auto-collects into `all_samples.tsv`.
 - [x] **Space Ranger command builder:** `sc_tools.ingest.spaceranger` — `build_spaceranger_count_cmd()`, `build_batch_commands()`. Supports Visium (--image) and Visium HD (--cytaimage).
 - [x] **Xenium Ranger command builder:** `sc_tools.ingest.xenium` — `build_xenium_ranger_cmd()`.
 - [x] **IMC pipeline command builder:** `sc_tools.ingest.imc` — `build_imc_pipeline_cmd()`.
-- [x] **Modality loaders:** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`, `concat_samples()`. Standardized Phase 1 obs/obsm keys.
+- [x] **Snakemake Phase 0a rules:** `spaceranger_count` and `phase0` target in robin, ggo_visium, and create_project.sh template. Driven by `metadata/phase0/all_samples.tsv`.
+
+#### Phase 0b: Load into AnnData / SpatialData
+
+- [x] **Modality loaders (implemented):** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`. Each sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
+- [ ] **CosMx loader:** `load_cosmx_sample()` — reads flat CSV/Parquet files or RDS (via rpy2+anndata2ri) from NanoString/AtoMx output. Sets spatial coordinates from cell centroid (x, y in microns). Batch TSV schema: `sample_id`, `cosmx_dir`, `batch`.
 - [x] **visium_hd_cell modality:** SpaceRanger 4 cell segmentation support. `load_visium_hd_cell_sample()` reads from `outs/cell_segmentation/`. Cell-level QC thresholds (like xenium). Routes to xenium recipe in `preprocess()`. `create_project.sh` accepts `visium_hd_cell` as valid data type.
-- [x] **Snakemake Phase 0 rules:** `spaceranger_count` and `phase0` target in robin, ggo_visium, and create_project.sh template. Driven by `metadata/phase0/all_samples.tsv`.
+- [x] **Concatenation:** `concat_samples()` merges per-sample AnnData with `calculate_qc_metrics()` applied.
+- [ ] **Phase 0b checkpoint:** Per-sample `data/{sample_id}/adata.p0.h5ad` saved by `scripts/ingest.py` before concatenation. Snakemake rule `adata_p0` produces sentinel `data/{sample_id}/.adata.p0.done`.
+- [ ] **SpatialData (optional):** `data/{sample_id}/spatialdata.zarr` for Visium HD and Xenium when full image pyramids / subcellular coords needed. Loader via `spatialdata-io`.
 
 ### Checkpoint Validation
 
@@ -53,18 +62,14 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **CLI:** `scripts/validate_checkpoint.py` — `--phase`, `--fix`, `--warn-only`. Exit code 1 on failure.
 - [x] **Snakemake validation sentinels:** `results/.adata.{name}.validated` sentinel files in robin, ggo_visium, and create_project.sh template. Downstream rules depend on sentinels.
 
-### Phase 1: Data Ingestion & QC
+### Phase 1: QC and Concatenation
 
-#### Ingestion (Platform-Specific)
+**Input:** Per-sample `data/{sample_id}/adata.p0.h5ad` produced in Phase 0b.
 
-Phase 0 produces `data/{sample_id}/outs/` via Space Ranger / Xenium Ranger / IMC pipeline. Phase 1 loads those outputs into AnnData using `sc_tools.ingest.loaders`.
-
-- [ ] **Visium / Visium HD:** `load_visium_sample()` or `load_visium_hd_sample()` from Phase 0 Space Ranger output. Keep H&E images when concatenating.
-- [ ] **Visium HD Cell:** `load_visium_hd_cell_sample()` from SpaceRanger 4 cell segmentation output (`outs/cell_segmentation/`).
-- [ ] **IMC:** `load_imc_sample()` from segmented h5ad.
-- [ ] **Xenium:** `load_xenium_sample()` from Xenium output (spatialdata-io or scanpy fallback).
-- [ ] **Concatenation:** `concat_samples()` merges per-sample AnnData with QC metrics.
-- [ ] **Required annotations:** `adata.obs['sample']` (sample of origin), `adata.obs['raw_data_dir']` (backup path for original data). Spatial coords in `adata.obsm['spatial']`.
+- [ ] **Load Phase 0 checkpoints:** Read all per-sample `adata.p0.h5ad` files listed in `metadata/phase0/all_samples.tsv`.
+- [ ] **Per-sample QC:** `sc_tools.qc.filter_spots()` (modality-aware thresholds); `compute_sample_metrics()`; `classify_samples()` (absolute + MAD outlier thresholds).
+- [ ] **Concatenation:** `concat_samples()` across all passing samples → `results/adata.raw.p1.h5ad`.
+- [ ] **Required annotations:** `obs['sample']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; no normalization.
 
 #### QC Metrics (sc_tools.qc)
 - [x] Implement `calculate_qc_metrics` (wrap scanpy `pp.calculate_qc_metrics`; optional mt/hb patterns).

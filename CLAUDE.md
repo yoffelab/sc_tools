@@ -52,8 +52,9 @@ Plan mode (discussing only): updating Mission optional until execution begins.
 
 | Phase | Name | Checkpoint |
 |-------|------|------------|
-| 0 | Upstream Raw Data Processing | `data/{sample_id}/outs/` |
-| 1 | Data Ingestion & QC | `adata.raw.p1.h5ad` |
+| 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` |
+| 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.p0.h5ad` |
+| 1 | QC and Concatenation | `adata.raw.p1.h5ad` |
 | 2 | Metadata Attachment (HIL) | `adata.annotated.p2.h5ad` |
 | 3 | Preprocessing | `adata.normalized.p3.h5ad` |
 | 3.5 | Demographics (parallel branch) | Figure 1 |

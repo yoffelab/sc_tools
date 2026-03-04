@@ -10,6 +10,20 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-03-04] - Phase 0 split into 0a/0b; per-sample AnnData/SpatialData checkpoints; CosMx loader
+
+- **Action:** Clarified Phase 0 architecture across all documentation. Split Phase 0 into two sub-steps and added per-sample AnnData/SpatialData as the Phase 0b checkpoint. Added CosMx loader as a pending TODO.
+- **Changes:**
+  - Phase 0a: platform tools (Space Ranger / Xenium / IMC) → `data/{sample_id}/outs/`
+  - Phase 0b: `sc_tools.ingest.loaders` → `data/{sample_id}/adata.p0.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional; Visium HD / Xenium)
+  - Phase 1 redefined as QC + concatenation from Phase 0b checkpoints (was: loading + QC + concat)
+  - Architecture.md: Section 2.1 new checkpoint rows for adata.p0.h5ad and spatialdata.zarr; Section 2.2 adds Phase 0 AnnData metadata contract; Phase 0 description restructured with 0a/0b subsections and modality table; Phase 1 description updated
+  - CosMx: added `load_cosmx_sample()` as TODO — reads flat CSV/Parquet or RDS (rpy2+anndata2ri), centroid coords → `obsm['spatial']`
+  - skills.md §1: new Phase 0 flow section with modality loader table
+  - CLAUDE.md: phase table split into 0a/0b rows
+  - Mission.md: Phase 0 section split into 0a/0b; Phase 1 section updated; CosMx loader TODO added
+- **Rationale:** The previous docs described loading as part of Phase 1, which conflated per-sample loading with multi-sample QC and concatenation. The 0a/0b split makes responsibilities clear: 0a = HPC platform tools, 0b = portable AnnData/SpatialData per sample, 1 = QC + concat. This also enables future Snakemake rules to checkpoint per-sample AnnData before concatenation.
+
 ### [2026-03-04] - Publication figure guidelines and skills.md reorganization
 
 - **Action:** (1) Added publication figure production guidelines to `skills.md` (now Section 12). (2) Reorganized `skills.md` into 4 logical parts with clean numbering (no more §11.5).

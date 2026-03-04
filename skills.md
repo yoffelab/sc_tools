@@ -14,6 +14,25 @@ Core computational steps in execution order (Phases 1-6 of the pipeline).
 
 ## 1. Data Ingestion, Integrity, and Multi-Modal Containers
 
+### Phase 0 → AnnData / SpatialData Flow
+
+Phase 0 is split into two sub-steps:
+- **Phase 0a:** Run platform tools (Space Ranger, Xenium Ranger, IMC pipeline, CosMx export) → `data/{sample_id}/outs/`
+- **Phase 0b:** Load per-sample into portable format → `data/{sample_id}/adata.p0.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional, for Visium HD / Xenium)
+
+Use `sc_tools.ingest.loaders` for Phase 0b loading. Each loader sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
+
+| Modality | Phase 0b loader | Notes |
+|----------|----------------|-------|
+| Visium | `load_visium_sample()` | H&E in `uns['spatial']` |
+| Visium HD | `load_visium_hd_sample()` | 8um bins default; parquet positions |
+| Visium HD Cell | `load_visium_hd_cell_sample()` | SpaceRanger 4 cell segmentation |
+| Xenium | `load_xenium_sample()` | spatialdata-io preferred; scanpy fallback |
+| IMC | `load_imc_sample()` | Reads segmented h5ad |
+| CosMx | `load_cosmx_sample()` | Flat CSV/Parquet or RDS (rpy2+anndata2ri); centroid coords |
+
+Phase 1 then loads all per-sample `adata.p0.h5ad` files, applies per-sample QC, and concatenates via `concat_samples()` → `results/adata.raw.p1.h5ad`.
+
 ### Core Skills
 - Load data into standardized containers: **AnnData** for single-modality, **MuData** for multi-modal (multi-omics) in-memory, and **SpatialData** for multi-modal datasets (images, masks, points, and expression).
 - **Scalability:** Utilize **Dask-backed** arrays and **Zarr** storage to handle "out-of-memory" issues common with Visium HD and Xenium. For GPU-accelerated preprocessing and PCA, consider **rapids-singlecell** (RAPIDS) where compatible.
@@ -57,7 +76,7 @@ Core computational steps in execution order (Phases 1-6 of the pipeline).
 |----------|--------------|-------------|-------------------|---------------|
 | Visium / Visium HD | Raw counts to scVI (no manual norm for VAE path); `normalize_total` + `log1p` for non-VAE | scVI (default) | HVG with `batch_key`; optionally intersect with SVG | Backup `adata.raw`; filter MT/RP/HB genes |
 | Xenium | `normalize_total` + `log1p` | Standard PCA or Harmony/scVI for multi-sample | HVG on log-normalized data | Tune normalization per dataset; n_PCs critical for KNN |
-| CosMx | `normalize_total` + `log1p` | Standard or Harmony/scVI | HVG | Detection algorithm changed 2023-2024 |
+| CosMx | `normalize_total` + `log1p` | Standard or Harmony/scVI | HVG | Phase 0b: flat CSV/Parquet or RDS → `load_cosmx_sample()`; detection algorithm changed 2023-2024 |
 | IMC | `arcsinh(X/5)` -- NOT `log1p` | CytoVI (scvi-tools, totalVI-inspired) | All markers (30-50 proteins); no HVG step | Segmentation quality is critical upstream step |
 
 **Implementation:** `sc_tools.pp.preprocess(adata, modality=..., integration=..., ...)` dispatches to modality-specific recipes. Individual steps (`backup_raw`, `normalize_total`, `log_transform`, `arcsinh_transform`, `filter_genes_by_pattern`, `pca`, `cluster`, etc.) are all importable from `sc_tools.pp` for fine-grained control.

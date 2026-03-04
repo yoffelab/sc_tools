@@ -125,9 +125,15 @@ class TestValidateManifest:
         issues = validate_manifest(df, "merfish")
         assert "Unknown modality" in issues[0]
 
-    def test_cosmx_no_requirements(self):
-        df = pd.DataFrame({"anything": [1]})
+    def test_cosmx_requires_cosmx_dir(self):
+        df = pd.DataFrame({"sample_id": ["S1"], "cosmx_dir": ["/path/to/cosmx"]})
         assert validate_manifest(df, "cosmx") == []
+
+    def test_cosmx_missing_cosmx_dir(self):
+        df = pd.DataFrame({"sample_id": ["S1"]})
+        issues = validate_manifest(df, "cosmx")
+        assert len(issues) == 1
+        assert "cosmx_dir" in issues[0]
 
     def test_null_sample_id(self):
         df = pd.DataFrame(
@@ -288,7 +294,7 @@ class TestConcatSamples:
 
 
 class TestLoadImcSample:
-    def test_load_from_h5ad(self, tmp_path):
+    def test_load_from_processed_dir(self, tmp_path):
         n_obs, n_vars = 30, 20
         X = np.random.rand(n_obs, n_vars).astype(np.float32)
         obs = pd.DataFrame(index=[f"cell_{i}" for i in range(n_obs)])
@@ -296,16 +302,17 @@ class TestLoadImcSample:
         adata = ad.AnnData(X=X, obs=obs, var=var)
         adata.obsm["spatial"] = np.random.rand(n_obs, 2)
 
-        path = tmp_path / "roi1.h5ad"
-        adata.write_h5ad(path)
+        processed_dir = tmp_path / "processed" / "sample1"
+        processed_dir.mkdir(parents=True)
+        adata.write_h5ad(processed_dir / "cells.h5ad")
 
-        loaded = load_imc_sample(path, "ROI_1")
+        loaded = load_imc_sample(processed_dir, "ROI_1")
         assert loaded.obs["sample"].iloc[0] == "ROI_1"
-        assert loaded.obs["raw_data_dir"].iloc[0] == str(path)
+        assert loaded.obs["raw_data_dir"].iloc[0] == str(processed_dir)
         assert "spatial" in loaded.obsm
 
     def test_x_spatial_renamed(self, tmp_path):
-        """obs['X_spatial'] should be copied to obsm['spatial'] if spatial missing."""
+        """obsm['X_spatial'] should be copied to obsm['spatial'] if spatial missing."""
         n_obs, n_vars = 10, 5
         adata = ad.AnnData(
             X=np.random.rand(n_obs, n_vars).astype(np.float32),
@@ -314,12 +321,20 @@ class TestLoadImcSample:
         )
         adata.obsm["X_spatial"] = np.random.rand(n_obs, 2)
 
-        path = tmp_path / "roi2.h5ad"
-        adata.write_h5ad(path)
+        processed_dir = tmp_path / "processed" / "sample2"
+        processed_dir.mkdir(parents=True)
+        adata.write_h5ad(processed_dir / "cells.h5ad")
 
-        loaded = load_imc_sample(path, "ROI_2")
+        loaded = load_imc_sample(processed_dir, "ROI_2")
         assert "spatial" in loaded.obsm
         np.testing.assert_array_equal(loaded.obsm["spatial"], loaded.obsm["X_spatial"])
+
+    def test_missing_cells_h5ad_raises(self, tmp_path):
+        """FileNotFoundError when cells.h5ad is absent."""
+        processed_dir = tmp_path / "processed" / "empty"
+        processed_dir.mkdir(parents=True)
+        with pytest.raises(FileNotFoundError, match="cells.h5ad"):
+            load_imc_sample(processed_dir, "ROI_3")
 
 
 # ---------------------------------------------------------------------------

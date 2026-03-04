@@ -2,6 +2,11 @@
 
 Supports per-batch TSV files under metadata/phase0/ with modality-specific
 column schemas. Concatenates all batch files into a collected manifest.
+
+IMC manifest note: ``REQUIRED_COLUMNS["imc"]`` lists the minimum columns for
+Phase 0b loading (``processed_dir``). Running the pipeline via Phase 0a also
+requires ``mcd_file`` and ``panel_csv``; include them in the TSV when the
+pipeline has not yet run.
 """
 
 from __future__ import annotations
@@ -19,8 +24,10 @@ REQUIRED_COLUMNS = {
     "visium_hd": {"sample_id", "fastq_dir", "cytaimage", "slide", "area"},
     "visium_hd_cell": {"sample_id", "fastq_dir", "cytaimage", "slide", "area"},
     "xenium": {"sample_id", "xenium_dir"},
-    "imc": {"sample_id", "mcd_file", "panel_csv"},
-    "cosmx": set(),  # CosMx: no Phase 0 (data assumed processed)
+    # IMC Phase 0b minimum: processed_dir points to processed/{sample}/.
+    # Also include mcd_file + panel_csv when running the pipeline (Phase 0a).
+    "imc": {"sample_id", "processed_dir"},
+    "cosmx": {"sample_id", "cosmx_dir"},  # flat CSV/Parquet or RDS output dir
 }
 
 

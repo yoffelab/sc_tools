@@ -1,7 +1,14 @@
-"""IMC pipeline command builder for Phase 0.
+"""IMC pipeline command builder for Phase 0a.
 
 Builds shell commands to run the ElementoLab IMC pipeline for segmentation
-and single-cell extraction from MCD files.
+and single-cell extraction from MCD files. The pipeline outputs to::
+
+    processed/{sample}/tiffs/   # per-channel TIFF images
+    processed/{sample}/masks/   # segmentation masks
+    processed/{sample}/cells.h5ad  # single-cell quantification (Phase 0b input)
+
+Phase 0b loading is handled by ``sc_tools.ingest.loaders.load_imc_sample()``,
+which reads ``processed/{sample}/cells.h5ad``.
 """
 
 from __future__ import annotations
@@ -27,9 +34,12 @@ def build_imc_pipeline_cmd(
     panel_csv
         Path to panel CSV defining channels.
     output_dir
-        Output directory for processed results.
+        Root output directory. The pipeline writes per-sample results under
+        ``output_dir/{sample}/tiffs/``, ``masks/``, and ``cells.h5ad``.
+        Typically set to ``processed/`` in the project directory.
     pipeline_dir
-        Path to cloned IMC pipeline repo. Defaults to ~/elementolab/imc.
+        Path to cloned ElementoLab IMC pipeline repo. Defaults to
+        ``~/elementolab/imc``.
 
     Returns
     -------
@@ -39,7 +49,8 @@ def build_imc_pipeline_cmd(
     -----
     Assumes the ElementoLab IMC pipeline is cloned and available on the
     system (typically on HPC). The pipeline handles: MCD extraction,
-    ilastik segmentation, and single-cell quantification.
+    ilastik segmentation, and single-cell quantification. Phase 0b loading
+    then reads ``processed/{sample}/cells.h5ad`` via ``load_imc_sample()``.
     """
     if pipeline_dir is None:
         pipeline_dir = "~/elementolab/imc"

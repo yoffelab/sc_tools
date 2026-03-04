@@ -1,7 +1,9 @@
-"""Modality-specific AnnData loaders and sample concatenation.
+"""Modality-specific AnnData loaders and sample concatenation (Phase 0b).
 
 Provides standardized loading functions for Visium, Visium HD, Xenium,
-and IMC data. Each loader sets required Phase 1 obs/obsm keys.
+IMC, and CosMx data. Each loader reads from the Phase 0a platform output
+directory and writes a per-sample AnnData with standardized obs/obsm keys
+(sample, library_id, raw_data_dir, spatial).
 """
 
 from __future__ import annotations
@@ -336,26 +338,47 @@ def load_xenium_sample(
 
 
 def load_imc_sample(
-    h5ad_path: str | Path,
+    processed_dir: str | Path,
     sample_id: str,
 ) -> ad.AnnData:
-    """Load one IMC ROI from an h5ad file.
+    """Load one IMC sample from a steinbock/ElementoLab processed directory.
+
+    Expects the standard IMC pipeline output layout::
+
+        processed/{sample}/
+            tiffs/        # per-channel TIFF images
+            masks/        # segmentation masks
+            cells.h5ad    # single-cell data (steinbock default)
 
     Parameters
     ----------
-    h5ad_path
-        Path to .h5ad file for a single ROI.
+    processed_dir
+        Path to the processed sample directory (e.g. ``processed/{sample}/``).
+        Must contain ``cells.h5ad`` (steinbock default) or ``cells/cells.h5ad``.
     sample_id
         Sample/ROI identifier.
 
     Returns
     -------
-    AnnData with sample annotation.
+    AnnData with sample annotation and spatial coordinates.
     """
+    processed_dir = Path(processed_dir)
+
+    # Locate the cells h5ad — try common steinbock output locations
+    candidates = [
+        processed_dir / "cells.h5ad",
+        processed_dir / "cells" / "cells.h5ad",
+    ]
+    h5ad_path = next((p for p in candidates if p.exists()), None)
+    if h5ad_path is None:
+        raise FileNotFoundError(
+            f"Could not find cells.h5ad in {processed_dir}. Tried: {[str(p) for p in candidates]}"
+        )
+
     adata = ad.read_h5ad(h5ad_path)
     adata.obs["sample"] = sample_id
     adata.obs["library_id"] = sample_id
-    adata.obs["raw_data_dir"] = str(h5ad_path)
+    adata.obs["raw_data_dir"] = str(processed_dir)
     adata.var_names_make_unique()
 
     # Ensure spatial coordinates exist

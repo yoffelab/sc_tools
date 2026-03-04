@@ -1,0 +1,4 @@
+# cosmx_full_library Snakemake config
+repo_root: "../../.."
+project_rel: "projects/cosmx/cosmx_full_library"
+container_sif: "containers/sc_tools.sif"

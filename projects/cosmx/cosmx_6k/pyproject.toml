@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cosmx_6k"
+version = "0.1.0"
+description = "cosmx_6k (cosmx) analysis (scripts only)"
+requires-python = ">=3.10"
+# Add project-specific deps here (beyond sc-tools base + deconvolution extra).
+# Most deps come from root: uv pip install -e ".[deconvolution]"
+dependencies = []
+
+[tool.setuptools]
+packages = []  # scripts-only project; no Python packages to install

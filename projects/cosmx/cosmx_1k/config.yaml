@@ -1,0 +1,4 @@
+# cosmx_1k Snakemake config
+repo_root: "../../.."
+project_rel: "projects/cosmx/cosmx_1k"
+container_sif: "containers/sc_tools.sif"

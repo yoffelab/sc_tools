@@ -109,20 +109,34 @@ snakemake -s Snakefile all
 
 ## 5. Per-Project Paths
 
-`run_apptainer.sh` binds the full repository to `/workspace` and sets the working directory to the project (e.g. `/workspace/projects/visium/ggo_visium`). Run from the repository root so paths resolve correctly. For ggo_visium, `GGO_VISIUM_PROJECT_DIR` is set inside the container so scripts resolve project paths.
+`run_container.sh` binds the full repository to `/workspace` and sets `PROJECT_DIR` inside the container to the project path (e.g. `/workspace/projects/visium_hd/robin`). Run from the repository root so all paths resolve correctly. Project scripts should use `$PROJECT_DIR` to reference their own directories.
 
 ---
 
 ## 6. Local Development (Non-Container)
 
-Each project has a `pyproject.toml` for project identity. All Python deps come from the root `sc-tools` package. Create a per-project conda env once (from repo root):
+All Python deps come from the root `sc-tools` package. Create a per-project conda env once (from repo root):
 
 ```bash
-# Replace <env_name> with your project (ggo_visium | robin | ggo_imc)
 conda create -n <env_name> python=3.10 -y
 conda activate <env_name>
-uv pip install -e ".[deconvolution]"
+uv pip install -e ".[deconvolution,integration,geneset]"
 ```
+
+**Available extras:**
+
+| Extra | Installs | When to use |
+|-------|----------|-------------|
+| `deconvolution` | scvi-tools, tangram-sc | Cell-type deconvolution |
+| `integration` | harmonypy | Harmony batch correction |
+| `geneset` | gseapy, pyucell | GSEA pseudobulk, UCell scoring |
+| `decoupler` | decoupler | TF/pathway activity |
+| `spatial` | utag | Spatial-aware clustering |
+| `gpu` | torch, rapids-singlecell | GPU-accelerated preprocessing |
+| `viz` | marsilea | Declarative composite figures |
+| `benchmark` | scikit-image, scib-metrics, cellpose, stardist | Segmentation/integration benchmarking |
+| `dev` | pytest, ruff | Development and testing |
+| `docs` | sphinx, pydata-sphinx-theme, myst-nb | Build API documentation |
 
 Run without a container:
 
@@ -130,12 +144,6 @@ Run without a container:
 conda activate <env_name>
 SC_TOOLS_RUNTIME=none snakemake -d <project_path> -s <project_path>/Snakefile <target>
 ```
-
-| Project    | Env name     |
-|------------|--------------|
-| ggo_visium | `ggo_visium` |
-| robin      | `robin`      |
-| ggo-imc    | `ggo_imc`    |
 
 ### UV (without conda)
 

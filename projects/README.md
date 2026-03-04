@@ -2,61 +2,86 @@
 
 All analysis projects live under **data-type** folders: `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`.
 
-Each project directory (e.g. `visium/ggo_visium/`) contains:
+## Create a New Project
 
-- `data/` — Raw sequencing and imaging
-- `figures/` — Output visualizations (includes `QC/raw/`, `QC/post/`, `manuscript/`)
-- `metadata/` — Gene signatures (JSON), sample metadata, `sample_metadata.csv`/`.xlsx`, `celltype_map.json`
-- `scripts/` — Analysis scripts (and optionally `old_code/` for legacy)
-- `results/` — Processed AnnData (.h5ad), CSVs
-- `outputs/` — Intermediate tool outputs (e.g. deconvolution logs)
-- `tests/` — Project integration tests (pytest)
-- `Mission.md` — Project todo list and roadmap (study aims, tasks, blockers); keep updated to track progress.
-- `Journal.md` — Project-specific analysis decision log (parameters, rationale, fixes).
-- `journal_summary.md` — Short summary of Journal.md for context; update when Journal gains new entries.
+From the repository root:
 
-Root `Mission.md`, `Journal.md`, and `journal_summary.md` exist at repo root for the toolkit; each project has its own for study-specific work.
+```bash
+./projects/create_project.sh <project_name> <data_type>
+```
+
+Valid `data_type`: `visium` | `visium_hd` | `visium_hd_cell` | `xenium` | `imc` | `cosmx`
+
+Example: `./projects/create_project.sh my_study visium_hd` creates `projects/visium_hd/my_study/` with the full directory tree.
 
 ---
 
-## Pipeline Phases (Non-Linear)
+## Project Directory Structure
 
-The workflow has **human-in-the-loop** steps. See `README.md` (Pipeline Workflow section) for the full diagram.
+Each project directory contains:
+
+| Path | Purpose |
+|------|---------|
+| `data/` | Raw sequencing and imaging (or symlinks to HPC) |
+| `metadata/` | Gene signatures (JSON), `sample_metadata.csv`/`.xlsx`, `celltype_map.json`, `phase0/` batch manifests |
+| `results/` | AnnData checkpoints (.h5ad) |
+| `figures/` | QC (`QC/raw/`, `QC/post/`) and manuscript figures |
+| `scripts/` | Project-specific analysis scripts |
+| `outputs/` | Intermediate tool outputs (deconvolution logs, etc.) |
+| `tests/` | Project integration tests (pytest) |
+| `Snakefile` | Project pipeline |
+| `config.yaml` | Snakemake config (paths, parameters) |
+| `Mission.md` | Project todo list and roadmap |
+| `Journal.md` | Project-specific decision log |
+| `journal_summary.md` | Short condensed summary of Journal.md |
+
+Root `Mission.md`, `Journal.md`, and `journal_summary.md` cover toolkit-level work; each project has its own for study-specific goals.
+
+---
+
+## Pipeline Phases
 
 | Phase | Name | Human-in-Loop? |
 |-------|------|----------------|
-| 1 | Data Ingestion & QC | No |
-| 2 | Metadata Attachment | Yes (unless `sample_metadata.csv`/`.xlsx` provided) |
-| 3 | Preprocessing | No |
-| 3.5 | Demographics (branch) | Project-specific |
-| 4 | Manual Cell Typing | Yes (iterative with `celltype_map.json`) |
-| 5 | Downstream Biology | No |
-| 6–7 | Meta Analysis (optional) | No |
+| **0a** | Platform tools (Space Ranger / Xenium Ranger / IMC) | No |
+| **0b** | Load per-sample into AnnData | No |
+| **1** | QC and Concatenation | No |
+| **2** | Metadata Attachment | Yes (unless `sample_metadata.csv`/`.xlsx` provided) |
+| **3** | Preprocessing | No |
+| **3.5** | Demographics (parallel branch) | Project-specific |
+| **3.5b** | Gene Scoring / Auto Cell Typing / Deconvolution | No |
+| **4** | Manual Cell Typing (skippable) | Yes (iterative with `celltype_map.json`) |
+| **5** | Downstream Biology | No |
+| **6–7** | Meta Analysis (optional) | No |
 
-**Entry points:** Preprocessed projects may start at Phase 3; already clustered projects may start at Phase 4.
+See root `README.md` (Pipeline Workflow section) for the full Mermaid diagram and checkpoint filenames.
+
+---
+
+## Running a Project Pipeline
+
+From the repo root:
+
+```bash
+snakemake -d projects/visium_hd/robin -s projects/visium_hd/robin/Snakefile all
+```
+
+Or from the project directory:
+
+```bash
+cd projects/visium_hd/robin && snakemake -d . -s Snakefile all
+```
+
+See [project_setup.md](../project_setup.md) for container and environment details.
 
 ---
 
 ## Testing
 
-Each project can have `tests/` for integration/smoke tests. Run with `pytest projects/visium/ggo_visium/tests/ -v`. Implementation order: (1) project tests, (2) sc_tools package tests, (3) implement functions. See root `Mission.md` Section 5.
-
----
-
-## Create a New Project
-
-From repo root:
+Each project has `tests/` for integration and smoke tests:
 
 ```bash
-./create_project.sh <project_name> <data_type>
+pytest projects/visium/ggo_visium/tests/ -v
 ```
 
-Example: `./create_project.sh ggo_visium visium` → `projects/visium/ggo_visium/` with the six subdirs.
-
-**Migrate existing root-level content into ggo_visium (one-time):**
-
-```bash
-./migrate_to_ggo_visium.sh
-```
-
-**Run the pipeline:** From repo root, `make` uses `PROJECT=projects/visium/ggo_visium` by default. Override with `make PROJECT=projects/visium/other_project phase1`, etc.
+Implementation order: (1) project tests, (2) sc_tools package tests (`sc_tools/tests/`), (3) implement functions.

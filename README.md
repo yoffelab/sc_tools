@@ -1,8 +1,8 @@
-# sc_tools — Scientific analysis tool for spatial and single-cell multiomics
+# sc_tools — Spatial and Single-Cell Omics Toolkit
 
-**sc_tools** is a **scientific analysis tool** for **spatial and single-cell multiomics**: a Python package and pipeline for spatial transcriptomics (e.g. Visium) and single-cell RNA-seq. It provides reusable utilities (plotting, statistics, colocalization, I/O) in a scanpy-style API and is used here for **lung tumor progression and Tertiary Lymphoid Structure (TLS) transcriptomics**—identifying transcriptional and spatial differences across **Normal**, **Non-Solid (GGO)**, and **Solid** lung tumors, with a focus on TLS heterogeneity and tumor–immune niches.
+**sc_tools** is a reusable Python toolkit and pipeline for spatial transcriptomics and single-cell omics. It wraps scanpy, squidpy, scVI-tools, and related libraries in a consistent API and provides a phased, Snakemake-driven workflow for multi-modality projects (Visium, Visium HD, Xenium, IMC, CosMx).
 
-The project is **buildable as an installable package** via `pyproject.toml` for use as a dependency or as a base for custom spatial/single-cell workflows.
+The package is installable via `pyproject.toml` and designed to be shared across projects. Project-specific data, results, and figures all live under `projects/<platform>/<project_name>/`.
 
 ---
 
@@ -11,63 +11,68 @@ The project is **buildable as an installable package** via `pyproject.toml` for 
 From the repository root:
 
 ```bash
-# Editable install (recommended for development)
+# Minimal install (plotting, QC, gene scoring)
 pip install -e .
 
 # Full pipeline (deconvolution: scvi-tools, tangram)
 pip install -e ".[deconvolution]"
 
-# With optional GPU support
+# Common combinations
+pip install -e ".[deconvolution,integration,geneset]"
 pip install -e ".[deconvolution,gpu]"
 ```
 
-For a per-project conda env: `conda create -n <project> python=3.10 -y && conda activate <project> && uv pip install -e ".[deconvolution]"`. See [project_setup.md](project_setup.md) for details.
+**Available extras:**
 
-**Lint (required before commit):** `make lint` runs Ruff check and format on `sc_tools`. Fix violations with `make format` and manual edits. See `skills.md` Section 11.
+| Extra | Installs | When to use |
+|-------|----------|-------------|
+| `deconvolution` | scvi-tools, tangram-sc | Cell-type deconvolution (Cell2location, Tangram, DestVI) |
+| `integration` | harmonypy | Harmony batch correction |
+| `geneset` | gseapy, pyucell | GSEA pseudobulk, UCell scoring |
+| `decoupler` | decoupler | TF/pathway activity |
+| `spatial` | utag | Spatial-aware clustering (UTAG) |
+| `gpu` | torch, rapids-singlecell | GPU-accelerated preprocessing |
+| `viz` | marsilea | Declarative composite figures |
+| `benchmark` | scikit-image, scib-metrics, cellpose, stardist | Segmentation/integration benchmarking |
+| `dev` | pytest, ruff | Development and testing |
+| `docs` | sphinx, pydata-sphinx-theme, myst-nb | Build documentation |
 
-**Docker:** Build with `docker build -t sc_tools:latest .`. Uses **conda** env `sc_tools` and **uv** for fast package installation. See [project_setup.md](project_setup.md) for full setup and per-project instructions. Run a project:
-```bash
-./scripts/run_docker.sh projects/visium/ggo_visium              # interactive bash
-./scripts/run_docker.sh projects/visium/ggo_visium python scripts/loupe2adata.py
-./projects/visium/ggo_visium/run_docker.sh                     # from project
-```
-Docker is auto-installed via Homebrew on macOS if missing. The script mounts the full repo; override image with `SC_TOOLS_IMAGE=myimage ./scripts/run_docker.sh ...`
+**Lint (required before commit):** `make lint` runs Ruff check and format on `sc_tools`.
 
----
-
-## What this project does
-
-- **Data:** Converts raw Visium and scRNA-seq into standardized AnnData; integrates with **scVI** for batch-corrected latent space; scores gene signatures (Seurat-based via Scanpy) from project `metadata/gene_signatures.json` (e.g. `projects/visium/ggo_visium/metadata/`).
-- **Spatial analysis:** Compares tumor and immune programs across tumor types (1-vs-rest); analyzes **process colocalization** (Pearson, Moran's I, neighborhood enrichment); visualizes signature heatmaps and volcano plots; studies **macrophage–proliferation** colocalization and TLS B-cell/T-cell states.
-- **Deconvolution:** Estimates cell-type proportions in spots via **Tangram** (with optional Cell2location/DestVI fallback), in batches per `library_id` for memory efficiency.
-- **Outputs:** Processed AnnData objects (`results/`), manuscript-ready figures (`figures/manuscript/`), and CSV statistics. All comparisons use **FDR (Benjamini–Hochberg)** and follow the statistical and plotting rules in `skills.md`.
+**Container:** See [project_setup.md](project_setup.md) for Apptainer/Docker setup and per-project usage.
 
 ---
 
-## What's important
+## What sc_tools provides
 
-- **Phased pipeline (non-linear):** See workflow diagram and phase summary below. See `Architecture.md` for data flow and script roles.
-- **Reusable library:** The **`sc_tools`** Python package (scanpy-style API) provides generic plotting and tools so analysis scripts stay thin and reproducible:
-  - **`st.pl`** — spatial plots, heatmaps/clustermaps, statistical annotations, volcano plots, versioned figure saving (PDF+PNG, dpi=300).
-  - **`st.tl`** — Mann–Whitney, FDR, colocalization (Pearson, Moran's I, neighborhood enrichment), deconvolution helpers, versioned `write_h5ad`.
-  - **`st.qc`** — QC metrics, filters, spatially variable genes, QC report plotting (planned).
-  - **`st.data`** — caching, I/O. **`st.memory`** — profiling, GPU detection.
-- **Standards:** Statistical rigor (significance bars, asterisks, adjusted p-values), no over-filtering of low-count GGO spots, and batch processing for deconvolution are mandatory. See `skills.md` and `Mission.md`.
+| Module | Purpose |
+|--------|---------|
+| `sc_tools.pl` | Spatial plots, heatmaps, statistical annotations, volcano plots, GSEA dotplots, versioned PDF+PNG saving |
+| `sc_tools.tl` | Signature scoring (scanpy/UCell/ssGSEA), gene set loaders (Hallmark bundled), ORA/GSEA, colocalization, deconvolution |
+| `sc_tools.qc` | Per-sample QC filtering, cross-sample comparison plots, HTML QC reports |
+| `sc_tools.pp` | Modality-aware preprocessing recipes: normalize, integrate (scVI/Harmony/CytoVI), reduce, cluster |
+| `sc_tools.ingest` | Batch manifests (`metadata/phase0/`), Space Ranger/Xenium/IMC command builders, AnnData loaders per modality, `concat_samples()` |
+| `sc_tools.validate` | Checkpoint validation for p1–p4 (required obs keys, obsm, representation); auto-fix; CLI for Snakemake |
+| `sc_tools.memory` | Memory profiling, GPU detection and auto-backend selection |
 
 ---
 
 ## Pipeline Workflow
 
-The pipeline is **non-linear** with human-in-loop phases. Branching points and explicit input files (e.g. clinical metadata map) bypass manual intervention.
+The pipeline is **non-linear** with human-in-loop phases. Branching points and explicit input files (e.g. clinical metadata) bypass manual steps.
 
 ```mermaid
 flowchart LR
-    subgraph P1["Phase 1: Data Ingestion & QC"]
+    subgraph P0["Phase 0: Upstream Data Processing"]
         direction TB
-        A1[Platform-specific ingestion] --> A2[Raw unnormalized AnnData]
-        A2 --> A3["QC metrics"]
+        Z1["(0a) HPC: Space Ranger / Xenium Ranger / IMC pipeline"] --> Z2["(0b) Load per sample → adata.p0.h5ad"]
+    end
+
+    subgraph P1["Phase 1: QC and Concatenation"]
+        direction TB
+        A1[Load Phase 0 AnnData] --> A2[Per-sample QC + filter]
+        A2 --> A3[concat_samples()]
         A3 --> A4["QC report: figures/QC/raw/"]
-        A1 --> |"Visium/HD | IMC | Xenium"| A2
     end
 
     subgraph P2["Phase 2: Metadata Attachment"]
@@ -75,7 +80,6 @@ flowchart LR
         B1{Clinical map provided?} --> |"No: HIL"| B2[Prepare CSV/xlsx]
         B2 --> B1
         B1 --> |"Yes"| B3[Join to adata.obs]
-        B3 --> B4[Clinical metadata attached]
     end
 
     subgraph P3["Phase 3: Preprocessing"]
@@ -104,7 +108,6 @@ flowchart LR
         E2 --> E3{Satisfactory?}
         E3 --> |"No: HIL"| E2
         E3 --> |"Yes"| E4[Apply celltype + celltype_broad]
-        E4 --> E5[Matrixplot, UMAP, signatures]
     end
 
     subgraph P5P67["Phase 5 & 6–7"]
@@ -122,15 +125,17 @@ flowchart LR
         end
     end
 
-    P1 --> P2 --> P3
+    P0 --> P1 --> P2 --> P3
     P3 --> P35
     P3 --> P35b
     P35b --> P4 --> P5P67
     P35b -.-> |"Skip Phase 4 if automated typing adequate"| P5P67
+    P1 -.-> |"START HERE: processed outs available"| P2
     P2 -.-> |"START HERE: preprocessed AnnData available"| P3
     P3 -.-> |"START HERE: clustered AnnData available"| P35b
     P35b -.-> |"START HERE: phenotyped AnnData available"| P4
 
+    style P0 fill:#f0f4ff
     style P1 fill:#e3f2fd
     style P2 fill:#fff3e0
     style P3 fill:#e8f5e9
@@ -141,54 +146,64 @@ flowchart LR
     style P67 fill:#fafafa
 ```
 
-| Phase | Name | Human-in-Loop? | Required Input | Output |
-|-------|------|----------------|----------------|--------|
-| **1** | Data Ingestion & QC | No | Platform raw data | Raw AnnData, `$(PROJECT)/figures/QC/raw/` |
-| **2** | Metadata Attachment | Yes (unless map provided) | `$(PROJECT)/metadata/sample_metadata.csv` or `.xlsx` | AnnData with clinical metadata |
-| **3** | Preprocessing | No | — | Filtered, normalized, clustered AnnData; `$(PROJECT)/figures/QC/post/` (no cell typing) |
-| **3.5** | Demographics | Project-specific | — | Figure 1, cohort stats |
-| **3.5b** | Gene scoring, automated cell typing, deconvolution | No | Hallmark + `metadata/{name}.json`; ref (deconv) | `adata.obsm['sig:...']`; phenotyped AnnData; optional deconvolution |
-| **4** | Manual Cell Typing | Yes (iterative); skippable if automated adequate | JSON: `cluster_id→celltype` | Phenotyped AnnData |
-| **5** | Downstream Biology | No | Phase 3.5b outputs | Spatial analysis, figures |
-| **6–7** | Meta Analysis | No | — | ROI/patient aggregated results |
-
----
-
-## What's still being worked on
-
-- **Deconvolution:** Pinpointing minimum data size and memory limits for Cell2location/DestVI; refining gene signatures and validating against HLCA/MSigDB/TCGA LUAD.
-- **Spatial:** Spatially variable genes (SVG), cell-type colocalization from deconvolution, spatial transition areas (Normal ↔ Non-Solid ↔ Solid, tumor–TLS), and macrophage state comparison across tumor types.
-- **TLS:** TLS niche extraction and lymphoid-rich neighborhood analysis.
+| Phase | Name | Human-in-Loop? | Checkpoint |
+|-------|------|----------------|------------|
+| **0a** | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` or `processed/{sample}/` |
+| **0b** | Load per-sample into AnnData | No | `data/{sample_id}/adata.p0.h5ad` |
+| **1** | QC and Concatenation | No | `results/adata.raw.p1.h5ad` |
+| **2** | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.p2.h5ad` |
+| **3** | Preprocessing | No | `results/adata.normalized.p3.h5ad` |
+| **3.5** | Demographics (branch) | Project-specific | Figure 1 |
+| **3.5b** | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.normalized.scored.p35.h5ad` |
+| **4** | Manual Cell Typing (skippable) | Yes (iterative) | `results/adata.celltyped.p4.h5ad` |
+| **5** | Downstream Biology | No | `figures/manuscript/` |
+| **6–7** | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` |
 
 ---
 
 ## Repository layout
 
-| Path | Purpose |
-|------|--------|
-| `sc_tools/` | Reusable Python package (pl, tl, qc, data, memory, utils) |
-| `scripts/` | Analysis scripts (preprocessing, deconvolution, spatial, figures); includes `old_code/` |
-| `projects/<platform>/<project>/metadata/` | Gene signatures (JSON), sample metadata (project-specific) |
-| `projects/` | Projects by data type (visium, visium_hd, xenium, imc, cosmx); each can have Mission.md, Journal.md |
-| `projects/create_project.sh` | Create a new project: `./projects/create_project.sh <project_name> <data_type>` |
-| `projects/visium/ggo_visium/` | GGO Visium project (Mission.md, Journal.md for study-specific goals and log) |
+```text
+sc_tools/               # Reusable Python package (pl, tl, qc, pp, ingest, validate, memory, utils)
+scripts/                # Shared scripts and run_container.sh
+projects/               # All project-specific content
+    create_project.sh   # ./projects/create_project.sh <project_name> <data_type>
+    <platform>/
+        <project_name>/
+            data/           # Raw sequencing and imaging
+            metadata/       # Gene signatures, sample_metadata.csv, celltype_map.json
+            results/        # AnnData checkpoints (.h5ad)
+            figures/        # QC, manuscript figures
+            scripts/        # Project-specific analysis scripts
+            outputs/        # Intermediate outputs (deconvolution logs, etc.)
+            tests/          # Project integration tests
+            Snakefile       # Project pipeline
+            Mission.md      # Project todo list
+            Journal.md      # Project decision log
+docs/                   # Sphinx API documentation (make docs)
+containers/             # Apptainer SIF and Dockerfile
+```
 
-Processed outputs (e.g. `results/`, `figures/`) live at root or under a project when using the project layout. Key docs: **`Mission.md`** (toolkit objectives, testing strategy), **`Architecture.md`** (phases, data flow, testing structure, key files), **`Journal.md`** (repo-level decisions), **`skills.md`** (statistical and coding standards). Per-project Mission and Journal live under `projects/<data_type>/<project_name>/`.
-
----
-
-## Setup (environments)
-
-- **Conda (per-project env):** `conda create -n <project> python=3.10 -y && conda activate <project> && uv pip install -e ".[deconvolution]"` from repo root.
-- **pip only:** `python -m venv venv`, activate, then `pip install -e ".[deconvolution]"` (or `pip install -r requirements.txt` for a non-package install).
-
-See `ENVIRONMENT_SETUP.md` for details. Core stack: **scanpy**, **squidpy**, **anndata**; optional **scvi-tools**, **tangram**, **cell2location** for deconvolution.
+Key docs: **`Mission.md`** (toolkit todos), **`Architecture.md`** (data flow, checkpoint contracts), **`skills.md`** (statistical and coding standards), **`project_setup.md`** (container and environment setup).
 
 ---
 
 ## Running the pipeline
 
-The **Makefile** defines targets in execution order (ingestion → preprocessing → scoring → deconvolution → spatial/figures). Run `make` or `make help` and use the annotated targets for reproducibility.
+Each project uses **Snakemake** as the workflow engine. From the repo root:
+
+```bash
+# Run a project target
+snakemake -d projects/visium_hd/robin -s projects/visium_hd/robin/Snakefile all
+
+# Run with container (auto-detects Apptainer on Linux, Docker on macOS)
+./scripts/run_container.sh projects/visium_hd/robin python scripts/run_signature_scoring.py
+
+# Override runtime
+SC_TOOLS_RUNTIME=docker ./scripts/run_container.sh projects/visium/ggo_visium
+```
+
+See [project_setup.md](project_setup.md) for container build instructions and per-project setup.
 
 ---
 

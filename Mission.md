@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2026-03-04
+**Last Updated:** 2026-03-04 (IMC loader API fix: processed_dir; CosMx required columns)
 
 ---
 

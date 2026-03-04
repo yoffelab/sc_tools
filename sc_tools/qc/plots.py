@@ -33,6 +33,7 @@ __all__ = [
     "qc_sample_comparison_bar",
     "qc_sample_violin_grouped",
     "qc_sample_scatter_matrix",
+    "qc_pct_mt_per_sample",
 ]
 
 
@@ -889,6 +890,15 @@ def _save_fig(fig: plt.Figure, output_dir: str | Path | None, basename: str, dpi
         fig.savefig(od / f"{basename}.png", bbox_inches="tight", dpi=dpi)
 
 
+def _format_log10_ticks(ax, max_val: float) -> None:
+    """Set custom log10(x+1) y-tick labels: 0 (1), 1 (10), 2 (100), etc."""
+    tick_map = {0: "0 (1)", 1: "1 (10)", 2: "2 (100)", 3: "3 (1K)", 4: "4 (10K)", 5: "5 (100K)"}
+    max_tick = int(np.ceil(max_val)) if np.isfinite(max_val) else 5
+    ticks = list(range(min(max_tick + 1, 6)))
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([tick_map.get(t, str(t)) for t in ticks])
+
+
 def qc_sample_comparison_bar(
     metrics: pd.DataFrame,
     metric_cols: list[str] | None = None,
@@ -896,6 +906,7 @@ def qc_sample_comparison_bar(
     output_dir: str | Path | None = None,
     basename: str = "qc_sample_comparison",
     dpi: int = 300,
+    log_scale: bool = False,
 ) -> plt.Figure:
     """
     Bar chart per metric, one bar per sample, sorted by value.
@@ -917,6 +928,9 @@ def qc_sample_comparison_bar(
         Base filename.
     dpi : int
         DPI for PNG.
+    log_scale : bool
+        If True, transform values with log10(x + 1) and annotate y-ticks
+        with original-scale labels (default False).
 
     Returns
     -------
@@ -953,14 +967,23 @@ def qc_sample_comparison_bar(
     for ax, col in zip(axes, metric_cols, strict=False):
         sorted_df = metrics[[col]].dropna().sort_values(col)
         colors = ["#d62728" if s in fail_set else "#1f77b4" for s in sorted_df.index]
-        ax.bar(range(len(sorted_df)), sorted_df[col].values, color=colors)
+        values = sorted_df[col].values.astype(float)
+        if log_scale:
+            values = np.log10(values + 1)
+        ax.bar(range(len(sorted_df)), values, color=colors)
         ax.set_xticks(range(len(sorted_df)))
         labels = [str(s) for s in sorted_df.index]
         ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
         ax.set_ylabel(col)
-        ax.set_title(col, fontweight="bold")
+        suffix = " (log10 scale)" if log_scale else ""
+        ax.set_title(f"{col}{suffix}", fontweight="bold")
+        if log_scale and len(values) > 0:
+            _format_log10_ticks(ax, float(np.nanmax(values)))
 
-    fig.suptitle("Cross-sample QC comparison", fontsize=14, fontweight="bold", y=1.01)
+    title_suffix = " (log10 scale)" if log_scale else ""
+    fig.suptitle(
+        f"Cross-sample QC comparison{title_suffix}", fontsize=14, fontweight="bold", y=1.01
+    )
     plt.tight_layout()
     _save_fig(fig, output_dir, basename, dpi)
     return fig
@@ -974,6 +997,7 @@ def qc_sample_violin_grouped(
     output_dir: str | Path | None = None,
     basename: str = "qc_sample_violin",
     dpi: int = 300,
+    log_scale: bool = False,
 ) -> plt.Figure:
     """
     Violin plots grouped by sample for direct distribution comparison.
@@ -994,6 +1018,9 @@ def qc_sample_violin_grouped(
         Base filename.
     dpi : int
         DPI for PNG.
+    log_scale : bool
+        If True, apply log10(x + 1) to all keys except pct_counts_mt
+        (which stays linear). Custom y-tick annotations are added (default False).
 
     Returns
     -------
@@ -1016,6 +1043,9 @@ def qc_sample_violin_grouped(
         _save_fig(fig, output_dir, basename, dpi)
         return fig
 
+    # Keys that should NOT be log-transformed (percentage metrics)
+    _pct_keys = {"pct_counts_mt", "pct_counts_hb"}
+
     fail_set = set()
     if classified is not None and "qc_pass" in classified.columns:
         fail_set = set(classified.index[~classified["qc_pass"]])
@@ -1027,10 +1057,13 @@ def qc_sample_violin_grouped(
         axes = [axes]
 
     for ax, key in zip(axes, keys, strict=False):
+        do_log = log_scale and key not in _pct_keys
         data_per_sample = []
         labels = []
         for s in samples:
-            vals = adata.obs.loc[adata.obs[sample_col] == s, key].dropna().values
+            vals = adata.obs.loc[adata.obs[sample_col] == s, key].dropna().values.astype(float)
+            if do_log:
+                vals = np.log10(vals + 1)
             data_per_sample.append(vals)
             label = f"{s} (FAIL)" if s in fail_set else str(s)
             labels.append(label)
@@ -1049,9 +1082,17 @@ def qc_sample_violin_grouped(
         ax.set_xticks(range(len(labels)))
         ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
         ax.set_ylabel(key)
-        ax.set_title(key, fontweight="bold")
+        suffix = " (log10 scale)" if do_log else ""
+        ax.set_title(f"{key}{suffix}", fontweight="bold")
+        if do_log and non_empty:
+            all_vals = np.concatenate([d for _, d in non_empty])
+            if len(all_vals) > 0:
+                _format_log10_ticks(ax, float(np.nanmax(all_vals)))
 
-    fig.suptitle("Per-sample QC distributions", fontsize=14, fontweight="bold", y=1.01)
+    title_suffix = " (log10 scale)" if log_scale else ""
+    fig.suptitle(
+        f"Per-sample QC distributions{title_suffix}", fontsize=14, fontweight="bold", y=1.01
+    )
     plt.tight_layout()
     _save_fig(fig, output_dir, basename, dpi)
     return fig
@@ -1138,6 +1179,103 @@ def qc_sample_scatter_matrix(
                     ax.set_xlabel(metric_cols[j])
 
     fig.suptitle("Sample QC scatter matrix", fontsize=14, fontweight="bold", y=1.01)
+    plt.tight_layout()
+    _save_fig(fig, output_dir, basename, dpi)
+    return fig
+
+
+def qc_pct_mt_per_sample(
+    adata: AnnData,
+    sample_col: str = "library_id",
+    pct_mt_col: str = "pct_counts_mt",
+    classified: pd.DataFrame | None = None,
+    output_dir: str | Path | None = None,
+    basename: str = "qc_pct_mt_per_sample",
+    dpi: int = 300,
+    figsize: tuple[float, float] | None = None,
+) -> plt.Figure:
+    """
+    Per-sample %MT distribution as box plots colored by pass/fail.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data with ``pct_counts_mt`` in obs.
+    sample_col : str
+        Column in obs identifying samples.
+    pct_mt_col : str
+        Obs column for percent mitochondrial (default ``pct_counts_mt``).
+    classified : pd.DataFrame or None
+        If provided, failed samples are colored red, pass samples blue.
+    output_dir : str or Path or None
+        If set, save PDF and PNG.
+    basename : str
+        Base filename.
+    dpi : int
+        DPI for PNG.
+    figsize : tuple or None
+        Figure size (auto-scaled by sample count if None).
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    if pct_mt_col not in adata.obs.columns:
+        fig, ax = plt.subplots(figsize=figsize or (8, 5))
+        ax.text(
+            0.5,
+            0.5,
+            f"{pct_mt_col} not in obs",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    if sample_col not in adata.obs.columns:
+        fig, ax = plt.subplots(figsize=figsize or (8, 5))
+        ax.text(
+            0.5,
+            0.5,
+            f"{sample_col} not in obs",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        _save_fig(fig, output_dir, basename, dpi)
+        return fig
+
+    fail_set = set()
+    if classified is not None and "qc_pass" in classified.columns:
+        fail_set = set(classified.index[~classified["qc_pass"]])
+
+    samples = sorted(adata.obs[sample_col].dropna().unique())
+    if figsize is None:
+        figsize = (max(8, len(samples) * 0.7), 5)
+    fig, ax = plt.subplots(figsize=figsize)
+
+    data_per_sample = []
+    for s in samples:
+        vals = adata.obs.loc[adata.obs[sample_col] == s, pct_mt_col].dropna().values
+        data_per_sample.append(vals)
+
+    bp = ax.boxplot(
+        data_per_sample,
+        positions=range(len(samples)),
+        patch_artist=True,
+        widths=0.6,
+    )
+    for patch, s in zip(bp["boxes"], samples, strict=False):
+        color = "#d62728" if s in fail_set else "#1f77b4"
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+
+    labels = [f"{s} (FAIL)" if s in fail_set else str(s) for s in samples]
+    ax.set_xticks(range(len(samples)))
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel(pct_mt_col)
+    ax.set_title("% Mitochondrial per sample", fontweight="bold")
     plt.tight_layout()
     _save_fig(fig, output_dir, basename, dpi)
     return fig

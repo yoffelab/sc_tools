@@ -212,12 +212,23 @@ def run_qc_report(
                 plt.close("all")
 
     # ---- HTML report ----
+    adata_post_for_report = None
+    if post_path is not None and post_path.exists():
+        # Re-read if not already loaded (may have been loaded above for post plots)
+        try:
+            adata_post_for_report = sc.read_h5ad(post_path)
+            adata_post_for_report = adata_post_for_report.copy()
+            _ensure_qc_metrics(adata_post_for_report)
+        except Exception:
+            adata_post_for_report = None
+
     if metrics is not None and classified is not None:
         try:
             generate_qc_report(
                 adata_raw, metrics, classified, figures_dir,
                 output_path=figures_qc / "qc_report.html",
                 sample_col=sample_col, modality=modality,
+                adata_post=adata_post_for_report,
             )
         except ImportError:
             print("Warning: jinja2 not installed; skipping HTML report generation.", file=sys.stderr)

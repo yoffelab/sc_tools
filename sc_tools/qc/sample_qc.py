@@ -49,8 +49,8 @@ _SAMPLE_THRESHOLDS: dict[str, dict[str, Any]] = {
         "n_spots_min": 50,
     },
     "visium_hd": {
-        "n_genes_median_min": 10,
-        "total_counts_median_min": 20,
+        "n_genes_median_min": 5,
+        "total_counts_median_min": 5,
         "pct_mt_median_max": 50.0,
         "n_spots_min": 500,
     },

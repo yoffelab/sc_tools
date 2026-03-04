@@ -33,9 +33,13 @@
                 border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
   .pass-badge { display: inline-block; background: #27ae60; color: #fff; padding: 2px 8px;
                 border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
-  .plot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 16px; }
+  .plot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .plot-row.full-width { grid-template-columns: 1fr; }
   .plot-item img { width: 100%; border: 1px solid #eee; border-radius: 4px; }
-  .plot-item .caption { font-size: 0.8rem; color: #888; margin-top: 4px; text-align: center; }
+  .plot-item .caption { font-size: 1.0rem; color: #555; margin-top: 4px; text-align: center; }
+  .plot-placeholder { display: flex; align-items: center; justify-content: center;
+                      min-height: 200px; background: #f8f9fa; border: 1px dashed #ddd;
+                      border-radius: 4px; color: #999; font-style: italic; }
   .fail-reasons { font-size: 0.8rem; color: #c0392b; }
   .footer { text-align: center; font-size: 0.8rem; color: #999; padding: 16px; }
 </style>
@@ -122,20 +126,108 @@
 </section>
 {% endif %}
 
-<!-- Comparison plots -->
-{% if plots %}
+<!-- QC Plots: 6-row structured layout -->
 <section>
-  <h2>Cross-Sample Comparison Plots</h2>
-  <div class="plot-grid">
-    {% for plot in plots %}
+  <h2>QC Plots</h2>
+
+  <!-- Row 1: QC 2x2 pre vs post -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Distribution Histograms</h3>
+  <div class="plot-row">
     <div class="plot-item">
-      <img src="data:image/png;base64,{{ plot.data }}" alt="{{ plot.caption }}">
-      <div class="caption">{{ plot.caption }}</div>
+      {% if plots.qc_2x2_pre %}
+      <img src="data:image/png;base64,{{ plots.qc_2x2_pre }}" alt="QC 2x2 Pre-filter">
+      {% endif %}
+      <div class="caption">QC 2x2 Pre-filter</div>
     </div>
-    {% endfor %}
+    <div class="plot-item">
+      {% if plots.qc_2x2_post %}
+      <img src="data:image/png;base64,{{ plots.qc_2x2_post }}" alt="QC 2x2 Post-filter">
+      <div class="caption">QC 2x2 Post-filter</div>
+      {% else %}
+      <div class="plot-placeholder">Post-filter data not provided</div>
+      {% endif %}
+    </div>
   </div>
+
+  <!-- Row 2: Violin pre vs post -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Violin Distributions</h3>
+  <div class="plot-row">
+    <div class="plot-item">
+      {% if plots.violin_pre %}
+      <img src="data:image/png;base64,{{ plots.violin_pre }}" alt="QC Violin Pre-filter">
+      {% endif %}
+      <div class="caption">QC Violin Pre-filter</div>
+    </div>
+    <div class="plot-item">
+      {% if plots.violin_post %}
+      <img src="data:image/png;base64,{{ plots.violin_post }}" alt="QC Violin Post-filter">
+      <div class="caption">QC Violin Post-filter</div>
+      {% else %}
+      <div class="plot-placeholder">Post-filter data not provided</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Row 3: pct_mt per sample (single column) -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Mitochondrial Content</h3>
+  <div class="plot-row">
+    <div class="plot-item">
+      {% if plots.pct_mt %}
+      <img src="data:image/png;base64,{{ plots.pct_mt }}" alt="% Mitochondrial per sample">
+      {% endif %}
+      <div class="caption">% Mitochondrial per sample</div>
+    </div>
+    <div class="plot-item">
+      <div class="plot-placeholder">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- Row 4: Cross-sample comparison bar (linear + log10) -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Cross-Sample Comparison (Bar)</h3>
+  <div class="plot-row">
+    <div class="plot-item">
+      {% if plots.comparison_bar %}
+      <img src="data:image/png;base64,{{ plots.comparison_bar }}" alt="Sample comparison (linear)">
+      {% endif %}
+      <div class="caption">Cross-sample comparison (linear)</div>
+    </div>
+    <div class="plot-item">
+      {% if plots.comparison_bar_log %}
+      <img src="data:image/png;base64,{{ plots.comparison_bar_log }}" alt="Sample comparison (log10)">
+      {% endif %}
+      <div class="caption">Cross-sample comparison (log10 scale)</div>
+    </div>
+  </div>
+
+  <!-- Row 5: Sample violin grouped (linear + log10) -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Per-Sample Distributions (Violin)</h3>
+  <div class="plot-row">
+    <div class="plot-item">
+      {% if plots.violin_grouped %}
+      <img src="data:image/png;base64,{{ plots.violin_grouped }}" alt="Sample violin (linear)">
+      {% endif %}
+      <div class="caption">Per-sample violin (linear)</div>
+    </div>
+    <div class="plot-item">
+      {% if plots.violin_grouped_log %}
+      <img src="data:image/png;base64,{{ plots.violin_grouped_log }}" alt="Sample violin (log10)">
+      {% endif %}
+      <div class="caption">Per-sample violin (log10 scale)</div>
+    </div>
+  </div>
+
+  <!-- Row 6: Scatter matrix (full width) -->
+  <h3 style="margin: 16px 0 8px; color: #555;">Sample QC Scatter Matrix</h3>
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      {% if plots.scatter_matrix %}
+      <img src="data:image/png;base64,{{ plots.scatter_matrix }}" alt="QC scatter matrix">
+      {% endif %}
+      <div class="caption">Sample QC scatter matrix</div>
+    </div>
+  </div>
+
 </section>
-{% endif %}
 
 <div class="footer">
   Generated by sc_tools QC report &mdash; {{ date }}

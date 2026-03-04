@@ -2,8 +2,8 @@
 QC HTML report generation.
 
 Produces a self-contained HTML file with per-sample metrics table,
-cross-sample comparison plots (embedded as base64 PNGs), and pass/fail
-summary.
+inline-generated QC plots (embedded as base64 PNGs), and pass/fail
+summary in a structured 6-row layout.
 """
 
 from __future__ import annotations
@@ -39,23 +39,6 @@ def _fig_to_base64(fig: plt.Figure, dpi: int = 150) -> str:
     return base64.b64encode(buf.read()).decode("ascii")
 
 
-def _collect_plot_pngs(figures_dir: Path) -> list[dict[str, str]]:
-    """Find existing QC PNGs in figures_dir/QC/ and encode as base64."""
-    plots = []
-    qc_dir = figures_dir / "QC"
-    if not qc_dir.exists():
-        return plots
-    for subdir in ["raw", "post", ""]:
-        search_dir = qc_dir / subdir if subdir else qc_dir
-        if not search_dir.exists():
-            continue
-        for png in sorted(search_dir.glob("*.png")):
-            data = base64.b64encode(png.read_bytes()).decode("ascii")
-            caption = png.stem.replace("_", " ").title()
-            plots.append({"data": data, "caption": caption})
-    return plots
-
-
 def generate_qc_report(
     adata: AnnData,
     metrics: pd.DataFrame,
@@ -65,20 +48,31 @@ def generate_qc_report(
     sample_col: str = "library_id",
     modality: str = "visium",
     title: str = "QC Report",
+    adata_post: AnnData | None = None,
 ) -> Path:
     """
-    Generate a self-contained HTML QC report.
+    Generate a self-contained HTML QC report with structured 6-row layout.
+
+    Plots are generated inline (not globbed from disk) and embedded as
+    base64 PNGs. The layout has 6 rows:
+
+    1. QC 2x2 pre-filter | QC 2x2 post-filter
+    2. QC violin pre-filter | QC violin post-filter
+    3. pct_counts_mt per-sample | (empty)
+    4. Cross-sample comparison bar (linear) | Same (log10)
+    5. QC sample violin grouped (linear) | Same (log10)
+    6. QC scatter matrix (full width)
 
     Parameters
     ----------
     adata : AnnData
-        AnnData used for QC (for total spot count).
+        Pre-filter AnnData used for QC.
     metrics : pd.DataFrame
         Output of ``compute_sample_metrics``.
     classified : pd.DataFrame
         Output of ``classify_samples`` (with ``qc_pass``, ``qc_fail_reasons``).
     figures_dir : str or Path
-        Base figures directory (contains ``QC/raw/``, ``QC/post/``).
+        Base figures directory (unused for plot generation but kept for API compat).
     output_path : str or Path
         Path for the output HTML file.
     sample_col : str
@@ -87,6 +81,8 @@ def generate_qc_report(
         Modality string for display.
     title : str
         Report title.
+    adata_post : AnnData or None
+        Post-filter AnnData. If provided, row 1 and 2 right panels are populated.
 
     Returns
     -------
@@ -99,6 +95,15 @@ def generate_qc_report(
         raise ImportError(
             "jinja2 is required for HTML report generation. Install with: pip install jinja2"
         ) from e
+
+    from .plots import (
+        qc_2x2_grid,
+        qc_pct_mt_per_sample,
+        qc_sample_comparison_bar,
+        qc_sample_scatter_matrix,
+        qc_sample_violin_grouped,
+        qc_violin_metrics,
+    )
 
     figures_dir = Path(figures_dir)
     output_path = Path(output_path)
@@ -133,8 +138,46 @@ def generate_qc_report(
                 row[col] = None
         table_rows.append(row)
 
-    # Collect embedded plots
-    plots = _collect_plot_pngs(figures_dir)
+    # Generate plots inline
+    named_plots = {}
+
+    # Row 1: QC 2x2 pre/post
+    named_plots["qc_2x2_pre"] = _fig_to_base64(qc_2x2_grid(adata))
+    if adata_post is not None:
+        named_plots["qc_2x2_post"] = _fig_to_base64(qc_2x2_grid(adata_post))
+
+    # Row 2: Violin pre/post
+    named_plots["violin_pre"] = _fig_to_base64(qc_violin_metrics(adata))
+    if adata_post is not None:
+        named_plots["violin_post"] = _fig_to_base64(qc_violin_metrics(adata_post))
+
+    # Row 3: pct_mt per sample
+    named_plots["pct_mt"] = _fig_to_base64(
+        qc_pct_mt_per_sample(adata, sample_col=sample_col, classified=classified)
+    )
+
+    # Row 4: Cross-sample comparison bar (linear + log10)
+    named_plots["comparison_bar"] = _fig_to_base64(
+        qc_sample_comparison_bar(metrics, classified=classified)
+    )
+    named_plots["comparison_bar_log"] = _fig_to_base64(
+        qc_sample_comparison_bar(metrics, classified=classified, log_scale=True)
+    )
+
+    # Row 5: Sample violin grouped (linear + log10)
+    named_plots["violin_grouped"] = _fig_to_base64(
+        qc_sample_violin_grouped(adata, sample_col=sample_col, classified=classified)
+    )
+    named_plots["violin_grouped_log"] = _fig_to_base64(
+        qc_sample_violin_grouped(
+            adata, sample_col=sample_col, classified=classified, log_scale=True
+        )
+    )
+
+    # Row 6: Scatter matrix
+    named_plots["scatter_matrix"] = _fig_to_base64(
+        qc_sample_scatter_matrix(metrics, classified=classified)
+    )
 
     # Compute summary stats
     n_pass = int(classified["qc_pass"].sum())
@@ -157,7 +200,7 @@ def generate_qc_report(
         median_genes=median_genes,
         has_mt=has_mt,
         table_rows=table_rows,
-        plots=plots,
+        plots=named_plots,
     )
 
     output_path.write_text(html)

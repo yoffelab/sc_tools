@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 REQUIRED_COLUMNS = {
     "visium": {"sample_id", "fastq_dir", "image", "slide", "area"},
     "visium_hd": {"sample_id", "fastq_dir", "cytaimage", "slide", "area"},
+    "visium_hd_cell": {"sample_id", "fastq_dir", "cytaimage", "slide", "area"},
     "xenium": {"sample_id", "xenium_dir"},
     "imc": {"sample_id", "mcd_file", "panel_csv"},
     "cosmx": set(),  # CosMx: no Phase 0 (data assumed processed)

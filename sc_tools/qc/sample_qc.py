@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 _SPOT_FILTER_DEFAULTS: dict[str, dict[str, Any]] = {
     "visium": {"min_counts": 50, "min_genes": 20, "max_pct_mt": None},
     "visium_hd": {"min_counts": 10, "min_genes": 5, "max_pct_mt": None},
+    "visium_hd_cell": {"min_counts": 5, "min_genes": 3, "max_pct_mt": None},
     "xenium": {"min_counts": 5, "min_genes": 3, "max_pct_mt": None},
     "cosmx": {"min_counts": 5, "min_genes": 3, "max_pct_mt": None},
     "imc": {"min_counts": 1, "min_genes": 1, "max_pct_mt": None},
@@ -53,6 +54,12 @@ _SAMPLE_THRESHOLDS: dict[str, dict[str, Any]] = {
         "total_counts_median_min": 5,
         "pct_mt_median_max": 50.0,
         "n_spots_min": 500,
+    },
+    "visium_hd_cell": {
+        "n_genes_median_min": 5,
+        "total_counts_median_min": 10,
+        "pct_mt_median_max": None,
+        "n_spots_min": 50,
     },
     "xenium": {
         "n_genes_median_min": 5,

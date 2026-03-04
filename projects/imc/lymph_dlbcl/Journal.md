@@ -71,3 +71,22 @@ This journal documents **project-specific** technical and analytical decisions. 
 
 - **Action:** Added `scripts/analyze_rds_notebook_usage.py` to scan all notebooks for readRDS/saveRDS and path references to the 47 downloaded RDS files; produced two metadata summaries.
 - **Outputs:** (1) **`metadata/rds_notebook_usage.csv`** — per RDS: inferred_content (e.g. Stromal panel S1: Seurat object B-cell subset), read_by_notebooks, written_by_notebooks, read/write snippets, summary. (2) **`metadata/notebook_rds_summary.csv`** — per notebook: rds_read, rds_written, rds_count. Enables traceability from RDS to notebooks and from notebooks to RDS, similar to the CSV inventory.
+
+### [2026-03-04] – Manuscript reproduction pipeline: full Snakemake + 25 scripts
+
+- **Action:** Implemented complete reproducible pipeline for DLBCL IMC manuscript (v7.4) figure reproduction. Hybrid approach: reuse 47 existing Seurat-converted h5ad objects for cell typing/labels; consolidate into sc_tools checkpoint format.
+- **Scripts created (25 total):**
+  - Phase 0: `download_clinical_metadata.sh`, `validate_h5ad_objects.py`
+  - Phase 1: `build_panel_adata.py`, `attach_clinical_metadata.py`, `build_spatial_adata.py`
+  - Phase 2-3: `validate_celltypes.py`, `build_lme_classes.py`
+  - Phase 4 (13 figures): `fig1_single_cell_atlas.py`, `fig2_lme_classes.py`, `fig3_clinical.py`, `fig4_spatial.py`, `fig5_ml_framework.py`, `supp_fig1_qc_panels.py` through `supp_fig8_extended_survival.py`
+  - Phase 6: `validate_figures.py`
+- **Snakefile:** Full DAG from download -> validate -> build -> figures -> verify. Rules for each phase; `snakemake --cores 8 all` runs everything.
+- **config.yaml:** Project parameters, input paths, LME class definitions, ML params (seed=42, 5-fold CV).
+- **Mission.md:** Overhauled with 13-figure plan, implementation phases 0-6, key files reference.
+- **Key decisions:**
+  - Panels: T2 (immune) + S2 (stromal) as primary (most complete with DLC_code and labels)
+  - LME class mapping from k=10 k-means (from DLBCL_case_clustering.ipynb): Cold={0,7,9}, CD206={1,8}, Cytotoxic={2,10}, Stroma={3,4}, T_cell_Regulated={5,6}
+  - Runtime: cayuga; data already present at `/home/fs01/juk4007/elementolab/sc_tools/projects/imc/lymph_dlbcl`
+  - Stats: BH FDR, lifelines for survival, sklearn RF for ML (Fig 5)
+- **Next:** Run `download_clinical_metadata.sh` on cayuga, then `snakemake --cores 8 phase0 phase1`

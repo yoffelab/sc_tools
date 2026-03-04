@@ -1,19 +1,43 @@
 # Journal Summary: lymph_dlbcl (Two-Panel IMC DLBCL)
 
-Condensed summary of `Journal.md` for this project. Full entries are in `Journal.md`.
+Condensed summary. Full entries in `Journal.md`.
 
 ## Project scope
 
-- Two-panel Hyperion IMC (DLBCL): **immune** and **stromal** panels, kept separate (e.g. separate h5ad per panel). Data is on remote path; priority is to **reuse existing processed data** from the previous analyst; process raw only when needed.
+Two-panel Hyperion IMC on DLBCL (diffuse large B-cell lymphoma). Immune (T2) and stromal (S2) panels kept separate. Manuscript reproduction: 5 main + 8 supplementary = 13 figures total.
 
-## Recent phase (2025-02-12)
+## Current status (2026-03-04)
 
-- **Inventory:** Remote file listing (CSV, h5ad, rds, h5); script `build_remote_inventory.py` produces `metadata/remote_file_inventory.csv`; notebook scan adds data_type, analysis_stage, needs_download. **Annotated** version with natural-language descriptors: `scripts/annotate_inventory_descriptors.py` writes `metadata/remote_file_inventory_annotated.csv` (detailed_descriptor filled). Original script output kept unchanged for traceability.
-- **Required files:** Normalized expression (cells as observations) per panel is primary; raw expression per panel when available. Identify in inventory → `metadata/files_to_download.csv` → download to `data/downloaded/` → `metadata/download_manifest.csv`. Build AnnData with normalized (and raw in layers when present).
-- **RDS:** `analyze_rds_notebook_usage.py` produced `metadata/rds_notebook_usage.csv` and `metadata/notebook_rds_summary.csv` for traceability of 47 RDS files to notebooks.
+- **Pipeline implemented:** 25 scripts + Snakefile + config.yaml for full manuscript reproduction
+- **Approach:** Hybrid — reuse 47 Seurat-converted h5ad objects (on cayuga); consolidate into sc_tools checkpoints
+- **Remote data:** `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` (cayuga)
+- **48 h5ad files** in `results/seurat_converted/` (immune T1/T2, stromal S1/S2, merged, spatial)
+- **Inventory complete:** 1,668 remote files catalogued with annotated descriptors
+- **Next:** Run download + phase0-1 on cayuga via `snakemake --cores 8 phase0 phase1`
 
-## Key conventions
+## Key decisions
 
-- Panels: **immune**, **stromal** (separate checkpoints).
-- Remote (read-only): `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2`.
-- Use annotated inventory for download decisions; keep script output and annotated file separate.
+- **Panels:** T2 (immune, 1.63M cells) + S2 (stromal, 1.55M cells) as primary — most complete with DLC_code and labels
+- **LME classes (5):** Cold (k-means 0,7,9), CD206 Enriched (1,8), Cytotoxic (2,10), Stroma (3,4), T cell Regulated (5,6) — from DLBCL_case_clustering.ipynb k=10 k-means
+- **Checkpoint naming:** `adata.{immune|stromal}.{raw.p1|annotated.p2|celltyped.p4}.h5ad`
+- **Spatial:** `adata.stromal.spatial.communities.h5ad` from SO_k30_community_cluster.h5ad
+- **ML (Fig 5):** RandomForest + RandomizedSearchCV, seed=42, 5-fold CV
+- **Stats:** BH FDR always, lifelines for survival, significance bars per skills.md
+
+## Pipeline phases
+
+| Phase | Scripts | Status |
+|-------|---------|--------|
+| 0 | download_clinical_metadata.sh, validate_h5ad_objects.py | Scripts ready |
+| 1 | build_panel_adata.py, attach_clinical_metadata.py, build_spatial_adata.py | Scripts ready |
+| 2-3 | validate_celltypes.py, build_lme_classes.py | Scripts ready |
+| 4 | fig1-5 + supp_fig1-8 (13 scripts) | Scripts ready |
+| 5 | Snakefile + config.yaml | Done |
+| 6 | validate_figures.py | Script ready |
+
+## Risks
+
+1. S2 objects lack DLC_code — need cell ID CSVs for sample mapping
+2. Spatial coords may differ between Seurat/AnnData
+3. ML reproducibility depends on random seed
+4. R-to-Python porting — validate numerically, not pixel-perfect

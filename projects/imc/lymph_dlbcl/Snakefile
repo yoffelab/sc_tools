@@ -1,0 +1,299 @@
+"""
+Snakefile: DLBCL IMC Manuscript Reproduction Pipeline
+
+Usage:
+    # Full pipeline
+    snakemake --cores 8 all
+
+    # Specific phases
+    snakemake --cores 8 phase0      # Data audit
+    snakemake --cores 8 phase1      # AnnData construction
+    snakemake --cores 8 phase2      # QC
+    snakemake --cores 8 phase3      # Cell type validation + LME
+    snakemake --cores 4 figures     # All figures
+    snakemake --cores 1 fig1        # Single figure
+
+    # Dry run
+    snakemake -n all
+
+    # On cayuga with container
+    ./scripts/run_container.sh . snakemake --cores 8 all
+"""
+
+configfile: "config.yaml"
+
+PANELS = config["panels"]  # ["immune", "stromal"]
+
+# ============================================================
+# Target rules
+# ============================================================
+
+rule all:
+    input:
+        # Phase 0
+        "outputs/h5ad_validation_report.md",
+        # Phase 1
+        expand("results/adata.{panel}.raw.p1.h5ad", panel=PANELS),
+        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        "results/adata.stromal.spatial.communities.h5ad",
+        # Phase 3
+        "outputs/celltype_validation_report.md",
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        "metadata/lme_class_assignments.csv",
+        # Figures
+        "figures/manuscript/fig1/.done",
+        "figures/manuscript/fig2/.done",
+        "figures/manuscript/fig3/.done",
+        "figures/manuscript/fig4/.done",
+        "figures/manuscript/fig5/.done",
+        expand("figures/manuscript/supp_fig{n}/.done", n=range(1, 9)),
+
+
+rule phase0:
+    input:
+        "outputs/h5ad_validation_report.md",
+
+rule phase1:
+    input:
+        expand("results/adata.{panel}.raw.p1.h5ad", panel=PANELS),
+        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        "results/adata.stromal.spatial.communities.h5ad",
+
+rule phase2:
+    input:
+        "outputs/celltype_validation_report.md",
+
+rule phase3:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        "metadata/lme_class_assignments.csv",
+
+rule figures:
+    input:
+        "figures/manuscript/fig1/.done",
+        "figures/manuscript/fig2/.done",
+        "figures/manuscript/fig3/.done",
+        "figures/manuscript/fig4/.done",
+        "figures/manuscript/fig5/.done",
+        expand("figures/manuscript/supp_fig{n}/.done", n=range(1, 9)),
+
+
+# ============================================================
+# Phase 0: Data Audit
+# ============================================================
+
+rule download_clinical:
+    """Download clinical/metadata files from cayuga backup."""
+    output:
+        manifest="metadata/download_manifest_phase0.csv",
+    shell:
+        "bash scripts/download_clinical_metadata.sh"
+
+
+rule validate_h5ad:
+    """Validate key h5ad objects."""
+    output:
+        report="outputs/h5ad_validation_report.md",
+        csv="outputs/h5ad_validation_summary.csv",
+    shell:
+        "python scripts/validate_h5ad_objects.py"
+
+
+# ============================================================
+# Phase 1: AnnData Construction
+# ============================================================
+
+rule build_panel_adata:
+    """Build panel-specific AnnData from Seurat-converted objects."""
+    input:
+        # Immune: T2 full
+        immune=config["objects"]["immune_full"],
+        # Stromal: S2 full
+        stromal=config["objects"]["stromal_full"],
+    output:
+        immune="results/adata.immune.raw.p1.h5ad",
+        stromal="results/adata.stromal.raw.p1.h5ad",
+    shell:
+        "python scripts/build_panel_adata.py --panel both"
+
+
+rule attach_clinical:
+    """Attach clinical metadata to panel AnnData."""
+    input:
+        immune="results/adata.immune.raw.p1.h5ad",
+        stromal="results/adata.stromal.raw.p1.h5ad",
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        immune="results/adata.immune.annotated.p2.h5ad",
+        stromal="results/adata.stromal.annotated.p2.h5ad",
+    shell:
+        "python scripts/attach_clinical_metadata.py --panel both"
+
+
+rule build_spatial:
+    """Build spatial community AnnData."""
+    input:
+        spatial=config["objects"]["spatial_communities"],
+    output:
+        "results/adata.stromal.spatial.communities.h5ad",
+    shell:
+        "python scripts/build_spatial_adata.py"
+
+
+# ============================================================
+# Phase 2-3: Validation + LME
+# ============================================================
+
+rule validate_celltypes:
+    """Validate cell types by marker expression."""
+    input:
+        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+    output:
+        report="outputs/celltype_validation_report.md",
+        immune_heatmap="figures/QC/celltype_marker_heatmap_immune.pdf",
+        stromal_heatmap="figures/QC/celltype_marker_heatmap_stromal.pdf",
+    shell:
+        "python scripts/validate_celltypes.py --panel both"
+
+
+rule build_lme_classes:
+    """Assign LME classes and create P4 checkpoints."""
+    input:
+        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        lme="metadata/lme_class_assignments.csv",
+    shell:
+        "python scripts/build_lme_classes.py --panel both"
+
+
+# ============================================================
+# Phase 4: Main Figures
+# ============================================================
+
+rule fig1:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+    output:
+        touch("figures/manuscript/fig1/.done"),
+    shell:
+        "python scripts/fig1_single_cell_atlas.py"
+
+
+rule fig2:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        lme="metadata/lme_class_assignments.csv",
+    output:
+        touch("figures/manuscript/fig2/.done"),
+    shell:
+        "python scripts/fig2_lme_classes.py"
+
+
+rule fig3:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        lme="metadata/lme_class_assignments.csv",
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        touch("figures/manuscript/fig3/.done"),
+    shell:
+        "python scripts/fig3_clinical.py"
+
+
+rule fig4:
+    input:
+        spatial="results/adata.stromal.spatial.communities.h5ad",
+        lme="metadata/lme_class_assignments.csv",
+    output:
+        touch("figures/manuscript/fig4/.done"),
+    shell:
+        "python scripts/fig4_spatial.py"
+
+
+rule fig5:
+    input:
+        lme="metadata/lme_class_assignments.csv",
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        touch("figures/manuscript/fig5/.done"),
+    shell:
+        "python scripts/fig5_ml_framework.py"
+
+
+# ============================================================
+# Phase 4: Supplementary Figures
+# ============================================================
+
+rule supp_fig1:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+    output:
+        touch("figures/manuscript/supp_fig1/.done"),
+    shell:
+        "python scripts/supp_fig1_qc_panels.py"
+
+
+rule supp_fig2:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+    output:
+        touch("figures/manuscript/supp_fig2/.done"),
+    shell:
+        "python scripts/supp_fig2_bcell.py"
+
+
+rule supp_fig3:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+    output:
+        touch("figures/manuscript/supp_fig3/.done"),
+    shell:
+        "python scripts/supp_fig3_tcell_myeloid.py"
+
+
+rule supp_fig4:
+    input:
+        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        lme="metadata/lme_class_assignments.csv",
+    output:
+        touch("figures/manuscript/supp_fig4/.done"),
+    shell:
+        "python scripts/supp_fig4_vessel.py"
+
+
+rule supp_fig5:
+    input:
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        touch("figures/manuscript/supp_fig5/.done"),
+    shell:
+        "python scripts/supp_fig5_tme_sensitivity.py"
+
+
+rule supp_fig6:
+    input:
+        lme="metadata/lme_class_assignments.csv",
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        touch("figures/manuscript/supp_fig6/.done"),
+    shell:
+        "python scripts/supp_fig6_mutations.py"
+
+
+rule supp_fig7:
+    output:
+        touch("figures/manuscript/supp_fig7/.done"),
+    shell:
+        "python scripts/supp_fig7_rna_protein.py"
+
+
+rule supp_fig8:
+    input:
+        lme="metadata/lme_class_assignments.csv",
+        manifest="metadata/download_manifest_phase0.csv",
+    output:
+        touch("figures/manuscript/supp_fig8/.done"),
+    shell:
+        "python scripts/supp_fig8_extended_survival.py"

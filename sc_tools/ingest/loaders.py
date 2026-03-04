@@ -138,6 +138,136 @@ def load_visium_hd_sample(
     return adata
 
 
+def load_visium_hd_cell_sample(
+    spaceranger_dir: str | Path,
+    sample_id: str,
+    *,
+    load_images: bool = False,
+) -> ad.AnnData:
+    """Load one Visium HD sample from SpaceRanger 4 cell segmentation output.
+
+    Reads the cell-level (not bin-level) data produced by SpaceRanger 4
+    under ``outs/cell_segmentation/``. This is single-cell resolution data,
+    fundamentally different from bin-based (8um) Visium HD.
+
+    Parameters
+    ----------
+    spaceranger_dir
+        Path to Space Ranger output directory (containing ``outs/``).
+    sample_id
+        Sample identifier to store in obs['sample'].
+    load_images
+        Whether to load images.
+
+    Returns
+    -------
+    AnnData with cell-level spatial coordinates and sample metadata.
+    """
+    import scanpy as sc
+
+    spaceranger_dir = Path(spaceranger_dir)
+
+    # Locate cell_segmentation directory
+    cell_seg_dir = spaceranger_dir / "outs" / "cell_segmentation"
+    if not cell_seg_dir.exists():
+        cell_seg_dir = spaceranger_dir / "cell_segmentation"
+    if not cell_seg_dir.exists():
+        raise FileNotFoundError(
+            f"Cell segmentation directory not found: "
+            f"{spaceranger_dir / 'outs' / 'cell_segmentation'} "
+            f"or {spaceranger_dir / 'cell_segmentation'}"
+        )
+
+    # Load the filtered feature-barcode matrix
+    h5_path = cell_seg_dir / "filtered_feature_bc_matrix.h5"
+    mtx_dir = cell_seg_dir / "filtered_feature_bc_matrix"
+
+    if h5_path.exists():
+        adata = sc.read_10x_h5(str(h5_path))
+    elif mtx_dir.exists():
+        adata = sc.read_10x_mtx(str(mtx_dir))
+    else:
+        raise FileNotFoundError(
+            f"No filtered matrix found in {cell_seg_dir}. "
+            f"Expected filtered_feature_bc_matrix.h5 or filtered_feature_bc_matrix/"
+        )
+
+    # Load cell coordinates from parquet or CSV
+    coords_loaded = False
+    for coords_name in ["cells.parquet", "cells.csv.gz", "cells.csv"]:
+        coords_path = cell_seg_dir / coords_name
+        if coords_path.exists():
+            if coords_name.endswith(".parquet"):
+                coords = pd.read_parquet(coords_path)
+            else:
+                coords = pd.read_csv(coords_path)
+
+            # Try standard column names
+            x_col = next(
+                (
+                    c
+                    for c in ["x_centroid", "cell_centroid_x", "pxl_col_in_fullres"]
+                    if c in coords.columns
+                ),
+                None,
+            )
+            y_col = next(
+                (
+                    c
+                    for c in ["y_centroid", "cell_centroid_y", "pxl_row_in_fullres"]
+                    if c in coords.columns
+                ),
+                None,
+            )
+
+            if x_col and y_col:
+                # Match barcodes if barcode column exists
+                bc_col = next((c for c in ["barcode", "cell_id"] if c in coords.columns), None)
+                if bc_col:
+                    coords = coords.set_index(bc_col)
+                    common = adata.obs_names.intersection(coords.index)
+                    if len(common) > 0:
+                        adata = adata[common].copy()
+                        adata.obsm["spatial"] = np.array(coords.loc[common, [x_col, y_col]])
+                        coords_loaded = True
+                else:
+                    # No barcode column; assume same order
+                    if len(coords) == adata.n_obs:
+                        adata.obsm["spatial"] = np.array(coords[[x_col, y_col]])
+                        coords_loaded = True
+            break
+
+    if not coords_loaded:
+        # Try tissue_positions.parquet (SR4 format)
+        pos_file = cell_seg_dir / "spatial" / "tissue_positions.parquet"
+        if pos_file.exists():
+            df_pos = pd.read_parquet(pos_file).set_index("barcode")
+            common = adata.obs_names.intersection(df_pos.index)
+            if len(common) > 0:
+                adata = adata[common].copy()
+                if "pxl_col_in_fullres" in df_pos.columns:
+                    adata.obsm["spatial"] = np.array(
+                        df_pos.loc[common, ["pxl_col_in_fullres", "pxl_row_in_fullres"]]
+                    )
+                    coords_loaded = True
+
+    if not coords_loaded:
+        logger.warning("Could not load spatial coordinates for %s cell segmentation", sample_id)
+
+    adata.obs["sample"] = sample_id
+    adata.obs["library_id"] = sample_id
+    adata.obs["raw_data_dir"] = str(spaceranger_dir)
+    adata.var_names_make_unique()
+
+    logger.info(
+        "Loaded Visium HD cell segmentation sample %s: %d cells x %d genes",
+        sample_id,
+        adata.n_obs,
+        adata.n_vars,
+    )
+    return adata
+
+
 def load_xenium_sample(
     xenium_dir: str | Path,
     sample_id: str,

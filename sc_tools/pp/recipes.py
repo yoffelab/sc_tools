@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["preprocess"]
 
-VALID_MODALITIES = {"visium", "visium_hd", "xenium", "cosmx", "imc"}
+VALID_MODALITIES = {"visium", "visium_hd", "visium_hd_cell", "xenium", "cosmx", "imc"}
 VALID_INTEGRATIONS = {"scvi", "harmony", "cytovi", "none"}
 
 
@@ -120,7 +120,7 @@ def preprocess(
             use_gpu=use_gpu,
             **kwargs,
         )
-    elif modality == "xenium":
+    elif modality in ("xenium", "visium_hd_cell"):
         _recipe_xenium(
             adata,
             batch_key=batch_key,

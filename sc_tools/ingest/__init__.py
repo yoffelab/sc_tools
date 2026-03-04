@@ -17,6 +17,7 @@ from .config import collect_all_batches, load_batch_manifest, validate_manifest
 from .loaders import (
     concat_samples,
     load_imc_sample,
+    load_visium_hd_cell_sample,
     load_visium_hd_sample,
     load_visium_sample,
     load_xenium_sample,
@@ -31,6 +32,7 @@ __all__ = [
     "build_batch_commands",
     "load_visium_sample",
     "load_visium_hd_sample",
+    "load_visium_hd_cell_sample",
     "load_xenium_sample",
     "load_imc_sample",
     "concat_samples",

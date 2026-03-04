@@ -26,8 +26,20 @@ from sc_tools.qc.plots import (
     qc_violin_metrics,
 )
 
-from . import gsea, heatmaps, spatial, statistical, volcano
+from . import benchmarking, gsea, heatmaps, spatial, statistical, volcano
 from . import save as save_figs
+from .benchmarking import (
+    plot_batch_vs_bio,
+    plot_composite_score_bar,
+    plot_embedding_comparison_umap,
+    plot_integration_comparison_table,
+    plot_integration_radar,
+    plot_integration_ranking_bar,
+    plot_marker_snr_heatmap,
+    plot_morphology_distributions,
+    plot_segmentation_comparison_table,
+    plot_segmentation_overlay,
+)
 from .gsea import plot_gsea_dotplot
 from .save import save_figure
 
@@ -37,6 +49,7 @@ __all__ = [
     "statistical",
     "volcano",
     "gsea",
+    "benchmarking",
     "save_figs",
     "save_figure",
     "plot_gsea_dotplot",
@@ -51,4 +64,15 @@ __all__ = [
     "qc_sample_comparison_bar",
     "qc_sample_violin_grouped",
     "qc_sample_scatter_matrix",
+    # Benchmarking plots
+    "plot_segmentation_comparison_table",
+    "plot_morphology_distributions",
+    "plot_marker_snr_heatmap",
+    "plot_segmentation_overlay",
+    "plot_composite_score_bar",
+    "plot_integration_comparison_table",
+    "plot_integration_radar",
+    "plot_integration_ranking_bar",
+    "plot_batch_vs_bio",
+    "plot_embedding_comparison_umap",
 ]

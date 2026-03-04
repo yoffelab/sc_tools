@@ -83,8 +83,74 @@ For **two-panel** structure, keep **immune** and **stromal** panels **separate**
 
 ---
 
-## 5. References
+## 5. Snakemake Pipeline
+
+The full pipeline is defined in `Snakefile` + `config.yaml`. Run with:
+
+```bash
+snakemake --cores 8 all          # Full pipeline
+snakemake --cores 8 phase0       # Download + validate
+snakemake --cores 8 phase1       # Build AnnData checkpoints
+snakemake --cores 8 figures      # All 13 figures
+bash scripts/run_on_cayuga.sh all  # Sync + run on cayuga
+```
+
+### DAG
+
+```
+download_clinical -> validate_h5ad
+                         |
+                   build_panel_adata (immune + stromal)
+                         |
+                   attach_clinical_metadata
+                         |
+              +----------+----------+
+              |                     |
+        validate_celltypes    build_lme_classes
+              |                     |
+        build_spatial         (P4 checkpoints)
+              |                     |
+              +----------+----------+
+                         |
+           fig1, fig2, fig3, fig4, fig5
+           supp_fig1 .. supp_fig8
+                         |
+                    validate_figures
+```
+
+### Scripts inventory (25 total)
+
+| Script | Phase | Purpose |
+|--------|-------|---------|
+| download_clinical_metadata.sh | 0 | Download clinical/metadata CSVs from cayuga backup |
+| validate_h5ad_objects.py | 0 | Validate shape, columns, labels of key h5ad objects |
+| build_panel_adata.py | 1 | Build immune/stromal P1 checkpoints from T2/S2 objects |
+| attach_clinical_metadata.py | 1 | Join clinical data -> P2 checkpoints |
+| build_spatial_adata.py | 1 | Build spatial community object |
+| validate_celltypes.py | 2-3 | Marker expression heatmap per cell type |
+| build_lme_classes.py | 3 | Assign 5 LME classes -> P4 checkpoints |
+| fig1_single_cell_atlas.py | 4 | UMAP, heatmap, dotplot, proportions |
+| fig2_lme_classes.py | 4 | LME heatmap, abundance, composition |
+| fig3_clinical.py | 4 | KM curves, COO, mutations, Cox |
+| fig4_spatial.py | 4 | Spatial communities, neighborhoods |
+| fig5_ml_framework.py | 4 | RF classification, ROC, IHC validation |
+| supp_fig1_qc_panels.py | 4 | Panel QC metrics |
+| supp_fig2_bcell.py | 4 | B cell subclusters |
+| supp_fig3_tcell_myeloid.py | 4 | T cell / myeloid |
+| supp_fig4_vessel.py | 4 | Vessel analysis |
+| supp_fig5_tme_sensitivity.py | 4 | TME clustering sensitivity |
+| supp_fig6_mutations.py | 4 | Mutation landscape |
+| supp_fig7_rna_protein.py | 4 | RNA-protein comparison |
+| supp_fig8_extended_survival.py | 4 | Extended survival |
+| validate_figures.py | 6 | Verify figures + numerical validation |
+| run_on_cayuga.sh | - | Sync + run pipeline on cayuga |
+
+---
+
+## 6. References
 
 - Root `Architecture.md`: checkpoint names, required metadata, phase details.
 - Root `Mission.md`: toolkit phasing and entry points.
-- This project `Mission.md`: roadmap and active tasks (inventory first, then reuse processed data; raw only if needed). Panels: immune and stromal, kept separate.
+- This project `Mission.md`: roadmap and active tasks.
+- `config.yaml`: Project parameters, input paths, LME definitions, ML config.
+- `Snakefile`: Full pipeline DAG.

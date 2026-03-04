@@ -1,0 +1,80 @@
+# config.yaml — DLBCL IMC Manuscript Reproduction Pipeline
+# Usage: snakemake -d projects/imc/lymph_dlbcl --configfile config.yaml --cores 8
+
+# --- Project metadata ---
+project: "lymph_dlbcl"
+platform: "imc"
+panels: ["immune", "stromal"]
+
+# --- Data paths (relative to project root) ---
+seurat_converted: "results/seurat_converted"
+downloaded_clinical: "data/downloaded/clinical"
+downloaded_metadata: "data/downloaded/metadata"
+
+# --- Key input objects ---
+objects:
+  immune_full: "results/seurat_converted/tcell_2_preprocessing/t2_SO_seurat.h5ad"
+  stromal_full: "results/seurat_converted/stroma_2_preprocessing/S1_seurat_SO.h5ad"
+  immune_merged: "results/seurat_converted/tcell_merged/SO2_seurat_bcell.h5ad"
+  stromal_merged: "results/seurat_converted/stroma_merged/SO2_seurat_bcell.h5ad"
+  spatial_communities: "results/seurat_converted/stroma_spatial/SO_k30_community_cluster.h5ad"
+  tme: "results/seurat_converted/s_tme_seurat.h5ad"
+
+# --- Clinical files (must exist after Phase 0 download) ---
+clinical:
+  clinical_full: "data/downloaded/clinical/DLBCL_clinical_full.csv"
+  punch_notes: "data/downloaded/clinical/CTMA_121_punch_notes.csv"
+  mutation_table: "data/downloaded/clinical/CTMA121_mut_table.csv"
+
+# --- Metadata files (must exist after Phase 0 download) ---
+metadata:
+  tme_clusters: "data/downloaded/metadata/2.17.22.v2stroma_C8_clusters.csv"
+  tme_alt6: "data/downloaded/metadata/2.23.23.TME_alt6.csv"
+  tme_zscore: "data/downloaded/metadata/7.14.22.TME.zscore.csv"
+  ihc_337: "data/downloaded/metadata/2.23.23.IHC_337_cases.csv"
+  ihc_266: "data/downloaded/metadata/2.23.23.IHC_266_all_markers.csv"
+  abundance: "data/downloaded/metadata/1.13.21.merged.abundance.csv"
+  community_merged: "data/downloaded/metadata/6.21.22.community_merged_sc_df_stroma.csv"
+  s1_cellid: "data/downloaded/metadata/S1_seurat_cellid.csv"
+  s2_cellid: "data/downloaded/metadata/S2_seurat_cellid.csv"
+  s1_tme_table: "data/downloaded/metadata/s1_tme_table.csv"
+  s2_tme_table: "data/downloaded/metadata/s2_tme_table.csv"
+  patient_tme: "data/downloaded/metadata/8.15.22.DLC380_patient_tme.csv"
+  community_abundance: "data/downloaded/metadata/7.31.22.k30_per_patient_community_abundance.csv"
+
+# --- IMC preprocessing parameters ---
+preprocessing:
+  cofactor: 5                # arcsinh cofactor for IMC
+  integration: "cytovi"      # integration method (cytovi for IMC)
+  batch_key: "sample"
+
+# --- LME class definitions (from manuscript) ---
+lme_classes:
+  # Final 5-class mapping (from k=10 k-means)
+  Cold: [0, 7, 9]
+  CD206_Enriched: [1, 8]
+  Cytotoxic: [2, 10]
+  Stroma: [3, 4]
+  T_cell_Regulated: [5, 6]
+  # Prevalence: Cold 35.1%, Stromal 21.3%, Cytotoxic 20.7%, CD206 8.2%, T cell Regulated 14.6%
+
+# --- Figure output ---
+figure_dpi: 300
+figure_format: "pdf"
+figure_dir: "figures/manuscript"
+
+# --- ML parameters (Fig 5) ---
+ml:
+  random_seed: 42
+  n_splits: 5              # cross-validation folds
+  n_iter: 100              # RandomizedSearchCV iterations
+
+# --- Manuscript reference ---
+manuscript:
+  version: "v7.4"
+  figures_dir: "manuscript/Figures_v7.1"
+  n_tumors: 328
+  n_markers: 52
+  n_major_celltypes: 12
+  n_subpopulations: 30
+  n_lme_classes: 5

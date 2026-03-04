@@ -12,7 +12,7 @@
 #      Mission.md, Journal.md, journal_summary.md
 #      CLAUDE.md, Snakefile, config.yaml, pyproject.toml
 #
-# Valid data_type: visium | visium_hd | xenium | imc | cosmx
+# Valid data_type: visium | visium_hd | visium_hd_cell | xenium | imc | cosmx
 # =============================================================================
 
 set -e
@@ -26,7 +26,7 @@ fi
 PROJECT_NAME="${1:?Usage: $0 <project_name> <data_type>}"
 DATA_TYPE="${2:?Usage: $0 <project_name> <data_type>}"
 
-VALID_TYPES=(visium visium_hd xenium imc cosmx)
+VALID_TYPES=(visium visium_hd visium_hd_cell xenium imc cosmx)
 if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
   echo "Error: data_type must be one of: ${VALID_TYPES[*]}" >&2
   exit 1

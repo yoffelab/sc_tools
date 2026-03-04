@@ -1,9 +1,9 @@
 # Mission: Two-Panel IMC DLBCL (lymph_dlbcl)
 
-**Project:** `projects/imc/lymph_dlbcl`  
-**Current Status:** Inventory complete; next: identify required files, download, build AnnData  
-**Author:** Junbum Kim  
-**Last Updated:** 2025-02-12
+**Project:** `projects/imc/lymph_dlbcl`
+**Current Status:** Manuscript reproduction — building reproducible Snakemake pipeline
+**Author:** Junbum Kim
+**Last Updated:** 2026-03-04
 
 This file holds **project-specific** goals. Repository-level pipeline and phase definitions are in the root `Mission.md` and `Architecture.md`.
 
@@ -11,109 +11,135 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 
 ## 1. Objective
 
-- **Scientific:** Two-panel Hyperion IMC project on DLBCL (diffuse large B-cell lymphoma). The two panels are **immune** and **stromal**; keep them **separate** (e.g. separate h5ad per panel). Produce multiple h5ad files aligned with sc_tools IMC conventions and other IMC projects in this repo.
-- **Operational (priority order):** (1) Build file inventory and **identify any already-processed data** from the previous analyst; **reuse it** if suitable. (2) **Only if** suitable processed outputs are not found, process raw data and run the sc_tools pipeline (ingestion → preprocessing → checkpoint AnnData). Do not re-process from raw when existing processed data can be picked up.
+- **Scientific:** Reproduce all figures from the DLBCL IMC manuscript "Integrative spatial analysis reveals a hierarchy of cellular organization in diffuse large B-cell lymphoma" (v7.4). 328 treatment-naive tumors, 52 markers across 2 IMC panels (immune + stromal), 12 major cell types -> 30 subpopulations, 5 LME (lymphoma microenvironment) classes.
+- **Operational:** Hybrid approach — reuse existing Seurat-converted h5ad objects (47 files on cayuga) for cell typing/labels, consolidate into sc_tools checkpoint format. Reproduce all 13 figures (5 main + 8 supplementary) in a reproducible Snakemake pipeline.
+- **Runtime:** cayuga (`/home/fs01/juk4007/elementolab/sc_tools/projects/imc/lymph_dlbcl`). Data already present there.
+- **Panels:** T2 (immune) + S2 (stromal) — most complete iterations with DLC_code and cell type labels.
 
 ---
 
 ## 2. Context and Conventions
 
-- **Remote data (read-only reference):** `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` (cayuga or equivalent).
+- **Remote data (read-only reference):** `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` (cayuga).
 - **Local project root:** `./projects/imc/lymph_dlbcl/`.
-- **Existing assets:** Processing notebooks are in `notebooks/dlbcl_notebooks/DLBCLv2/` (two panels: **immune**, **stromal**; preprocessing per panel, merged analyses, clinical, spatial, vessel, etc.).
-- **Target:** Standard checkpoint nomenclature per root `Architecture.md`; **keep immune and stromal panels separate** (e.g. `results/adata.immune.normalized.p3.h5ad`, `results/adata.stromal.normalized.p3.h5ad`, or equivalent).
+- **Existing assets:** 47 Seurat-converted h5ad in `results/seurat_converted/`; notebooks in `notebooks/dlbcl_notebooks/DLBCLv2/`; manuscript in `manuscript/`.
+- **Target:** Standard checkpoint nomenclature per root `Architecture.md`; **keep immune and stromal panels separate**.
+- **Manuscript figures:** `manuscript/Figures_v7.1/` (Adobe Illustrator originals for visual comparison).
 
 ---
 
-## 3. Phase Alignment (sc_tools Phasing Scheme)
+## 3. Figures to Reproduce
 
-| Phase | lymph_dlbcl Status | Notes |
-|-------|--------------------|--------|
-| **1** | Pending | Data ingestion: CSVs (and any mcd/txt) → AnnData; QC. |
-| **2** | Pending | Metadata attachment (sample, clinical). |
-| **3** | Pending | Preprocessing, normalization, clustering (no cell typing in Phase 3). |
-| **3.5b** | Pending | Gene scoring, automated cell typing, optional deconvolution. |
-| **4** | Pending | Manual cell typing (if needed). |
-| **5–7** | Pending | Downstream biology; optional meta analysis. |
-
-Entry point for this project: start at **planning and inventory** (below), then Phase 1 once CSVs and descriptors are mapped.
+| Figure | Content | Key Data |
+|--------|---------|----------|
+| **Fig 1** | Single-cell atlas: UMAP, marker heatmap, dotplot, cell proportions | Both panels, celltyped P4 |
+| **Fig 2** | 5 LME classes: complex heatmap, abundance, IMC images | TME cluster assignments, cell proportions |
+| **Fig 3** | Clinical: KM curves (OS/PFS), COO, mutations | Clinical CSV, mutation table, survival data |
+| **Fig 4** | Spatial: 20 communities, neighborhood enrichment | Spatial community h5ad (k=30 kNN) |
+| **Fig 5** | ML: ROC, feature importance, IHC validation | TME z-scores, IHC data, clinical |
+| **Supp 1** | Panel composition and QC metrics | Marker lists, intensity distributions |
+| **Supp 2** | B cell subcluster analysis | B cell subset, re-clustering, marker heatmap |
+| **Supp 3** | T cell/myeloid characterization | T cell + myeloid subsets, markers, proportions |
+| **Supp 4** | Vessel analysis | Endothelial subsets, vessel density per LME |
+| **Supp 5** | TME clustering sensitivity | Alternative k values, stability analysis |
+| **Supp 6** | Mutation landscape | Per-gene mutation rates, co-occurrence, LME enrichment |
+| **Supp 7** | RNA-protein comparison (CosMx) | IMC protein vs CosMx RNA correlation |
+| **Supp 8** | Extended survival and IHC validation | Multivariate Cox, subgroup KM, IHC-based TME prediction |
 
 ---
 
-## 4. Planning Roadmap (Current Priority)
+## 4. Implementation Phases
 
-**Priority:** Reuse the previous analyst’s **already-processed data** when the inventory shows it exists and is suitable. **Process raw data only if** we cannot find or use that processed output.
+### Phase 0: Data Audit and Organization
 
-### Step 1: Remote file inventory and directory-structure dataframe (first deliverable)
+- [x] Step 1: Remote file inventory and h5ad conversion (47 files)
+- [ ] **0.1** Download missing clinical/metadata from cayuga (`scripts/download_clinical_metadata.sh`)
+- [ ] **0.2** Validate key h5ad objects (`scripts/validate_h5ad_objects.py`)
+- [ ] **0.3** Map cell type labels to manuscript nomenclature (`metadata/celltype_map_immune.json`, `metadata/celltype_map_stromal.json`)
 
-1. **Obtain remote file listing (no bulk download):**
-   - On remote (e.g. `ssh cayuga`): run `find` under `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` for all `*.csv` (and optionally other processed outputs: e.g. `*.h5ad`, `*.rds`, `*.h5`); capture relative path, size, and optionally directory depth.
-   - Save raw listing (e.g. `metadata/remote_csv_listing.txt` or equivalent) if useful for reproducibility.
+### Phase 1: AnnData Construction (Per Panel)
 
-2. **Build a dataframe of CSV (and other key) files with descriptors:**
-   - Columns: at least `relative_path`, `remote_full_path`, `size_bytes`, `parent_dir`, `filename`; add **descriptor** and **inferred_role** by cross-referencing:
-     - **Project tree:** folder names and path structure (e.g. immune vs stromal preprocessing, stroma_spatial, total_tumor, clinical_analysis).
-     - **Notebooks:** scan `notebooks/dlbcl_notebooks/DLBCLv2/**/*.ipynb` for path references to infer which file is used where (e.g. immune-panel merged counts, stromal-panel cell IDs, clinical metadata, **or already-processed objects**).
-   - Human-in-loop: review and fill descriptor and `inferred_role`; **flag candidates for “already processed”** (e.g. merged expression matrices, cluster annotations, Seurat/AnnData intermediates).
+- [ ] **1.1** Build panel checkpoints from T2/S2 preprocessing objects (`scripts/build_panel_adata.py`)
+- [ ] **1.2** Attach clinical metadata (`scripts/attach_clinical_metadata.py`)
+- [ ] **1.3** Build celltyped checkpoints (P4)
+- [ ] **1.4** Build spatial community object (`scripts/build_spatial_adata.py`)
 
-3. **Store the inventory in project metadata (two artifacts for traceability):**
-   - **`metadata/remote_file_inventory.csv`** — Script output (Step 2a); reproducible; `detailed_descriptor` empty.
-   - **`metadata/remote_file_inventory_annotated.csv`** — Same columns with **detailed_descriptor** filled (Step 2b: human or AI, or via `scripts/annotate_inventory_descriptors.py`). Use the annotated file for deciding what to download and for documentation.
+### Phase 2: QC and Normalization Verification
 
-4. **Document in Journal.md:** decisions on column names, descriptor taxonomy, and any script used to generate the inventory.
+- [ ] **2.1** Verify normalization (`scripts/verify_normalization.py`)
+- [ ] **2.2** QC report (`scripts/run_qc_report.py`)
 
-### Step 2 (priority): Identify required files and reuse existing processed data
+### Phase 3: Cell Typing Validation and LME Construction
 
-- **What we need to download:** Expression matrices with **cells as observations** (rows). Priority: **(1) Normalized** expression matrix per panel — we will run the sc_tools pipeline on normalized data. **(2) Raw** expression matrix per panel — if we can reassemble or identify raw cell-by-marker tables on the remote, we should download those too so we have both raw and normalized available (e.g. for QC, backup `adata.raw`, or re-normalization). From the inventory and notebook review, identify which remote files correspond to these.
-- **Identify required files:** Mark in the inventory (or `metadata/files_to_download.csv`) which paths are: (a) **normalized** expression (cells = observations) for immune and stromal panels; (b) **raw** expression (cells = observations) for each panel when available. Include any cell metadata or sample IDs needed to build AnnData.
-- **Download required files:** Download only those identified files to the local project (e.g. `data/downloaded/`). Use a documented method (e.g. `rsync`, `scp`) and keep `metadata/download_manifest.csv` for traceability.
-- **Build AnnData:** Use normalized data as the primary input for the sc_tools pipeline. Where raw expression was downloaded, reassemble into AnnData and store raw counts (e.g. in `adata.X` or `adata.layers['raw']`) so we retain both; otherwise build from normalized only.
-- **If suitable processed data is found:** Map to our checkpoint names; write `results/adata.immune.*.h5ad` and `results/adata.stromal.*.h5ad` (and shared metadata as needed). Skip re-processing from raw for that panel when normalized (and optionally raw) are already available.
-- **If not found (or only partially):** Proceed to Step 3 for the missing panel(s) or samples.
+- [ ] **3.1** Validate cell types (`scripts/validate_celltypes.py`)
+- [ ] **3.2** Assign LME classes (`scripts/build_lme_classes.py`)
 
-### Step 3 (fallback): Process raw data only when needed
+### Phase 4: Figure Reproduction
 
-- **Only if** we cannot find or use existing processed data: scripted ingestion from raw CSVs (and any mcd/txt) into AnnData; QC; write `results/adata.immune.raw.p1.h5ad` and/or `results/adata.stromal.raw.p1.h5ad` and then run preprocessing. Keep immune and stromal pipelines separate.
+- [ ] **4.1** Fig 1: Single-cell atlas (`scripts/fig1_single_cell_atlas.py`)
+- [ ] **4.2** Fig 2: LME classes (`scripts/fig2_lme_classes.py`)
+- [ ] **4.3** Fig 3: Clinical (`scripts/fig3_clinical.py`)
+- [ ] **4.4** Fig 4: Spatial (`scripts/fig4_spatial.py`)
+- [ ] **4.5** Fig 5: ML framework (`scripts/fig5_ml_framework.py`)
+- [ ] **4.6** Supp 1: QC panels (`scripts/supp_fig1_qc_panels.py`)
+- [ ] **4.7** Supp 2: B cell (`scripts/supp_fig2_bcell.py`)
+- [ ] **4.8** Supp 3: T cell/myeloid (`scripts/supp_fig3_tcell_myeloid.py`)
+- [ ] **4.9** Supp 4: Vessel (`scripts/supp_fig4_vessel.py`)
+- [ ] **4.10** Supp 5: TME sensitivity (`scripts/supp_fig5_tme_sensitivity.py`)
+- [ ] **4.11** Supp 6: Mutations (`scripts/supp_fig6_mutations.py`)
+- [ ] **4.12** Supp 7: RNA-protein (`scripts/supp_fig7_rna_protein.py`)
+- [ ] **4.13** Supp 8: Extended survival (`scripts/supp_fig8_extended_survival.py`)
+
+### Phase 5: Snakemake Pipeline
+
+- [ ] **5.1** `config.yaml` with project parameters
+- [ ] **5.2** `Snakefile` with full DAG
+
+### Phase 6: Verification
+
+- [ ] **6.1** Visual comparison with `manuscript/Figures_v7.1/` originals
+- [ ] **6.2** Numerical validation (cell counts, LME sizes, KM p-values, AUC)
+- [ ] **6.3** End-to-end Snakemake run
 
 ---
 
 ## 5. Completed Tasks
 
 - [x] Create project layout: `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`, and planning docs.
-- [x] Step 1: Remote file listing obtained (Option B); inventory script run; **annotated inventory** produced and stored as **`metadata/remote_file_inventory_annotated.csv`** (script output kept as `metadata/remote_file_inventory.csv` for traceability).
-- [ ] Step 2: Identify required files from annotated inventory; download; build AnnData for immune and stromal panels.
+- [x] Step 1: Remote file listing obtained; inventory script run; annotated inventory produced (`metadata/remote_file_inventory_annotated.csv`).
+- [x] RDS metadata extracted (47 files + notebook traceability); Seurat-to-h5ad conversion done (48 objects in `results/seurat_converted/`).
 
 ---
 
-## 6. Active Tasks (Roadmap)
+## 6. Key Files
 
-- [x] **Step 1.1:** Remote listing obtained (Option B); stored in `metadata/remote_csv_listing.txt`.
-- [x] **Step 1.2:** Inventory script run; notebook references and heuristics in `metadata/remote_file_inventory.csv`.
-- [x] **Step 1.3:** **Detailed descriptors** filled via `scripts/annotate_inventory_descriptors.py`; output stored as **`metadata/remote_file_inventory_annotated.csv`** (original script output unchanged for traceability).
-- [ ] **Step 2 (priority):** Using **`metadata/remote_file_inventory_annotated.csv`**, identify **required** files: (1) normalized expression (cells as observations) per panel; (2) raw expression per panel if available; (3) cell metadata/sample IDs. Record in `metadata/files_to_download.csv`; download to `data/downloaded/`; keep `metadata/download_manifest.csv`; build AnnData into `results/adata.immune.*.h5ad` and `results/adata.stromal.*.h5ad`.
-- [ ] **Step 3 (fallback):** For panel(s) with no suitable processed data, run Phase 1 from raw; keep immune and stromal separate.
-
----
-
-## 7. Traceability and Reproducibility
-
-- **Scripts:** All steps that can be automated (inventory build, notebook scan, download manifest) live under `scripts/` with clear inputs and outputs. Each script logs or writes to `metadata/` or `outputs/` so the pipeline is reproducible.
-- **Documented commands:** Remote `find` and download commands (e.g. `rsync`/`scp`) are recorded in this repo (e.g. in `scripts/README.md` or a runbook in `metadata/`) so anyone can re-run the listing and download steps.
-- **Manifests:** Keep a manifest of downloaded files (remote path, local path, date, checksum optional) in `metadata/` (e.g. `metadata/download_manifest.csv`) after downloading required files.
-- **Inventory:** Script output = `metadata/remote_file_inventory.csv` (reproducible). Annotated version with natural-language descriptors = **`metadata/remote_file_inventory_annotated.csv`** (separate file for traceability; use for downstream decisions).
-- **Journal:** Log material decisions (which files were chosen as “required”, download date, script versions) in `Journal.md`.
+| What | Where |
+|------|-------|
+| Immune full (T2) | `results/seurat_converted/tcell_2_preprocessing/t2_SO_seurat.h5ad` (1.63M cells, 49 vars, has DLC_code + labels) |
+| Stromal full (S2) | `results/seurat_converted/stroma_2_preprocessing/S1_seurat_SO.h5ad` (1.55M cells, 50 vars) |
+| Immune merged | `results/seurat_converted/tcell_merged/SO2_seurat_bcell.h5ad` (979K cells, has DLC_code + labels) |
+| Stromal merged | `results/seurat_converted/stroma_merged/SO2_seurat_bcell.h5ad` (1.17M cells, has meta + recluster) |
+| Spatial communities | `results/seurat_converted/stroma_spatial/SO_k30_community_cluster.h5ad` (1.65M cells, cluster + community) |
+| TME object | `results/seurat_converted/s_tme_seurat.h5ad` (576 obs, 34 vars) |
+| h5ad inventory | `metadata/h5ad_inventory_summary.csv` (48 rows) |
+| Remote file inventory | `metadata/remote_file_inventory_annotated.csv` |
+| Manuscript | `manuscript/DLBCL_hyperion_draft_v7.4_comments.docx` |
+| Original figures | `manuscript/Figures_v7.1/` (Adobe Illustrator) |
 
 ---
 
-## 8. Blockers and Sanity Checks
+## 7. Risks and Mitigations
 
-- **Blocker:** Do not assume all data is local; plan around remote path access (SSH + find/rsync/scp as needed).
-- **Sanity:** Descriptor and inferred_role should be consistent and reviewable so we know which files feed which panel (immune vs stromal) and whether to reuse as processed or ingest as raw.
+1. **Missing sample mapping for stromal panel** — S2 objects lack DLC_code. Mitigation: use cell ID CSVs or orig.ident mapping.
+2. **Spatial coordinates** — may be stored differently in Seurat vs AnnData. Mitigation: extract from quant CSVs.
+3. **ML reproducibility** — random seed dependent. Mitigation: fix seed, report CI.
+4. **R-to-Python porting** — original analysis in R. Mitigation: validate outputs numerically, not pixel-perfect.
 
 ---
 
-## 9. Technical Decision Log (Reference this project's Journal.md)
+## 8. Traceability and Reproducibility
 
-- **Inventory columns:** `relative_path`, `remote_full_path`, `size_bytes`, `parent_dir`, `filename`, `descriptor`, `inferred_role` (to be refined in Step 1 and logged in Journal.md).
-- **Descriptor source:** Project tree + notebook path references; human review for final labels. **Panels:** immune and stromal; keep separate. **Priority:** reuse existing processed data; process raw only if needed.
-- **Required download content:** Normalized expression matrix (cells = observations) per panel — primary; run sc_tools pipeline on normalized. Raw expression matrix (cells = observations) per panel — download when we can reassemble/identify it so we have both raw and normalized (e.g. for adata.raw or re-normalization).
+- **Scripts:** All automated steps live under `scripts/` with clear inputs and outputs.
+- **Manifests:** `metadata/download_manifest_phase0.csv` for downloaded files.
+- **Journal:** Log material decisions in `Journal.md`.
+- **Snakemake:** Full pipeline in `Snakefile` + `config.yaml`.

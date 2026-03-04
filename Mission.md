@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2026-03-04 (IMC loader API fix: processed_dir; CosMx required columns)
+**Last Updated:** 2026-03-04
 
 ---
 
@@ -50,10 +50,14 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 #### Phase 0b: Load into AnnData / SpatialData
 
 - [x] **Modality loaders (implemented):** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`. Each sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
-- [ ] **CosMx loader:** `load_cosmx_sample()` — reads flat CSV/Parquet files or RDS (via rpy2+anndata2ri) from NanoString/AtoMx output. Sets spatial coordinates from cell centroid (x, y in microns). Batch TSV schema: `sample_id`, `cosmx_dir`, `batch`.
+- [ ] **CosMx loader (deprioritized):** `load_cosmx_sample()` — reads flat CSV/Parquet files or RDS (via rpy2+anndata2ri) from NanoString/AtoMx output. Sets spatial coordinates from cell centroid (x, y in microns). Batch TSV schema: `sample_id`, `cosmx_dir`, `batch`. Three panel tiers with different output characteristics:
+  - **CosMx 1k:** ~1,000-plex targeted panel; flat CSV/Parquet export from AtoMx.
+  - **CosMx 6k:** ~6,000-plex panel; larger expression matrices; same flat file format.
+  - **CosMx full_library:** Whole-transcriptome (~18k genes); significantly larger files; may require chunked loading or backed AnnData.
 - [x] **visium_hd_cell modality:** SpaceRanger 4 cell segmentation support. `load_visium_hd_cell_sample()` reads from `outs/cell_segmentation/`. Cell-level QC thresholds (like xenium). Routes to xenium recipe in `preprocess()`. `create_project.sh` accepts `visium_hd_cell` as valid data type.
 - [x] **Concatenation:** `concat_samples()` merges per-sample AnnData with `calculate_qc_metrics()` applied.
-- [ ] **Phase 0b checkpoint:** Per-sample `data/{sample_id}/adata.p0.h5ad` saved by `scripts/ingest.py` before concatenation. Snakemake rule `adata_p0` produces sentinel `data/{sample_id}/.adata.p0.done`.
+- [ ] **IMC end-to-end ingestion pipeline (priority):** Wire `build_imc_pipeline_cmd()` + `load_imc_sample()` into a complete Snakemake workflow for IMC projects. Includes: Phase 0a Snakemake rules (run ElementoLab pipeline per MCD on HPC → `processed/{sample}/`), Phase 0b rules (load each sample → `data/{sample_id}/adata.p0.h5ad`), and batch manifest templates for IMC (`metadata/phase0/`). Must be done **before** the generic checkpoint script below. Target projects: lymph_dlbcl, ggo-imc.
+- [ ] **Phase 0b checkpoint script:** Per-sample `data/{sample_id}/adata.p0.h5ad` saved by `scripts/ingest.py` before concatenation. Snakemake rule `adata_p0` produces sentinel `data/{sample_id}/.adata.p0.done`. Depends on IMC ingestion pipeline being wired first.
 - [ ] **SpatialData (optional):** `data/{sample_id}/spatialdata.zarr` for Visium HD and Xenium when full image pyramids / subcellular coords needed. Loader via `spatialdata-io`.
 
 ### Checkpoint Validation
@@ -230,16 +234,28 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Publication figure guidelines (skills.md §12):** Journal-specific standards for Nature/Cell/Science families. Dimension/DPI/font tables, Okabe-Ito and Paul Tol color-blind safe palettes, statistical reporting requirements, line weights, scale bars, marsilea for composite figures, pre-submission checklist. `pyproject.toml [viz]` extra for marsilea.
 - **skills.md reorganization:** Restructured into 4 logical parts: (I) Analysis Pipeline §1-6, (II) Spatial and Integrative Analysis §7-9, (III) Statistical Analysis and Visualization §10-12, (IV) Engineering and CI §13-17. Colors (old §11.5) merged with palettes into §11. References consolidated into Appendix.
 
-### In Progress — Next immediate steps
+### In Progress — Priority order
 
-**Testing (order: 1st ggo_visium, 2nd sc_tools, 3rd functions)**
-- [ ] ggo_visium project tests: `projects/visium/ggo_visium/tests/`. Integration/smoke tests for Makefile and scripts.
-- [ ] sc_tools package tests: `sc_tools/tests/`. Unit tests for pl, tl, qc with synthetic fixtures.
-- [ ] Add pytest to pyproject.toml / requirements.
+**1. IMC ingestion pipeline (next)**
+- [ ] Wire end-to-end IMC Snakemake workflow (Phase 0a → 0b) for lymph_dlbcl and ggo-imc.
+- [ ] Create IMC batch manifest templates under `metadata/phase0/`.
+- [ ] Validate against existing processed data on HPC.
 
-**Makefile & scripts**
-- [ ] Align Makefile targets with Phases 0–7 (see README Pipeline Workflow).
-- [ ] Update scripts to use `$(PROJECT)/metadata/` instead of `metadata/`. Affected: score_gene_signatures.py, tumor_differences.py, tls_analysis.py, manuscript_spatial_plots.py, celltyping.py, etc.
+**2. PyPI deployment (CI/CD step 4)**
+- [ ] Ensure `pyproject.toml` builds clean wheel/sdist.
+- [ ] GitHub Action for publishing on release (trusted publishing).
+
+**3. Phase 0b checkpoint script**
+- [ ] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.p0.h5ad`.
+- [ ] Snakemake rule `adata_p0` with sentinel `data/{sample_id}/.adata.p0.done`.
+
+**4. Testing**
+- [ ] ggo_visium project tests: `projects/visium/ggo_visium/tests/`. Integration/smoke tests.
+- [ ] sc_tools package tests: `sc_tools/tests/`. Expand unit tests for pl, tl, qc.
+
+**5. Makefile and scripts cleanup**
+- [ ] Align Makefile targets with Phases 0–7.
+- [ ] Update scripts to use `$(PROJECT)/metadata/` paths.
 - [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
 
 ### CI/CD Roadmap
@@ -258,7 +274,7 @@ Sequential; each step builds on the previous. See skills.md Sections 13 and 16.
 
 - [ ] Organize production scripts by phase within project.
 - [ ] Update imports to use `sc_tools.pl.*`, `sc_tools.tl.*` everywhere.
-- [ ] imc-analysis: review, identify functionalities, integrate into `sc_tools`.
+- [ ] CosMx loader: `load_cosmx_sample()` for 1k/6k/full_library panels (deprioritized; no active CosMx project).
 - [ ] Documentation: migration guide, docstrings, API docs.
 
 ### Operational notes

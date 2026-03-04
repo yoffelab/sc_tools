@@ -143,7 +143,7 @@ Run Space Ranger, Xenium Ranger, or the IMC pipeline on raw FASTQs / images to p
 | Visium HD / Visium HD Cell | `sample_id`, `fastq_dir`, `cytaimage`, `slide`, `area`, `batch` |
 | Xenium | `sample_id`, `xenium_dir`, `batch` |
 | IMC | `sample_id`, `mcd_file`, `panel_csv`, `batch` |
-| CosMx | `sample_id`, `cosmx_dir`, `batch` — flat files / RDS converted to AnnData in Phase 0b |
+| CosMx | `sample_id`, `cosmx_dir`, `panel_tier` (1k/6k/full_library), `batch` — flat files / RDS converted to AnnData in Phase 0b |
 
 **Snakemake:** `spaceranger_count` (or equivalent) per-sample rule; `phase0` target expands all samples from `all_samples.tsv`.
 
@@ -166,7 +166,11 @@ Convert per-sample platform outputs into portable AnnData (or SpatialData) objec
 | IMC | `load_imc_sample()` | `data/{sample_id}/adata.p0.h5ad` |
 | CosMx | `load_cosmx_sample()` | `data/{sample_id}/adata.p0.h5ad` |
 
-**CosMx loading:** CosMx output is flat CSV / Parquet files (or RDS from NanoString software). `load_cosmx_sample()` reads the expression matrix, FOV coordinates, and cell metadata; converts to AnnData with `obsm['spatial']` set from cell centroid coordinates (x, y in microns). RDS inputs require `rpy2` + `anndata2ri`; flat file inputs use `pandas` + `squidpy` for spatial graph construction.
+**CosMx loading (deprioritized):** CosMx output is flat CSV / Parquet files (or RDS from NanoString software). `load_cosmx_sample()` reads the expression matrix, FOV coordinates, and cell metadata; converts to AnnData with `obsm['spatial']` set from cell centroid coordinates (x, y in microns). RDS inputs require `rpy2` + `anndata2ri`; flat file inputs use `pandas` + `squidpy` for spatial graph construction. Three panel tiers exist with different scale characteristics:
+
+- **CosMx 1k:** ~1,000-plex targeted panel. Standard flat CSV/Parquet export from AtoMx.
+- **CosMx 6k:** ~6,000-plex panel. Larger expression matrices; same flat file format.
+- **CosMx full_library:** Whole-transcriptome (~18k genes). Significantly larger files; may require chunked loading or backed AnnData (`adata.X` as sparse on disk).
 
 Each loader sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`, and ensures `X` contains raw counts. See Section 2.2 for full requirements.
 

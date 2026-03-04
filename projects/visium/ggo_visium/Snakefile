@@ -6,11 +6,49 @@
 
 configfile: "config.yaml"
 
+import os
+
 ROOT = config["repo_root"]
 PROJECT = config["project_rel"]
 
 def run_container(script):
     return f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
+
+# ---- Phase 0: Upstream Raw Data Processing ----
+import pandas as pd
+
+PHASE0_DIR = "metadata/phase0"
+
+def load_phase0_manifest():
+    all_tsv = f"{PHASE0_DIR}/all_samples.tsv"
+    if os.path.exists(all_tsv):
+        return pd.read_csv(all_tsv, sep="\t")
+    return pd.DataFrame()
+
+PHASE0_MANIFEST = load_phase0_manifest()
+PHASE0_SAMPLES = list(PHASE0_MANIFEST["sample_id"]) if len(PHASE0_MANIFEST) > 0 else []
+
+rule spaceranger_count:
+    output: directory("data/{sample_id}/outs")
+    params:
+        row=lambda wc: PHASE0_MANIFEST[PHASE0_MANIFEST["sample_id"] == wc.sample_id].iloc[0]
+    threads: 16
+    resources: mem_mb=64000
+    shell:
+        """
+        spaceranger count \
+            --id={wildcards.sample_id} \
+            --transcriptome={config[transcriptome]} \
+            --fastqs={params.row[fastq_dir]} \
+            --image={params.row[image]} \
+            --slide={params.row[slide]} \
+            --area={params.row[area]} \
+            --localcores={threads} --localmem=64 \
+            --output-dir=data/{wildcards.sample_id}
+        """
+
+rule phase0:
+    input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
 
 # ---- Phase 1: Data Ingestion & QC ----
 rule adata_annotation:
@@ -23,8 +61,13 @@ rule adata_annotated_p2:
     input: "results/adata.annotation.h5ad", "scripts/annotation2mask_img.py"
     shell: run_container("scripts/annotation2mask_img.py")
 
-rule phase1:
+rule validate_p2:
     input: "results/adata.annotated.p2.h5ad"
+    output: touch("results/.adata.annotated.p2.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.annotated.p2.h5ad --phase p2 --fix"
+
+rule phase1:
+    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated"
 
 # ---- Phase 2: Metadata Attachment ----
 # (metadata already joined in Phase 1 for this project)
@@ -51,8 +94,13 @@ rule scvi_leiden_phenotyped:
 
 rule adata_p35:
     output: "results/adata.normalized.scored.p35.h5ad"
-    input: "results/adata.annotated.p2.h5ad", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
+    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
     shell: run_container("scripts/score_gene_signatures.py")
+
+rule validate_p35:
+    input: "results/adata.normalized.scored.p35.h5ad"
+    output: touch("results/.adata.normalized.scored.p35.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.scored.p35.h5ad --phase p35 --fix"
 
 DECONV_METHOD = config.get("deconv_method", "cell2location")
 

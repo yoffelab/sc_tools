@@ -21,6 +21,9 @@ This document outlines the directory structure, data flow, and script inventory.
 │   ├── pl/                  # Plotting: spatial, heatmaps, statistical, volcano, save
 │   ├── tl/                  # Tools: testing, colocalization, deconvolution, io
 │   ├── qc/                  # QC: calculate_qc_metrics, filter_cells, filter_genes, highly_variable_genes, spatially_variable_genes
+│   ├── pp/                  # Preprocessing: normalization, integration, clustering, recipes
+│   ├── ingest/              # Phase 0: batch manifests, command builders, modality loaders
+│   ├── validate.py          # Checkpoint validation (p1-p4) per Architecture.md Section 2.2
 │   ├── memory/              # Profiling, GPU
 │   ├── utils/               # Signatures, versioned save helpers
 │   └── tests/               # Package unit tests (pytest)
@@ -61,6 +64,8 @@ All of the following live under `projects/<platform>/<project_name>/`. **Checkpo
 
 | Phase | Standard path | Description |
 |-------|----------------|-------------|
+| **0** | `data/{sample_id}/outs/` | Per-sample upstream output (Space Ranger, Xenium Ranger, IMC). |
+| **0** | `metadata/phase0/all_samples.tsv` | Collected batch manifest (auto-generated). |
 | **1** | `results/adata.raw.p1.h5ad` | Raw unnormalized AnnData after ingestion and QC. |
 | **2** | `results/adata.annotated.p2.h5ad` | AnnData with clinical/sample metadata (and masks if applicable) attached. |
 | **3** | `results/adata.normalized.p3.h5ad` | Filtered, normalized, batch-corrected, clustered (no cell typing). |
@@ -115,6 +120,37 @@ Gene signature scoring uses `sc_tools.tl.score_signature` and writes **obsm** (`
 ---
 
 ## 3. Phase Details and Data Flow
+
+### Phase 0: Upstream Raw Data Processing
+
+**Purpose:** Run platform-specific upstream tools (Space Ranger, Xenium Ranger, IMC pipeline) on HPC before Phase 1 ingestion. Batch-based processing with collected manifest.
+
+**Batch manifest system:**
+- Per-batch TSV files under `metadata/phase0/` (e.g., `batch1_samples.tsv`, `batch2_samples.tsv`)
+- `sc_tools.ingest.collect_all_batches()` concatenates all batch TSVs into `metadata/phase0/all_samples.tsv`
+- Each TSV has modality-specific columns (see `sc_tools.ingest.config.REQUIRED_COLUMNS`)
+
+**Visium / Visium HD TSV schema:** `sample_id`, `fastq_dir`, `image` (Visium) or `cytaimage` (Visium HD), `slide`, `area`, `batch`
+
+**Xenium TSV schema:** `sample_id`, `xenium_dir`, `batch`
+
+**IMC TSV schema:** `sample_id`, `mcd_file`, `panel_csv`, `batch`
+
+**CosMx:** No Phase 0 (data assumed pre-processed).
+
+**Snakemake:** Each project Snakefile includes a `phase0` target and per-sample `spaceranger_count` (or equivalent) rules driven by the manifest. The `phase0` target expands to all samples in `all_samples.tsv`.
+
+**Command builders:** `sc_tools.ingest.spaceranger.build_spaceranger_count_cmd()`, `sc_tools.ingest.xenium.build_xenium_ranger_cmd()`, `sc_tools.ingest.imc.build_imc_pipeline_cmd()`.
+
+**Outputs:** `data/{sample_id}/outs/` per sample. Phase 1 loads these via `sc_tools.ingest.loaders`.
+
+### Checkpoint Validation
+
+Each checkpoint (p1 through p4) has a validation sentinel rule in the Snakefile. The sentinel file `results/.adata.{name}.validated` is created by `scripts/validate_checkpoint.py` which calls `sc_tools.validate.validate_checkpoint()`. Downstream rules depend on the sentinel, ensuring metadata contracts (Section 2.2) are enforced before the next phase.
+
+**CLI:** `python scripts/validate_checkpoint.py <path> --phase <p1|p2|p3|p35|p4> [--fix] [--warn-only]`
+
+**Auto-fix (--fix):** Renames `obs['batch']` to `obs['raw_data_dir']` (p1 only). All other issues require human intervention.
 
 ### Phase 1: Data Ingestion & QC
 

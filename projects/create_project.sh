@@ -188,6 +188,9 @@ cat > "${PROJECT_ROOT}/Snakefile" << SNAKEFILE_EOF
 
 configfile: "config.yaml"
 
+import os
+import pandas as pd
+
 ROOT = config["repo_root"]
 PROJECT = config["project_rel"]
 
@@ -195,50 +198,90 @@ def run_container(script, args=""):
     cmd = f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
     return cmd + (f' {args}' if args else '')
 
+# ---- Phase 0: Upstream Raw Data Processing ----
+PHASE0_DIR = "metadata/phase0"
+
+def load_phase0_manifest():
+    all_tsv = f"{PHASE0_DIR}/all_samples.tsv"
+    if os.path.exists(all_tsv):
+        return pd.read_csv(all_tsv, sep="\t")
+    return pd.DataFrame()
+
+PHASE0_MANIFEST = load_phase0_manifest()
+PHASE0_SAMPLES = list(PHASE0_MANIFEST["sample_id"]) if len(PHASE0_MANIFEST) > 0 else []
+
+rule phase0:
+    input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
+
 # ---- Phase 1: Data Ingestion & QC ----
 rule adata_raw_p1:
     output: "results/adata.raw.p1.h5ad"
     input: "scripts/ingest.py"
     shell: run_container("scripts/ingest.py")
 
-rule phase1:
+rule validate_p1:
     input: "results/adata.raw.p1.h5ad"
+    output: touch("results/.adata.raw.p1.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.raw.p1.h5ad --phase p1 --fix"
+
+rule phase1:
+    input: "results/adata.raw.p1.h5ad", "results/.adata.raw.p1.validated"
 
 # ---- Phase 2: Metadata Attachment ----
 rule adata_annotated_p2:
     output: "results/adata.annotated.p2.h5ad"
-    input: "results/adata.raw.p1.h5ad", "metadata/sample_metadata.csv"
+    input: "results/adata.raw.p1.h5ad", "results/.adata.raw.p1.validated", "metadata/sample_metadata.csv"
     shell: run_container("scripts/attach_metadata.py")
 
-rule phase2:
+rule validate_p2:
     input: "results/adata.annotated.p2.h5ad"
+    output: touch("results/.adata.annotated.p2.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.annotated.p2.h5ad --phase p2 --fix"
+
+rule phase2:
+    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated"
 
 # ---- Phase 3: Preprocessing ----
 rule adata_normalized_p3:
     output: "results/adata.normalized.p3.h5ad"
-    input: "results/adata.annotated.p2.h5ad", "scripts/preprocess.py"
+    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated", "scripts/preprocess.py"
     shell: run_container("scripts/preprocess.py")
 
-rule phase3:
+rule validate_p3:
     input: "results/adata.normalized.p3.h5ad"
+    output: touch("results/.adata.normalized.p3.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.p3.h5ad --phase p3 --fix"
+
+rule phase3:
+    input: "results/adata.normalized.p3.h5ad", "results/.adata.normalized.p3.validated"
 
 # ---- Phase 3.5b: Gene Scoring ----
 rule adata_p35:
     output: "results/adata.normalized.scored.p35.h5ad"
-    input: "results/adata.normalized.p3.h5ad", "metadata/gene_signatures.json", "scripts/score_signatures.py"
+    input: "results/adata.normalized.p3.h5ad", "results/.adata.normalized.p3.validated", "metadata/gene_signatures.json", "scripts/score_signatures.py"
     shell: run_container("scripts/score_signatures.py")
 
-rule phase35b:
+rule validate_p35:
     input: "results/adata.normalized.scored.p35.h5ad"
+    output: touch("results/.adata.normalized.scored.p35.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.scored.p35.h5ad --phase p35 --fix"
+
+rule phase35b:
+    input: "results/adata.normalized.scored.p35.h5ad", "results/.adata.normalized.scored.p35.validated"
 
 # ---- Phase 4: Cell Typing ----
 rule adata_celltyped_p4:
     output: "results/adata.celltyped.p4.h5ad"
-    input: "results/adata.normalized.scored.p35.h5ad", "metadata/celltype_map.json", "scripts/apply_celltype.py"
+    input: "results/adata.normalized.scored.p35.h5ad", "results/.adata.normalized.scored.p35.validated", "metadata/celltype_map.json", "scripts/apply_celltype.py"
     shell: run_container("scripts/apply_celltype.py")
 
-rule phase4:
+rule validate_p4:
     input: "results/adata.celltyped.p4.h5ad"
+    output: touch("results/.adata.celltyped.p4.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.celltyped.p4.h5ad --phase p4 --fix"
+
+rule phase4:
+    input: "results/adata.celltyped.p4.h5ad", "results/.adata.celltyped.p4.validated"
 
 # ---- Default ----
 rule all:

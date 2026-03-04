@@ -17,6 +17,7 @@
 
 | Phase | Name | Notes |
 |-------|------|--------|
+| **0** | Upstream Raw Data Processing | Space Ranger / Xenium Ranger / IMC pipeline on HPC; batch manifests under `metadata/phase0/`. |
 | **1** | Data Ingestion & QC | Platform-specific ingestion; QC metrics and reports. |
 | **2** | Metadata Attachment | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. |
 | **3** | Preprocessing | Backup `adata.raw`; filter; normalize; batch correct (e.g. scVI); cluster. No automated cell typing. |
@@ -35,6 +36,21 @@
 ## 2. General Analysis — To-Do and Implementation Status
 
 All paths below are project-specific: `projects/<platform>/<project_name>/...`. Nothing lives at repo root for `metadata/`, `results/`, or `figures/`.
+
+### Phase 0: Upstream Raw Data Processing
+
+- [x] **Batch manifest system:** `sc_tools.ingest.config` — `load_batch_manifest()`, `collect_all_batches()`, `validate_manifest()`. Per-batch TSVs under `metadata/phase0/`; auto-collects into `all_samples.tsv`.
+- [x] **Space Ranger command builder:** `sc_tools.ingest.spaceranger` — `build_spaceranger_count_cmd()`, `build_batch_commands()`. Supports Visium (--image) and Visium HD (--cytaimage).
+- [x] **Xenium Ranger command builder:** `sc_tools.ingest.xenium` — `build_xenium_ranger_cmd()`.
+- [x] **IMC pipeline command builder:** `sc_tools.ingest.imc` — `build_imc_pipeline_cmd()`.
+- [x] **Modality loaders:** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_xenium_sample()`, `load_imc_sample()`, `concat_samples()`. Standardized Phase 1 obs/obsm keys.
+- [x] **Snakemake Phase 0 rules:** `spaceranger_count` and `phase0` target in robin, ggo_visium, and create_project.sh template. Driven by `metadata/phase0/all_samples.tsv`.
+
+### Checkpoint Validation
+
+- [x] **`sc_tools.validate`:** `validate_p1` through `validate_p4`, `validate_checkpoint()` dispatcher, `validate_file()` convenience. Auto-fix: `obs['batch']` to `obs['raw_data_dir']` (p1). 30 unit tests.
+- [x] **CLI:** `scripts/validate_checkpoint.py` — `--phase`, `--fix`, `--warn-only`. Exit code 1 on failure.
+- [x] **Snakemake validation sentinels:** `results/.adata.{name}.validated` sentinel files in robin, ggo_visium, and create_project.sh template. Downstream rules depend on sentinels.
 
 ### Phase 1: Data Ingestion & QC
 
@@ -198,6 +214,8 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Legacy merged:** `scripts/old_code/` (read-only reference).
 - **Spatial multipage refactor (ggo_visium):** Logic moved from repo-root `scripts/spatial_multipage.py` into `projects/visium/ggo_visium/scripts/spatial_multipage_colocalization.py` using sc_tools: scores from obsm via `get_signature_df`, `multipage_spatial_pdf` and `truncated_similarity` in sc_tools; outputs to `figures/manuscript/macrophage_localization/` and `figures/manuscript/neutrophil_cytotoxic_tcell_localization/`. Repo-root script deprecated (docstring). Makefile target: `make spatial-multipage-colocalization`.
 - **Phase 3 preprocessing module (sc_tools.pp):** Modality-aware preprocessing with GPU auto-detection (rapids-singlecell/scanpy). Normalization (`normalize_total`, `log_transform`, `scale`, `arcsinh_transform`, `filter_genes_by_pattern`, `backup_raw`). Integration (`run_scvi`, `run_harmony`, `run_cytovi`; all soft deps). Reduction/clustering (`pca`, `neighbors` with auto use_rep detection, `umap`, `leiden`, `cluster`, `run_utag`). Recipes: `preprocess(modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc")`. 38 unit tests pass, lint clean. skills.md updated with modality-specific preprocessing standards.
+- **Phase 0 ingestion module (sc_tools.ingest):** Batch manifest system (`config.py`), Space Ranger / Xenium / IMC command builders (`spaceranger.py`, `xenium.py`, `imc.py`), modality-specific AnnData loaders (`loaders.py`). Snakemake Phase 0 rules and validation sentinels in robin, ggo_visium, and create_project.sh template. 26 unit tests pass, lint clean.
+- **Checkpoint validation (sc_tools.validate):** `validate_p1` through `validate_p4` with auto-fix support. CLI wrapper `scripts/validate_checkpoint.py` for Snakemake integration. Validation sentinels enforce Architecture.md Section 2.2 metadata contracts. 30 unit tests pass, lint clean.
 
 ### In Progress — Next immediate steps
 

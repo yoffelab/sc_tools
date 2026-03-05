@@ -511,7 +511,7 @@ def test_qc_sample_scatter_matrix(tmp_path):
 
 
 def test_generate_qc_report(tmp_path):
-    """HTML report is generated successfully."""
+    """HTML report is generated successfully (legacy API)."""
     pytest.importorskip("jinja2")
     from sc_tools.qc import generate_qc_report
 
@@ -526,16 +526,386 @@ def test_generate_qc_report(tmp_path):
     qc_dir.mkdir(parents=True)
 
     output = qc_dir / "qc_report.html"
-    result = generate_qc_report(
-        adata,
-        metrics,
-        classified,
-        figures_dir,
-        output,
-        sample_col="library_id",
-        modality="visium",
-    )
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        result = generate_qc_report(
+            adata,
+            metrics,
+            classified,
+            figures_dir,
+            output,
+            sample_col="library_id",
+            modality="visium",
+        )
     assert result.exists()
     content = result.read_text()
     assert "QC Report" in content
     assert "sample_0" in content
+
+
+# ---------------------------------------------------------------------------
+# New date-versioned QC report tests
+# ---------------------------------------------------------------------------
+
+
+def _qc_fixtures():
+    """Shared fixture: multi-sample adata with QC metrics + classification."""
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=30)
+    calculate_qc_metrics(adata, inplace=True, percent_top=None)
+    metrics = compute_sample_metrics(adata, sample_col="library_id")
+    classified = classify_samples(metrics, modality="visium")
+    return adata, metrics, classified
+
+
+def test_generate_pre_filter_report(tmp_path):
+    """Pre-filter QC HTML is generated with date stamp."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_pre_filter_report
+
+    adata, metrics, classified = _qc_fixtures()
+    result = generate_pre_filter_report(
+        adata,
+        metrics,
+        classified,
+        tmp_path,
+        sample_col="library_id",
+        modality="visium",
+        date_stamp="20260304",
+    )
+    assert result.exists()
+    assert "20260304" in result.name
+    content = result.read_text()
+    assert "Pre-filter QC" in content
+    assert "sample_0" in content
+
+
+def test_generate_post_filter_report(tmp_path):
+    """Post-filter QC HTML is generated with pre-vs-post comparison."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_filter_report
+
+    adata_pre, metrics, classified = _qc_fixtures()
+    # Simulate a post-filter adata by removing a few obs
+    adata_post = adata_pre[10:].copy()
+    calculate_qc_metrics(adata_post, inplace=True, percent_top=None)
+
+    result = generate_post_filter_report(
+        adata_pre,
+        adata_post,
+        metrics,
+        classified,
+        tmp_path,
+        sample_col="library_id",
+        modality="visium",
+        date_stamp="20260304",
+    )
+    assert result.exists()
+    assert "20260304" in result.name
+    content = result.read_text()
+    assert "Post-filter" in content
+
+
+def test_generate_post_integration_report_with_celltype(tmp_path):
+    """Post-integration QC HTML with celltype includes integration metrics."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_integration_report
+
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=30)
+    calculate_qc_metrics(adata, inplace=True, percent_top=None)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obsm["X_pca"] = rng.randn(adata.n_obs, 10).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 5) for i in range(adata.n_obs)])
+    adata.obs["celltype"] = pd.Categorical([f"type_{i % 3}" for i in range(adata.n_obs)])
+    adata.obs["batch"] = adata.obs["library_id"]
+
+    result = generate_post_integration_report(
+        adata,
+        tmp_path,
+        batch_key="batch",
+        celltype_key="celltype",
+        sample_col="library_id",
+        date_stamp="20260304",
+    )
+    assert result.exists()
+    assert "20260304" in result.name
+    content = result.read_text()
+    assert "Post-integration" in content
+
+
+def test_generate_post_integration_report_no_celltype(tmp_path):
+    """Post-integration QC works gracefully without celltype (batch-only)."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_integration_report
+
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=30)
+    calculate_qc_metrics(adata, inplace=True, percent_top=None)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obsm["X_pca"] = rng.randn(adata.n_obs, 10).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 5) for i in range(adata.n_obs)])
+    adata.obs["batch"] = adata.obs["library_id"]
+
+    result = generate_post_integration_report(
+        adata,
+        tmp_path,
+        batch_key="batch",
+        celltype_key=None,
+        sample_col="library_id",
+        date_stamp="20260304",
+    )
+    assert result.exists()
+    content = result.read_text()
+    assert "Post-integration" in content
+
+
+def test_generate_all_qc_reports(tmp_path):
+    """Orchestrator generates all three reports."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_all_qc_reports
+
+    adata, metrics, classified = _qc_fixtures()
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obsm["X_pca"] = rng.randn(adata.n_obs, 10).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 5) for i in range(adata.n_obs)])
+    adata.obs["batch"] = adata.obs["library_id"]
+
+    adata_post = adata[5:].copy()
+    calculate_qc_metrics(adata_post, inplace=True, percent_top=None)
+
+    results = generate_all_qc_reports(
+        adata,
+        metrics,
+        classified,
+        tmp_path,
+        adata_post=adata_post,
+        adata_integrated=adata,
+        sample_col="library_id",
+        date_stamp="20260304",
+    )
+    assert "pre_filter" in results
+    assert "post_filter" in results
+    assert "post_integration" in results
+    for path in results.values():
+        assert path.exists()
+
+
+def test_date_stamp_in_filename(tmp_path):
+    """Date stamp appears in generated filename."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_pre_filter_report
+
+    adata, metrics, classified = _qc_fixtures()
+    result = generate_pre_filter_report(
+        adata,
+        metrics,
+        classified,
+        tmp_path,
+        sample_col="library_id",
+        date_stamp="20991231",
+    )
+    assert "20991231" in result.name
+
+
+def test_backward_compat_generate_qc_report_deprecation(tmp_path):
+    """Legacy generate_qc_report emits DeprecationWarning."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_qc_report
+
+    adata, metrics, classified = _qc_fixtures()
+    qc_dir = tmp_path / "QC"
+    qc_dir.mkdir()
+
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        generate_qc_report(
+            adata,
+            metrics,
+            classified,
+            tmp_path,
+            qc_dir / "report.html",
+            sample_col="library_id",
+        )
+
+
+def test_segmentation_section_no_masks(tmp_path):
+    """Segmentation section returns None when no masks dir exists."""
+    from sc_tools.qc.report_utils import compute_segmentation_section
+
+    adata = _minimal_adata()
+    result = compute_segmentation_section(adata, tmp_path / "nonexistent")
+    assert result is None
+
+
+def test_auto_detect_embeddings():
+    """auto_detect_embeddings finds known keys in adata.obsm."""
+    from sc_tools.qc.report_utils import auto_detect_embeddings
+
+    adata = _minimal_adata(n_obs=20, n_vars=10)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_pca"] = rng.randn(20, 10).astype(np.float32)
+    adata.obsm["X_scVI"] = rng.randn(20, 10).astype(np.float32)
+
+    found = auto_detect_embeddings(adata)
+    assert "scVI" in found
+    assert found["scVI"] == "X_scVI"
+    assert "Unintegrated (PCA)" in found
+
+
+# ---------------------------------------------------------------------------
+# qc_umap_grid and qc_cluster_distribution tests
+# ---------------------------------------------------------------------------
+
+
+def test_qc_umap_grid(tmp_path):
+    """UMAP grid generates without error."""
+    import matplotlib.pyplot as plt
+
+    from sc_tools.pl.qc_plots import qc_umap_grid
+
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=20)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 4) for i in range(adata.n_obs)])
+
+    fig = qc_umap_grid(
+        adata,
+        color_keys=["library_id", "leiden"],
+        output_dir=tmp_path,
+        basename="umap_test",
+    )
+    assert fig is not None
+    assert (tmp_path / "umap_test.png").exists()
+    plt.close(fig)
+
+
+def test_qc_cluster_distribution(tmp_path):
+    """Cluster distribution bar chart generates without error."""
+    import matplotlib.pyplot as plt
+
+    from sc_tools.pl.qc_plots import qc_cluster_distribution
+
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=20)
+    adata.obs["leiden"] = pd.Categorical([str(i % 4) for i in range(adata.n_obs)])
+
+    fig = qc_cluster_distribution(
+        adata,
+        cluster_key="leiden",
+        sample_col="library_id",
+        output_dir=tmp_path,
+        basename="cluster_dist_test",
+    )
+    assert fig is not None
+    assert (tmp_path / "cluster_dist_test.png").exists()
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# Modality-aware terminology tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetModalityTerms:
+    def test_visium_terms(self):
+        from sc_tools.qc.report_utils import get_modality_terms
+
+        t = get_modality_terms("visium")
+        assert t["feature"] == "Gene"
+        assert t["features"] == "Genes"
+        assert t["observation"] == "Spot"
+        assert t["observations"] == "Spots"
+        assert t["has_mt"] is True
+        assert t["intensity_label"] == "Total counts"
+        assert t["feature_count_label"] == "Genes detected"
+
+    def test_imc_terms(self):
+        from sc_tools.qc.report_utils import get_modality_terms
+
+        t = get_modality_terms("imc")
+        assert t["feature"] == "Protein"
+        assert t["features"] == "Proteins"
+        assert t["observation"] == "Cell"
+        assert t["observations"] == "Cells"
+        assert t["has_mt"] is False
+        assert t["intensity_label"] == "Total intensity"
+        assert t["feature_count_label"] == "Proteins detected"
+
+    def test_xenium_terms(self):
+        from sc_tools.qc.report_utils import get_modality_terms
+
+        t = get_modality_terms("xenium")
+        assert t["feature"] == "Gene"
+        assert t["observation"] == "Cell"
+        assert t["has_mt"] is True
+
+    def test_visium_hd_cell_terms(self):
+        from sc_tools.qc.report_utils import get_modality_terms
+
+        t = get_modality_terms("visium_hd_cell")
+        assert t["feature"] == "Gene"
+        assert t["observation"] == "Cell"
+
+
+class TestCalculateQcMetricsImc:
+    def test_imc_no_mt(self):
+        """IMC modality should skip MT pattern automatically."""
+        adata = _minimal_adata(n_obs=30, n_vars=50, mt_genes=0)
+        calculate_qc_metrics(adata, inplace=True, modality="imc", percent_top=(10, 20))
+        assert "total_counts" in adata.obs.columns
+        assert "n_genes_by_counts" in adata.obs.columns
+        # pct_counts_mt should NOT be computed for IMC
+        assert "pct_counts_mt" not in adata.obs.columns
+
+    def test_percent_top_capped(self):
+        """percent_top values exceeding n_vars should be silently dropped."""
+        adata = _minimal_adata(n_obs=20, n_vars=30, mt_genes=0)
+        # Default percent_top=(50,100,200,500) -- all exceed n_vars=30
+        calculate_qc_metrics(adata, inplace=True, modality="imc")
+        assert "total_counts" in adata.obs.columns
+
+
+class TestPreFilterReportTerminology:
+    def test_imc_report_uses_protein(self, tmp_path):
+        """Pre-filter report for IMC should contain 'Protein' not 'Gene'."""
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        calculate_qc_metrics(adata, inplace=True, percent_top=(10, 20))
+
+        from sc_tools.qc import generate_pre_filter_report
+
+        metrics = compute_sample_metrics(adata, sample_col="library_id", modality="imc")
+        classified = classify_samples(metrics, modality="imc")
+
+        try:
+            path = generate_pre_filter_report(
+                adata,
+                metrics,
+                classified,
+                tmp_path,
+                sample_col="library_id",
+                modality="imc",
+            )
+        except ImportError:
+            pytest.skip("jinja2 not installed")
+
+        html = path.read_text()
+        assert "Protein" in html
+        assert "Cell" in html or "cell" in html
+
+
+class TestSegmentationQcReport:
+    def test_no_masks_returns_none(self, tmp_path):
+        """Segmentation report should return None when no masks exist."""
+        from sc_tools.qc import generate_segmentation_qc_report
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        masks_dir = tmp_path / "empty_masks"
+        masks_dir.mkdir()
+
+        result = generate_segmentation_qc_report(
+            adata,
+            masks_dir,
+            tmp_path / "out",
+        )
+        assert result is None

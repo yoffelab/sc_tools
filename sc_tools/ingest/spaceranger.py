@@ -24,6 +24,10 @@ def build_spaceranger_count_cmd(
     cytaimage: str | None = None,
     slide: str | None = None,
     area: str | None = None,
+    probe_set: str | None = None,
+    sample_filter: str | None = None,
+    create_bam: bool = False,
+    spaceranger_path: str = "spaceranger",
     output_dir: str = "data",
     localcores: int = 16,
     localmem: int = 64,
@@ -49,6 +53,14 @@ def build_spaceranger_count_cmd(
         Slide serial number.
     area
         Capture area (e.g., D1, A1).
+    probe_set
+        Path to probe set CSV (SR4 FFPE/Flex assays).
+    sample_filter
+        Value for --sample flag to select FASTQ subset by prefix.
+    create_bam
+        Whether to create BAM output (default False).
+    spaceranger_path
+        Path to spaceranger binary (default "spaceranger").
     output_dir
         Output directory prefix.
     localcores
@@ -69,12 +81,16 @@ def build_spaceranger_count_cmd(
         raise ValueError("Must provide either 'image' (Visium) or 'cytaimage' (Visium HD)")
 
     parts = [
-        "spaceranger count",
+        f"{spaceranger_path} count",
         f"--id={sample_id}",
         f"--transcriptome={transcriptome}",
         f"--fastqs={fastqs}",
     ]
 
+    if probe_set:
+        parts.append(f"--probe-set={probe_set}")
+    if sample_filter:
+        parts.append(f"--sample={sample_filter}")
     if cytaimage:
         parts.append(f"--cytaimage={cytaimage}")
     if image:
@@ -83,6 +99,8 @@ def build_spaceranger_count_cmd(
         parts.append(f"--slide={slide}")
     if area:
         parts.append(f"--area={area}")
+
+    parts.append(f"--create-bam={'true' if create_bam else 'false'}")
 
     parts.extend(
         [
@@ -134,6 +152,8 @@ def build_batch_commands(
             ("cytaimage", "cytaimage"),
             ("slide", "slide"),
             ("area", "area"),
+            ("probe_set", "probe_set"),
+            ("sample_filter", "sample_filter"),
         ]:
             val = row.get(col)
             if val is not None and str(val) not in ("", "nan", "None"):

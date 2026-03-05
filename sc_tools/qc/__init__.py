@@ -28,7 +28,14 @@ from .plots import (
     qc_spatial_multipage,
     qc_violin_metrics,
 )
-from .report import generate_qc_report
+from .report import (
+    generate_all_qc_reports,
+    generate_post_filter_report,
+    generate_post_integration_report,
+    generate_pre_filter_report,
+    generate_qc_report,
+    generate_segmentation_qc_report,
+)
 from .sample_qc import (
     apply_qc_filter,
     classify_samples,
@@ -67,4 +74,9 @@ __all__ = [
     "save_pass_fail_lists",
     "apply_qc_filter",
     "generate_qc_report",
+    "generate_pre_filter_report",
+    "generate_post_filter_report",
+    "generate_post_integration_report",
+    "generate_segmentation_qc_report",
+    "generate_all_qc_reports",
 ]

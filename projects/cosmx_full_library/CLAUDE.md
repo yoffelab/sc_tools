@@ -33,7 +33,7 @@ SC_TOOLS_RUNTIME=none snakemake -d projects/cosmx_full_library -s projects/cosmx
 pytest projects/cosmx_full_library/tests/ -v
 
 # Create conda env (one-time setup, from repo root):
-#   conda create -n cosmx_full_library python=3.10 -y && conda activate cosmx_full_library
+#   conda create -n cosmx_full_library python=3.11 -y && conda activate cosmx_full_library
 #   uv pip install -e ".[deconvolution]"
 ```
 

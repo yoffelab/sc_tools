@@ -258,7 +258,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 **2. PyPI deployment (CI/CD step 4) — DONE**
 - [x] Ensure `pyproject.toml` builds clean wheel/sdist.
 - [x] GitHub Action for publishing on release (trusted publishing).
-- [x] LICENSE file (MIT, Yoffe Lab). `requires-python >= 3.10`. Package-data for bundled JSON/HTML.
+- [x] LICENSE file (MIT, Yoffe Lab). `requires-python >= 3.11`. Package-data for bundled JSON/HTML.
 - [ ] One-time PyPI setup: add trusted publisher for `yoffelab/sc_tools` repo on pypi.org.
 
 **3. Phase 0b checkpoint script**

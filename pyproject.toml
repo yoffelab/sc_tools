@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Scientific analysis tools for spatial and single-cell multiomics"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Junbum Kim" },
 ]
@@ -26,7 +26,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -72,6 +71,8 @@ decoupler = [
 # Batch integration
 integration = [
     "harmonypy",
+    "bbknn",
+    "scanorama",
 ]
 # Spatial clustering
 spatial = [
@@ -125,7 +126,7 @@ include = ["sc_tools*"]
 sc_tools = ["data/*.json", "data/*.html"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 # Lint sc_tools (required). Scripts: add once fixed (run: ruff check scripts --exclude scripts/old_code).
 exclude = [

@@ -1,8 +1,13 @@
 """
-Thin wrappers for running Cellpose and StarDist on IMC multi-channel TIFFs.
+Thin wrappers for running Cellpose and StarDist on IMC data.
 
-Both functions accept a multi-channel intensity TIFF (C, H, W) and return
-a labeled segmentation mask (H, W).
+Both functions accept either:
+- A probability map ``(H, W, C)`` from Ilastik pixel classification (typical
+  IMC pipeline: ``*_Probabilities.tiff`` with 3 channels: background, nucleus,
+  cytoplasm).
+- A multi-channel intensity TIFF ``(C, H, W)`` with explicit channel indices.
+
+Both return a labeled segmentation mask ``(H, W)``.
 """
 
 from __future__ import annotations
@@ -16,6 +21,15 @@ __all__ = ["run_cellpose", "run_stardist"]
 logger = logging.getLogger(__name__)
 
 
+def _normalize(img: np.ndarray) -> np.ndarray:
+    """Normalize a 2D image to [0, 1] float32."""
+    img = img.astype(np.float32)
+    vmin, vmax = img.min(), img.max()
+    if vmax > vmin:
+        img = (img - vmin) / (vmax - vmin)
+    return img
+
+
 def _extract_and_normalize(
     intensity: np.ndarray,
     channel_indices: list[int],
@@ -23,33 +37,41 @@ def _extract_and_normalize(
     """Extract channels from a (C, H, W) array, average, and normalize to [0, 1]."""
     selected = intensity[channel_indices].astype(np.float32)
     combined = np.mean(selected, axis=0)
-    vmin, vmax = combined.min(), combined.max()
-    if vmax > vmin:
-        combined = (combined - vmin) / (vmax - vmin)
-    return combined
+    return _normalize(combined)
 
 
 def run_cellpose(
-    intensity_tiff: np.ndarray,
-    nuclear_channels: list[int],
+    image: np.ndarray,
+    nuclear_channels: list[int] | None = None,
     membrane_channels: list[int] | None = None,
+    nuclear_idx: int = 1,
+    cytoplasm_idx: int = 2,
     model_type: str = "cyto2",
     diameter: float | None = None,
     flow_threshold: float = 0.4,
     cellprob_threshold: float = 0.0,
     gpu: bool = False,
 ) -> np.ndarray:
-    """Run Cellpose segmentation on an IMC multi-channel TIFF.
+    """Run Cellpose segmentation.
 
     Parameters
     ----------
-    intensity_tiff
-        Multi-channel image, shape ``(C, H, W)``.
+    image
+        Either a probability map ``(H, W, C)`` from Ilastik (e.g. 3 channels:
+        background, nucleus, cytoplasm), or a multi-channel intensity TIFF
+        ``(C, H, W)``. Detected automatically from shape.
     nuclear_channels
-        Indices of nuclear channels (e.g. ``[39, 40]`` for DNA1, DNA2).
+        For ``(C, H, W)`` input: indices of nuclear channels. Ignored for
+        ``(H, W, C)`` probability maps.
     membrane_channels
-        Indices of membrane channels (e.g. ``[14]`` for CD45). If None,
-        runs nucleus-only (cyto2 still uses the nuclear channel as ch2).
+        For ``(C, H, W)`` input: indices of membrane channels. Ignored for
+        ``(H, W, C)`` probability maps.
+    nuclear_idx
+        For ``(H, W, C)`` probability maps: index of the nuclear channel
+        (default 1).
+    cytoplasm_idx
+        For ``(H, W, C)`` probability maps: index of the cytoplasm channel
+        (default 2).
     model_type
         Cellpose model type (default ``"cyto2"``).
     diameter
@@ -72,16 +94,31 @@ def run_cellpose(
             "cellpose is required. Install with: pip install 'sc-tools[benchmark]'"
         ) from e
 
-    nuclear = _extract_and_normalize(intensity_tiff, nuclear_channels)
-
-    if membrane_channels is not None and len(membrane_channels) > 0:
-        membrane = _extract_and_normalize(intensity_tiff, membrane_channels)
-        # Cellpose expects shape (2, H, W): channel 0 = cytoplasm/membrane, channel 1 = nucleus
-        img = np.stack([membrane, nuclear], axis=0)
-        channels = [1, 2]  # [cytoplasm, nucleus]
+    # Detect input format
+    if image.ndim == 3 and image.shape[2] <= 4:
+        # (H, W, C) probability map
+        nuclear = _normalize(image[:, :, nuclear_idx])
+        cytoplasm = _normalize(image[:, :, cytoplasm_idx])
+        img = np.stack([cytoplasm, nuclear], axis=0)
+        channels = [1, 2]
+    elif image.ndim == 3 and nuclear_channels is not None:
+        # (C, H, W) multi-channel intensity
+        nuclear = _extract_and_normalize(image, nuclear_channels)
+        if membrane_channels is not None and len(membrane_channels) > 0:
+            membrane = _extract_and_normalize(image, membrane_channels)
+            img = np.stack([membrane, nuclear], axis=0)
+            channels = [1, 2]
+        else:
+            img = nuclear
+            channels = [0, 0]
+    elif image.ndim == 2:
+        img = _normalize(image)
+        channels = [0, 0]
     else:
-        img = nuclear
-        channels = [0, 0]  # grayscale
+        raise ValueError(
+            f"Unexpected image shape {image.shape}. Expected (H, W, C) probability map "
+            f"or (C, H, W) intensity TIFF."
+        )
 
     # Support cellpose v3 (models.Cellpose) and v4+ (models.CellposeModel)
     try:
@@ -102,21 +139,28 @@ def run_cellpose(
 
 
 def run_stardist(
-    intensity_tiff: np.ndarray,
-    nuclear_channels: list[int],
+    image: np.ndarray,
+    nuclear_channels: list[int] | None = None,
+    nuclear_idx: int = 1,
     model_name: str = "2D_versatile_fluo",
     prob_thresh: float | None = None,
     nms_thresh: float | None = None,
     scale: float | None = None,
 ) -> np.ndarray:
-    """Run StarDist segmentation on an IMC multi-channel TIFF.
+    """Run StarDist segmentation.
 
     Parameters
     ----------
-    intensity_tiff
-        Multi-channel image, shape ``(C, H, W)``.
+    image
+        Either a probability map ``(H, W, C)`` from Ilastik (nuclear channel
+        at ``nuclear_idx``), or a multi-channel intensity TIFF ``(C, H, W)``
+        (nuclear channels at ``nuclear_channels``), or a 2D nuclear image
+        ``(H, W)``.
     nuclear_channels
-        Indices of nuclear channels (e.g. ``[39, 40]`` for DNA1, DNA2).
+        For ``(C, H, W)`` input: indices of nuclear channels.
+    nuclear_idx
+        For ``(H, W, C)`` probability maps: index of the nuclear channel
+        (default 1).
     model_name
         StarDist pretrained model name (default ``"2D_versatile_fluo"``).
     prob_thresh
@@ -124,8 +168,7 @@ def run_stardist(
     nms_thresh
         Non-maximum suppression threshold. None = model default.
     scale
-        Scale factor for the image (useful if pixel size differs from
-        training data). None = no rescaling.
+        Scale factor for the image. None = no rescaling.
 
     Returns
     -------
@@ -138,7 +181,20 @@ def run_stardist(
             "stardist is required. Install with: pip install 'sc-tools[benchmark]'"
         ) from e
 
-    nuclear = _extract_and_normalize(intensity_tiff, nuclear_channels)
+    # Detect input format
+    if image.ndim == 3 and image.shape[2] <= 4:
+        # (H, W, C) probability map
+        nuclear = _normalize(image[:, :, nuclear_idx])
+    elif image.ndim == 3 and nuclear_channels is not None:
+        # (C, H, W) multi-channel intensity
+        nuclear = _extract_and_normalize(image, nuclear_channels)
+    elif image.ndim == 2:
+        nuclear = _normalize(image)
+    else:
+        raise ValueError(
+            f"Unexpected image shape {image.shape}. Expected (H, W, C) probability map, "
+            f"(C, H, W) intensity TIFF, or (H, W) nuclear image."
+        )
 
     model = StarDist2D.from_pretrained(model_name)
 

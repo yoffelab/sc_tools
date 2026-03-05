@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: #333; background: #f8f9fa; line-height: 1.5; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  header { background: #1a5276; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px; }
+  header h1 { font-size: 1.6rem; margin-bottom: 8px; }
+  header .meta { font-size: 0.9rem; opacity: 0.85; }
+  header .meta span { margin-right: 24px; }
+  .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          flex: 1; min-width: 180px; text-align: center; }
+  .card .value { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
+  .card .label { font-size: 0.85rem; color: #666; margin-top: 4px; }
+  .card.best .value { color: #27ae60; }
+  .card.info .value { color: #2980b9; }
+  section { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  section h2 { font-size: 1.2rem; color: #2c3e50; margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+  .plot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .plot-row.full-width { grid-template-columns: 1fr; }
+  .plot-item img { width: 100%; border: 1px solid #eee; border-radius: 4px; }
+  .plot-item .caption { font-size: 1.0rem; color: #555; margin-top: 4px; text-align: center; }
+  .plotly-container { width: 100%; min-height: 400px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .footer { text-align: center; font-size: 0.8rem; color: #999; padding: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>{{ title }}</h1>
+  <div class="meta">
+    <span>Date: {{ date }}</span>
+    <span>Modality: {{ modality }}</span>
+    <span>Samples: {{ n_samples }}</span>
+    <span>Total {{ terms.observations_lower }}: {{ n_spots | int }}</span>
+    <span>Report: Post-integration QC</span>
+  </div>
+</header>
+
+<div class="summary-cards">
+  <div class="card info">
+    <div class="value">{{ n_spots | int }}</div>
+    <div class="label">Total {{ terms.observations_lower }}</div>
+  </div>
+  <div class="card info">
+    <div class="value">{{ n_clusters }}</div>
+    <div class="label">Clusters</div>
+  </div>
+  <div class="card info">
+    <div class="value">{{ n_embeddings }}</div>
+    <div class="label">Embeddings evaluated</div>
+  </div>
+  {% if best_method %}
+  <div class="card best">
+    <div class="value">{{ best_method }}</div>
+    <div class="label">Best integration method</div>
+  </div>
+  {% endif %}
+  {% if best_score is not none %}
+  <div class="card best">
+    <div class="value">{{ "%.3f" | format(best_score) }}</div>
+    <div class="label">Best overall score</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- UMAP Grid -->
+{% if plots.umap_grid %}
+<section>
+  <h2>UMAP Embeddings</h2>
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ plots.umap_grid }}" alt="UMAP Grid">
+      <div class="caption">UMAP colored by sample, batch, cluster{% if has_celltype %}, cell type{% endif %}</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Cluster Distribution -->
+{% if plots.cluster_dist %}
+<section>
+  <h2>Cluster Distribution</h2>
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ plots.cluster_dist }}" alt="Cluster Distribution">
+      <div class="caption">Cluster composition per sample</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Integration Metrics -->
+{% if integration_plots %}
+<section>
+  <h2>Integration Quality Metrics</h2>
+
+  {% if integration_plots.integration_table %}
+  <h3 style="margin: 16px 0 8px; color: #555;">Comparison Table</h3>
+  <div class="plotly-container">
+    {{ integration_plots.integration_table }}
+  </div>
+  {% endif %}
+
+  {% if integration_plots.integration_radar %}
+  <h3 style="margin: 16px 0 8px; color: #555;">Radar Chart</h3>
+  <div class="plotly-container">
+    {{ integration_plots.integration_radar }}
+  </div>
+  {% endif %}
+
+  {% if integration_plots.integration_ranking %}
+  <h3 style="margin: 16px 0 8px; color: #555;">Ranking</h3>
+  <div class="plotly-container">
+    {{ integration_plots.integration_ranking }}
+  </div>
+  {% endif %}
+
+  {% if integration_plots.batch_vs_bio %}
+  <h3 style="margin: 16px 0 8px; color: #555;">Batch Removal vs Bio Conservation</h3>
+  <div class="plotly-container">
+    {{ integration_plots.batch_vs_bio }}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- Segmentation Scores -->
+{% if segmentation %}
+<section>
+  <h2>Segmentation Quality</h2>
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>ROI</th>
+        {% for col in segmentation.columns %}
+        <th>{{ col }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for roi, row in segmentation.iterrows() %}
+      <tr>
+        <td><strong>{{ roi }}</strong></td>
+        {% for col in segmentation.columns %}
+        <td>{{ "%.3f" | format(row[col]) if row[col] is number else row[col] }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if seg_plots %}
+  {% for name, img in seg_plots.items() %}
+  <div class="plot-row full-width" style="margin-top: 16px;">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ img }}" alt="{{ name }}">
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="footer">
+  Generated by sc_tools Post-integration QC Report &mdash; {{ date }}
+</div>
+
+</div>
+</body>
+</html>

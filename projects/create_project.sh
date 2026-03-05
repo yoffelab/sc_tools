@@ -154,7 +154,7 @@ SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s proj
 pytest projects/${DATA_TYPE}/${PROJECT_NAME}/tests/ -v
 
 # Create conda env (one-time setup, from repo root):
-#   conda create -n ${PROJECT_NAME} python=3.10 -y && conda activate ${PROJECT_NAME}
+#   conda create -n ${PROJECT_NAME} python=3.11 -y && conda activate ${PROJECT_NAME}
 #   uv pip install -e ".[deconvolution]"
 \`\`\`
 
@@ -176,6 +176,22 @@ cat > "${PROJECT_ROOT}/config.yaml" << CONFIG_EOF
 repo_root: "../../.."
 project_rel: "projects/${DATA_TYPE}/${PROJECT_NAME}"
 container_sif: "containers/sc_tools.sif"
+
+# Phase 0: upstream tool paths (adjust for your HPC)
+# spaceranger_path: "/path/to/spaceranger"
+# transcriptome: "/path/to/refdata-gex-GRCh38-2024-A"
+# probe_set: "/path/to/probe_sets/Visium_Human_Transcriptome_Probe_Set_v2.1.0_GRCh38-2024-A.csv"
+# output_dir: "spaceranger_outputs"
+# create_bam: false
+# localcores: 32
+# localmem: 220
+
+# SLURM resource defaults (used by generate_phase0_sbatch.py)
+# slurm:
+#   partition: "scu-cpu"
+#   cpus_per_task: 32
+#   mem: "240G"
+#   time: "2-00:00:00"
 CONFIG_EOF
 
 # ---- Snakefile ----
@@ -347,7 +363,7 @@ echo "Next steps:"
 echo "  1. Edit Mission.md with your scientific objective"
 echo "  2. Add ingestion script: ${PROJECT_ROOT}/scripts/ingest.py"
 echo "  3. Create conda env:"
-echo "       conda create -n ${PROJECT_NAME} python=3.10 -y"
+echo "       conda create -n ${PROJECT_NAME} python=3.11 -y"
 echo "       conda activate ${PROJECT_NAME}"
 echo "       uv pip install -e '.[deconvolution]'   # from repo root"
 echo "  4. Run (container): snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile phase1"

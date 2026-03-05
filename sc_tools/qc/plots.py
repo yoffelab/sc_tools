@@ -47,6 +47,7 @@ def qc_2x2_grid(
     basename: str = "qc_2x2",
     dpi: int = 300,
     figsize: tuple[float, float] = (10, 10),
+    modality: str = "visium",
 ) -> plt.Figure:
     """
     Plot 2x2 QC grid: total_counts, n_genes, log1p(total_counts), pct_counts_mt.
@@ -80,19 +81,25 @@ def qc_2x2_grid(
     matplotlib.figure.Figure
         The figure (caller may show or save).
     """
+    from .report_utils import get_modality_terms
+
+    terms = get_modality_terms(modality)
+
     fig, axes = plt.subplots(2, 2, figsize=figsize)
 
     for ax in axes.flat:
         ax.set_visible(True)
 
     # (1,1) total_counts
+    _intensity_title = terms["intensity_label"]
+    _feat_per_obs = f"{terms['features']} per {terms['observation_lower']}"
     if total_counts_col in adata.obs.columns:
         x = adata.obs[total_counts_col].values
         x = x[~np.isnan(x) & np.isfinite(x)]
         axes[0, 0].hist(
             x, bins=min(80, max(20, len(x) // 20)), color="steelblue", edgecolor="white"
         )
-        axes[0, 0].set_title("Total counts", fontsize=12, fontweight="bold")
+        axes[0, 0].set_title(_intensity_title, fontsize=12, fontweight="bold")
         axes[0, 0].set_xlabel(total_counts_col)
     else:
         axes[0, 0].text(
@@ -103,14 +110,14 @@ def qc_2x2_grid(
             va="center",
             transform=axes[0, 0].transAxes,
         )
-        axes[0, 0].set_title("Total counts", fontsize=12, fontweight="bold")
+        axes[0, 0].set_title(_intensity_title, fontsize=12, fontweight="bold")
 
     # (1,2) n_genes_by_counts
     if n_genes_col in adata.obs.columns:
         x = adata.obs[n_genes_col].values
         x = x[~np.isnan(x) & np.isfinite(x)]
         axes[0, 1].hist(x, bins=min(80, max(20, len(x) // 20)), color="coral", edgecolor="white")
-        axes[0, 1].set_title("Genes per spot/cell", fontsize=12, fontweight="bold")
+        axes[0, 1].set_title(_feat_per_obs, fontsize=12, fontweight="bold")
         axes[0, 1].set_xlabel(n_genes_col)
     else:
         axes[0, 1].text(
@@ -121,7 +128,7 @@ def qc_2x2_grid(
             va="center",
             transform=axes[0, 1].transAxes,
         )
-        axes[0, 1].set_title("Genes per spot/cell", fontsize=12, fontweight="bold")
+        axes[0, 1].set_title(_feat_per_obs, fontsize=12, fontweight="bold")
 
     # (2,1) log1p(total_counts)
     if total_counts_col in adata.obs.columns:
@@ -150,7 +157,11 @@ def qc_2x2_grid(
         axes[1, 1].hist(
             x, bins=min(80, max(20, len(x) // 20)), color="gray", edgecolor="white", alpha=0.7
         )
-        axes[1, 1].set_title("log1p(genes per spot)", fontsize=12, fontweight="bold")
+        axes[1, 1].set_title(
+            f"log1p({terms['features_lower']} per {terms['observation_lower']})",
+            fontsize=12,
+            fontweight="bold",
+        )
         axes[1, 1].set_xlabel("log1p(n_genes_by_counts)")
     else:
         axes[1, 1].text(
@@ -185,6 +196,7 @@ def qc_2x4_pre_post(
     basename: str = "qc_2x4_pre_post",
     dpi: int = 300,
     figsize: tuple[float, float] = (16, 10),
+    modality: str = "visium",
 ) -> plt.Figure:
     """
     Plot pre- vs post-filter QC: 2 rows x 4 columns.
@@ -222,6 +234,11 @@ def qc_2x4_pre_post(
     matplotlib.figure.Figure
         The figure.
     """
+    from .report_utils import get_modality_terms
+
+    terms = get_modality_terms(modality)
+    _feat_per_obs = f"{terms['features']} per {terms['observation_lower']}"
+
     fig, axes = plt.subplots(2, 4, figsize=figsize)
 
     def _draw_hist(ax, x, color, title, xlabel):
@@ -258,7 +275,7 @@ def qc_2x4_pre_post(
             axes[0, 1],
             adata_pre.obs[n_genes_col].values,
             "coral",
-            "Pre: Genes per spot/cell",
+            f"Pre: {_feat_per_obs}",
             n_genes_col,
         )
     else:
@@ -298,7 +315,7 @@ def qc_2x4_pre_post(
             axes[0, 3],
             adata_post.obs[n_genes_col].values,
             "coral",
-            "Post: Genes per spot/cell",
+            f"Post: {_feat_per_obs}",
             n_genes_col,
         )
     else:

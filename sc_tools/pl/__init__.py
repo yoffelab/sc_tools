@@ -26,7 +26,7 @@ from sc_tools.qc.plots import (
     qc_violin_metrics,
 )
 
-from . import benchmarking, gsea, heatmaps, spatial, statistical, volcano
+from . import benchmarking, gsea, heatmaps, qc_plots, spatial, statistical, volcano
 from . import save as save_figs
 from .benchmarking import (
     plot_batch_vs_bio,
@@ -41,6 +41,7 @@ from .benchmarking import (
     plot_segmentation_overlay,
 )
 from .gsea import plot_gsea_dotplot
+from .qc_plots import qc_cluster_distribution, qc_umap_grid
 from .save import save_figure
 
 __all__ = [
@@ -75,4 +76,8 @@ __all__ = [
     "plot_integration_ranking_bar",
     "plot_batch_vs_bio",
     "plot_embedding_comparison_umap",
+    # QC plots (post-integration)
+    "qc_umap_grid",
+    "qc_cluster_distribution",
+    "qc_plots",
 ]

@@ -14,6 +14,7 @@ from .integration import (
     compare_integrations,
     compute_composite_score,
     compute_integration_metrics,
+    run_integration_benchmark,
 )
 from .mask_io import (
     load_cellpose_mask,
@@ -52,6 +53,7 @@ __all__ = [
     "compute_integration_metrics",
     "compute_composite_score",
     "compare_integrations",
+    "run_integration_benchmark",
     # Segment runners
     "run_cellpose",
     "run_stardist",

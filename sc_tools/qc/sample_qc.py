@@ -159,6 +159,11 @@ def filter_spots(
     if mp is not None and "pct_counts_mt" in adata.obs.columns:
         keep &= adata.obs["pct_counts_mt"].values <= mp
 
+    from .report_utils import get_modality_terms
+
+    terms = get_modality_terms(modality)
+    _obs_label = terms["observations_lower"]
+
     if sample_col and sample_col in adata.obs.columns:
         removed = ~keep
         for sample in adata.obs[sample_col].unique():
@@ -166,7 +171,11 @@ def filter_spots(
             n_rm = int(removed[mask].sum())
             if n_rm > 0:
                 logger.info(
-                    "filter_spots: %s — removed %d / %d spots", sample, n_rm, int(mask.sum())
+                    "filter_spots: %s — removed %d / %d %s",
+                    sample,
+                    n_rm,
+                    int(mask.sum()),
+                    _obs_label,
                 )
 
     # Apply filter
@@ -175,10 +184,11 @@ def filter_spots(
 
     n_after = adata.n_obs
     logger.info(
-        "filter_spots (%s): %d -> %d spots (removed %d)",
+        "filter_spots (%s): %d -> %d %s (removed %d)",
         modality,
         n_before,
         n_after,
+        _obs_label,
         n_before - n_after,
     )
 

@@ -21,6 +21,10 @@ __all__ = [
     "run_scvi",
     "run_harmony",
     "run_cytovi",
+    "run_combat",
+    "run_bbknn",
+    "run_scanorama",
+    "run_scanvi",
 ]
 
 
@@ -263,3 +267,223 @@ def run_cytovi(
         "max_epochs": max_epochs,
     }
     logger.info("CytoVI latent stored in obsm['X_cytovi'] (shape=%s)", adata.obsm["X_cytovi"].shape)
+
+
+def run_combat(
+    adata: AnnData,
+    batch_key: str = "library_id",
+    key_added: str = "X_pca_combat",
+    n_pcs: int = 50,
+    **kwargs: Any,
+) -> None:
+    """Run ComBat batch correction followed by PCA.
+
+    Wraps ``scanpy.pp.combat()``. Corrects ``adata.X`` in-place, then
+    re-runs PCA and stores the result in ``adata.obsm[key_added]``.
+
+    Parameters
+    ----------
+    adata
+        Annotated data (log-normalized). Modified in place.
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    key_added
+        Key for the PCA embedding of corrected data in ``obsm``.
+    n_pcs
+        Number of PCs to compute after correction.
+    **kwargs
+        Passed to ``scanpy.pp.combat``.
+    """
+    import scanpy as sc
+
+    if batch_key not in adata.obs.columns:
+        raise ValueError(f"'{batch_key}' not found in adata.obs")
+
+    logger.info("ComBat (batch_key='%s')", batch_key)
+    sc.pp.combat(adata, key=batch_key, **kwargs)
+
+    n_comps = min(n_pcs, adata.n_vars - 1, adata.n_obs - 1)
+    sc.tl.pca(adata, n_comps=n_comps)
+    adata.obsm[key_added] = adata.obsm["X_pca"].copy()
+    logger.info("ComBat corrected PCA stored in obsm['%s'] (%d PCs)", key_added, n_comps)
+
+
+def run_bbknn(
+    adata: AnnData,
+    batch_key: str = "library_id",
+    neighbors_within_batch: int = 3,
+    **kwargs: Any,
+) -> None:
+    """Run BBKNN batch-balanced k-nearest-neighbors graph construction.
+
+    Wraps ``bbknn.bbknn()``. Modifies the neighbor graph in ``obsp``
+    and runs UMAP, storing coordinates in ``adata.obsm['X_umap_bbknn']``.
+
+    BBKNN is graph-based and does not produce a latent embedding.
+    For benchmarking, the UMAP coordinates are used as a proxy.
+
+    Requires ``bbknn``: ``pip install bbknn``
+
+    Parameters
+    ----------
+    adata
+        Annotated data with PCA in ``obsm['X_pca']``. Modified in place.
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    neighbors_within_batch
+        How many nearest neighbors to find per batch.
+    **kwargs
+        Passed to ``bbknn.bbknn``.
+    """
+    try:
+        import bbknn
+    except ImportError:
+        raise ImportError(
+            "bbknn is required for BBKNN integration. Install with:\n  pip install bbknn"
+        ) from None
+
+    import scanpy as sc
+
+    if "X_pca" not in adata.obsm:
+        raise ValueError("PCA required before BBKNN. Run sc.tl.pca first.")
+
+    logger.info(
+        "BBKNN (batch_key='%s', neighbors_within_batch=%d)", batch_key, neighbors_within_batch
+    )
+    bbknn.bbknn(adata, batch_key=batch_key, neighbors_within_batch=neighbors_within_batch, **kwargs)
+    sc.tl.umap(adata)
+    adata.obsm["X_umap_bbknn"] = adata.obsm["X_umap"].copy()
+    logger.info("BBKNN UMAP stored in obsm['X_umap_bbknn']")
+
+
+def run_scanorama(
+    adata: AnnData,
+    batch_key: str = "library_id",
+    key_added: str = "X_scanorama",
+    **kwargs: Any,
+) -> None:
+    """Run Scanorama integration.
+
+    Wraps ``scanorama.integrate_scanpy()`` or ``scanpy.external.pp.scanorama_integrate``.
+    Stores corrected embedding in ``adata.obsm[key_added]``.
+
+    Requires ``scanorama``: ``pip install scanorama``
+
+    Parameters
+    ----------
+    adata
+        Annotated data (log-normalized). Modified in place.
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    key_added
+        Key for the corrected embedding in ``obsm``.
+    **kwargs
+        Passed to the integration function.
+    """
+    try:
+        import scanorama  # noqa: F401
+    except ImportError:
+        raise ImportError(
+            "scanorama is required for Scanorama integration. Install with:\n  pip install scanorama"
+        ) from None
+
+    import scanpy as sc
+
+    if batch_key not in adata.obs.columns:
+        raise ValueError(f"'{batch_key}' not found in adata.obs")
+
+    logger.info("Scanorama (batch_key='%s')", batch_key)
+    sc.external.pp.scanorama_integrate(
+        adata,
+        key=batch_key,
+        adjusted_basis=key_added,
+        **kwargs,
+    )
+    logger.info("Scanorama corrected embedding stored in obsm['%s']", key_added)
+
+
+def run_scanvi(
+    adata: AnnData,
+    batch_key: str = "library_id",
+    labels_key: str = "celltype",
+    n_latent: int = 30,
+    max_epochs: int = 200,
+    use_gpu: str | bool = "auto",
+    unlabeled_category: str = "Unknown",
+    scvi_model: Any | None = None,
+    **kwargs: Any,
+) -> None:
+    """Run scANVI semi-supervised integration.
+
+    Initializes from a pre-trained scVI model (or trains one) and
+    refines using cell type labels. Stores latent representation in
+    ``adata.obsm['X_scANVI']``.
+
+    Requires ``scvi-tools``: ``pip install sc-tools[deconvolution]``
+
+    Parameters
+    ----------
+    adata
+        Annotated data with raw counts. Modified in place.
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    labels_key
+        Column in ``adata.obs`` with cell type labels.
+    n_latent
+        Dimensionality of the latent space.
+    max_epochs
+        Maximum training epochs for scANVI fine-tuning.
+    use_gpu
+        ``"auto"`` (default), True, or False.
+    unlabeled_category
+        Label for unlabeled cells (default ``"Unknown"``).
+    scvi_model
+        Pre-trained ``scvi.model.SCVI`` model. If None, one is trained.
+    **kwargs
+        Passed to ``SCANVI.from_scvi_model()``.
+    """
+    try:
+        import scvi
+    except ImportError:
+        raise ImportError(
+            "scvi-tools is required for scANVI integration. Install with:\n"
+            "  pip install sc-tools[deconvolution]"
+        ) from None
+
+    if labels_key not in adata.obs.columns:
+        raise ValueError(
+            f"'{labels_key}' not found in adata.obs. scANVI requires cell type labels."
+        )
+
+    gpu = _detect_gpu(use_gpu)
+    logger.info(
+        "scANVI (batch_key='%s', labels_key='%s', n_latent=%d, gpu=%s)",
+        batch_key,
+        labels_key,
+        n_latent,
+        gpu,
+    )
+
+    if scvi_model is None:
+        scvi.model.SCVI.setup_anndata(adata, batch_key=batch_key)
+        scvi_model = scvi.model.SCVI(adata, n_latent=n_latent)
+        train_kwargs: dict[str, Any] = {"max_epochs": max_epochs, "early_stopping": True}
+        if gpu:
+            train_kwargs["accelerator"] = "gpu"
+        scvi_model.train(**train_kwargs)
+
+    scanvi_model = scvi.model.SCANVI.from_scvi_model(
+        scvi_model,
+        adata=adata,
+        labels_key=labels_key,
+        unlabeled_category=unlabeled_category,
+        **kwargs,
+    )
+
+    train_kwargs_scanvi: dict[str, Any] = {"max_epochs": max_epochs}
+    if gpu:
+        train_kwargs_scanvi["accelerator"] = "gpu"
+    scanvi_model.train(**train_kwargs_scanvi)
+
+    adata.obsm["X_scANVI"] = scanvi_model.get_latent_representation()
+    logger.info("scANVI latent stored in obsm['X_scANVI'] (shape=%s)", adata.obsm["X_scANVI"].shape)

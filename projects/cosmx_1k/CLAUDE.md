@@ -33,7 +33,7 @@ SC_TOOLS_RUNTIME=none snakemake -d projects/cosmx_1k -s projects/cosmx_1k/Snakef
 pytest projects/cosmx_1k/tests/ -v
 
 # Create conda env (one-time setup, from repo root):
-#   conda create -n cosmx_1k python=3.10 -y && conda activate cosmx_1k
+#   conda create -n cosmx_1k python=3.11 -y && conda activate cosmx_1k
 #   uv pip install -e ".[deconvolution]"
 ```
 

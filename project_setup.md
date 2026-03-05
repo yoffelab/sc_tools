@@ -118,7 +118,7 @@ snakemake -s Snakefile all
 All Python deps come from the root `sc-tools` package. Create a per-project conda env once (from repo root):
 
 ```bash
-conda create -n <env_name> python=3.10 -y
+conda create -n <env_name> python=3.11 -y
 conda activate <env_name>
 uv pip install -e ".[deconvolution,integration,geneset]"
 ```

@@ -18,6 +18,7 @@ __all__ = [
     "compute_integration_metrics",
     "compute_composite_score",
     "compare_integrations",
+    "run_integration_benchmark",
 ]
 
 logger = logging.getLogger(__name__)
@@ -147,7 +148,7 @@ def compute_integration_metrics(
     adata: AnnData,
     embedding_key: str,
     batch_key: str,
-    celltype_key: str,
+    celltype_key: str | None = None,
     use_scib: str = "auto",
 ) -> dict[str, float]:
     """Compute integration quality metrics for one embedding.
@@ -161,7 +162,9 @@ def compute_integration_metrics(
     batch_key
         Column in ``adata.obs`` with batch labels.
     celltype_key
-        Column in ``adata.obs`` with cell type labels.
+        Column in ``adata.obs`` with cell type labels. If ``None`` or not
+        present in ``adata.obs``, bio conservation metrics are skipped and
+        only batch removal metrics are returned.
     use_scib
         ``"auto"`` (default): use scib-metrics if available, else sklearn.
         ``"scib"``: require scib-metrics (error if missing).
@@ -170,17 +173,19 @@ def compute_integration_metrics(
     Returns
     -------
     Dict with batch removal and bio conservation metric values, all in [0, 1].
+    When *celltype_key* is ``None``, bio metrics are omitted.
     """
     if embedding_key not in adata.obsm:
         raise KeyError(f"Embedding {embedding_key!r} not found in adata.obsm")
     if batch_key not in adata.obs.columns:
         raise KeyError(f"Batch key {batch_key!r} not found in adata.obs")
-    if celltype_key not in adata.obs.columns:
-        raise KeyError(f"Cell type key {celltype_key!r} not found in adata.obs")
+
+    # Resolve celltype availability
+    has_celltype = celltype_key is not None and celltype_key in adata.obs.columns
 
     X = np.asarray(adata.obsm[embedding_key])
     batch = np.asarray(adata.obs[batch_key])
-    celltype = np.asarray(adata.obs[celltype_key])
+    celltype = np.asarray(adata.obs[celltype_key]) if has_celltype else None
 
     should_use_scib = (use_scib == "scib") or (use_scib == "auto" and _HAS_SCIB)
     if use_scib == "scib" and not _HAS_SCIB:
@@ -191,19 +196,23 @@ def compute_integration_metrics(
 
     metrics: dict[str, float] = {}
 
-    if should_use_scib:
+    if should_use_scib and has_celltype:
         metrics.update(_compute_scib_metrics(adata, embedding_key, batch_key, celltype_key))
+    elif should_use_scib and not has_celltype:
+        # Batch-only via scib path
+        metrics.update(_compute_scib_metrics_batch_only(adata, embedding_key, batch_key))
     else:
         logger.info("scib-metrics not available, using sklearn fallbacks")
         # Batch removal metrics
         metrics["asw_batch"] = _asw_batch_sklearn(X, batch)
         metrics["pcr"] = _pcr_sklearn(X, batch)
-        metrics["graph_connectivity"] = _graph_connectivity(X, celltype)
+        if has_celltype:
+            metrics["graph_connectivity"] = _graph_connectivity(X, celltype)
 
-        # Bio conservation metrics
-        metrics["asw_celltype"] = _asw_celltype_sklearn(X, celltype)
-        metrics["ari"] = _ari_sklearn(X, celltype)
-        metrics["nmi"] = _nmi_sklearn(X, celltype)
+            # Bio conservation metrics
+            metrics["asw_celltype"] = _asw_celltype_sklearn(X, celltype)
+            metrics["ari"] = _ari_sklearn(X, celltype)
+            metrics["nmi"] = _nmi_sklearn(X, celltype)
 
     # Clamp to [0, 1]
     for k, v in metrics.items():
@@ -272,6 +281,42 @@ def _compute_scib_metrics(
     return metrics
 
 
+def _compute_scib_metrics_batch_only(
+    adata: AnnData,
+    embedding_key: str,
+    batch_key: str,
+) -> dict[str, float]:
+    """Compute batch-only metrics using scib-metrics (no celltype)."""
+    import scib_metrics
+
+    X = np.asarray(adata.obsm[embedding_key])
+    batch = np.asarray(adata.obs[batch_key])
+
+    metrics: dict[str, float] = {}
+
+    try:
+        metrics["asw_batch"] = float(scib_metrics.silhouette_batch(X, batch, np.zeros(len(batch))))
+    except Exception:
+        metrics["asw_batch"] = _asw_batch_sklearn(X, batch)
+
+    try:
+        metrics["pcr"] = float(scib_metrics.pcr_comparison(X, X, batch))
+    except Exception:
+        metrics["pcr"] = _pcr_sklearn(X, batch)
+
+    try:
+        metrics["ilisi"] = float(scib_metrics.ilisi_knn(X, batch))
+    except Exception:
+        logger.debug("iLISI computation failed, skipping")
+
+    try:
+        metrics["kbet"] = float(scib_metrics.kbet(X, batch))
+    except Exception:
+        logger.debug("kBET computation failed, skipping")
+
+    return metrics
+
+
 def compute_composite_score(
     metrics: dict[str, float],
     batch_weight: float = 0.4,
@@ -314,7 +359,7 @@ def compare_integrations(
     adata: AnnData,
     embeddings: dict[str, str],
     batch_key: str,
-    celltype_key: str,
+    celltype_key: str | None = None,
     batch_weight: float = 0.4,
     bio_weight: float = 0.6,
     include_unintegrated: bool = True,
@@ -332,7 +377,8 @@ def compare_integrations(
     batch_key
         Column in ``obs`` with batch labels.
     celltype_key
-        Column in ``obs`` with cell type labels.
+        Column in ``obs`` with cell type labels. If ``None`` or not
+        present in ``adata.obs``, bio conservation metrics are skipped.
     batch_weight
         Weight for batch removal in composite score.
     bio_weight
@@ -369,4 +415,241 @@ def compare_integrations(
     if len(df) > 0:
         df = df.sort_values("overall_score", ascending=False).reset_index(drop=True)
 
+    # TODO: When unintegrated baseline wins, consider emitting a warning.
+    # This usually indicates insufficient batch effect or benchmark misconfiguration.
+
     return df
+
+
+# ---------------------------------------------------------------------------
+# Integration Benchmark Orchestrator
+# ---------------------------------------------------------------------------
+
+# Default methods per modality category
+_PROTEIN_METHODS = ["harmony", "bbknn", "combat", "scanorama", "cytovi", "pca"]
+_TRANSCRIPTOMIC_METHODS = ["harmony", "bbknn", "combat", "scanorama", "scvi", "pca"]
+
+# Modalities that use protein-based integration
+_PROTEIN_MODALITIES = {"imc"}
+
+
+def run_integration_benchmark(
+    adata: AnnData,
+    modality: str = "visium",
+    batch_key: str = "library_id",
+    celltype_key: str | None = None,
+    methods: list[str] | None = None,
+    use_gpu: str | bool = "auto",
+    max_epochs: int = 200,
+    use_scib: str = "auto",
+) -> tuple[AnnData, pd.DataFrame]:
+    """Run multiple integration methods and benchmark them.
+
+    Orchestrates integration across methods appropriate for the given
+    modality, computes quality metrics for each, and returns the
+    AnnData with all embeddings plus a comparison DataFrame.
+
+    Parameters
+    ----------
+    adata
+        AnnData with raw counts (for VAE methods) or normalized data.
+        Modified in place with embeddings added to ``obsm``.
+    modality
+        Data modality (determines default method set and normalization).
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    celltype_key
+        Column in ``adata.obs`` with cell type labels. If provided and
+        ``scib-metrics`` is available, the ``Benchmarker`` class is used.
+    methods
+        List of method names to run. If ``None``, uses modality defaults.
+        Valid names: ``harmony``, ``bbknn``, ``combat``, ``scanorama``,
+        ``scvi``, ``scanvi``, ``cytovi``, ``pca``.
+    use_gpu
+        GPU setting for VAE methods.
+    max_epochs
+        Maximum epochs for VAE methods.
+    use_scib
+        Passed to metric computation.
+
+    Returns
+    -------
+    tuple[AnnData, pd.DataFrame]
+        The AnnData with all embeddings, and the comparison DataFrame
+        sorted by ``overall_score``.
+    """
+    import scanpy as sc
+
+    is_protein = modality in _PROTEIN_MODALITIES
+
+    if methods is None:
+        methods = _PROTEIN_METHODS if is_protein else _TRANSCRIPTOMIC_METHODS
+
+    if batch_key not in adata.obs.columns:
+        raise ValueError(f"batch_key '{batch_key}' not in adata.obs")
+
+    # Ensure PCA exists (needed for harmony, bbknn, combat, baseline)
+    if "X_pca" not in adata.obsm:
+        n_comps = min(50, adata.n_vars - 1, adata.n_obs - 1)
+        sc.tl.pca(adata, n_comps=n_comps)
+        logger.info("Computed PCA with %d components", n_comps)
+
+    embedding_keys: dict[str, str] = {}
+
+    for method in methods:
+        try:
+            if method == "harmony":
+                from sc_tools.pp.integrate import run_harmony
+
+                run_harmony(adata, batch_key=batch_key)
+                embedding_keys["Harmony"] = "X_pca_harmony"
+
+            elif method == "bbknn":
+                from sc_tools.pp.integrate import run_bbknn
+
+                run_bbknn(adata, batch_key=batch_key)
+                embedding_keys["BBKNN"] = "X_umap_bbknn"
+
+            elif method == "combat":
+                from sc_tools.pp.integrate import run_combat
+
+                run_combat(adata, batch_key=batch_key)
+                embedding_keys["ComBat"] = "X_pca_combat"
+
+            elif method == "scanorama":
+                from sc_tools.pp.integrate import run_scanorama
+
+                run_scanorama(adata, batch_key=batch_key)
+                embedding_keys["Scanorama"] = "X_scanorama"
+
+            elif method == "scvi":
+                from sc_tools.pp.integrate import run_scvi
+
+                run_scvi(
+                    adata,
+                    batch_key=batch_key,
+                    max_epochs=max_epochs,
+                    use_gpu=use_gpu,
+                )
+                embedding_keys["scVI"] = "X_scVI"
+
+            elif method == "scanvi":
+                if celltype_key and celltype_key in adata.obs.columns:
+                    from sc_tools.pp.integrate import run_scanvi
+
+                    run_scanvi(
+                        adata,
+                        batch_key=batch_key,
+                        labels_key=celltype_key,
+                        max_epochs=max_epochs,
+                        use_gpu=use_gpu,
+                    )
+                    embedding_keys["scANVI"] = "X_scANVI"
+                else:
+                    logger.info("Skipping scANVI: celltype_key not available")
+
+            elif method == "cytovi":
+                from sc_tools.pp.integrate import run_cytovi
+
+                run_cytovi(
+                    adata,
+                    batch_key=batch_key,
+                    max_epochs=max_epochs,
+                    use_gpu=use_gpu,
+                )
+                embedding_keys["CytoVI"] = "X_cytovi"
+
+            elif method == "pca":
+                embedding_keys["Unintegrated (PCA)"] = "X_pca"
+
+            else:
+                logger.warning("Unknown integration method: %s", method)
+
+        except ImportError as e:
+            logger.warning("Skipping %s: %s", method, e)
+        except Exception:
+            logger.warning("Failed to run %s", method, exc_info=True)
+
+    # Try scib-metrics Benchmarker first
+    comparison_df = _try_scib_benchmarker(
+        adata,
+        embedding_keys,
+        batch_key,
+        celltype_key,
+        use_scib,
+    )
+
+    if comparison_df is None:
+        # Fall back to our compare_integrations
+        comparison_df = compare_integrations(
+            adata,
+            embedding_keys,
+            batch_key,
+            celltype_key=celltype_key,
+            include_unintegrated=False,
+            use_scib=use_scib,
+        )
+
+    logger.info("Integration benchmark complete: %d methods evaluated", len(comparison_df))
+    return adata, comparison_df
+
+
+def _try_scib_benchmarker(
+    adata: AnnData,
+    embedding_keys: dict[str, str],
+    batch_key: str,
+    celltype_key: str | None,
+    use_scib: str,
+) -> pd.DataFrame | None:
+    """Try to use scib_metrics.benchmark.Benchmarker for comparison.
+
+    Returns None if not available or if celltype_key is missing.
+    """
+    if use_scib == "sklearn":
+        return None
+    if celltype_key is None or celltype_key not in adata.obs.columns:
+        return None
+
+    try:
+        from scib_metrics.benchmark import Benchmarker
+    except ImportError:
+        return None
+
+    obsm_keys = [v for v in embedding_keys.values() if v in adata.obsm]
+    if not obsm_keys:
+        return None
+
+    try:
+        bm = Benchmarker(
+            adata,
+            batch_key=batch_key,
+            label_key=celltype_key,
+            embedding_obsm_keys=obsm_keys,
+            n_jobs=-1,
+        )
+        bm.benchmark()
+        df = bm.get_results(min_max_scale=False)
+
+        # Map obsm keys back to method names
+        key_to_name = {v: k for k, v in embedding_keys.items()}
+        if "Embedding" in df.columns:
+            df["method"] = df["Embedding"].map(key_to_name).fillna(df["Embedding"])
+        elif df.index.name == "Embedding" or "Embedding" not in df.columns:
+            df = df.reset_index()
+            if "Embedding" in df.columns:
+                df["method"] = df["Embedding"].map(key_to_name).fillna(df["Embedding"])
+
+        # Compute overall score if not present
+        if "Total" in df.columns:
+            df["overall_score"] = df["Total"]
+        elif "overall_score" not in df.columns:
+            numeric_cols = df.select_dtypes(include="number").columns
+            df["overall_score"] = df[numeric_cols].mean(axis=1)
+
+        df = df.sort_values("overall_score", ascending=False).reset_index(drop=True)
+        logger.info("Used scib-metrics Benchmarker for comparison")
+        return df
+
+    except Exception:
+        logger.debug("scib-metrics Benchmarker failed; falling back", exc_info=True)
+        return None

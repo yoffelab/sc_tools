@@ -35,6 +35,7 @@ def calculate_qc_metrics(
     inplace: bool = True,
     percent_top: list[int] | None = (50, 100, 200, 500),
     log1p: bool = False,
+    modality: str = "visium",
     **kwargs: Any,
 ) -> pd.DataFrame | None:
     """
@@ -50,8 +51,10 @@ def calculate_qc_metrics(
     mt_pattern : str or compiled regex or None
         Pattern to mark mitochondrial genes in adata.var (default MT- / mt- / Mt).
         If None, mt genes are not marked and pct_counts_mt is not computed.
+        Automatically set to None for protein-based modalities (e.g. ``"imc"``).
     hb_pattern : str or compiled regex or None
         Pattern to mark hemoglobin genes for pct_counts_hb. If None, not computed.
+        Automatically set to None for protein-based modalities.
     qc_vars : list of str or None
         If None, built from mt_pattern and hb_pattern: ['mt'] and optionally ['mt','hb'].
         Passed to scanpy as qc_vars (column names in adata.var).
@@ -59,8 +62,11 @@ def calculate_qc_metrics(
         If True, add metrics to adata.obs and adata.var (default True).
     percent_top : list of int or None
         Passed to scanpy (default (50, 100, 200, 500)).
+        Automatically capped to ``n_vars`` to avoid IndexError on small panels.
     log1p : bool
         Passed to scanpy (default False).
+    modality : str
+        Data modality. Protein-based modalities (``"imc"``) skip MT/HB patterns.
     **kwargs
         Passed to scanpy.pp.calculate_qc_metrics.
 
@@ -71,6 +77,12 @@ def calculate_qc_metrics(
         otherwise None.
     """
     import scanpy as sc
+
+    # Protein-based modalities have no mitochondrial or hemoglobin genes
+    _protein_modalities = {"imc"}
+    if modality in _protein_modalities:
+        mt_pattern = None
+        hb_pattern = None
 
     var_names = pd.Series(adata.var_names)
     if mt_pattern is not None:
@@ -88,8 +100,11 @@ def calculate_qc_metrics(
             qc_vars.append("mt")
         if hb_pattern is not None and "hb" in adata.var.columns:
             qc_vars.append("hb")
-        if not qc_vars:
-            qc_vars = None
+
+    # Cap percent_top to n_vars to avoid IndexError on small panels (e.g. 52-protein IMC)
+    if percent_top is not None:
+        n_vars = adata.n_vars
+        percent_top = tuple(p for p in percent_top if p <= n_vars) or None
 
     return sc.pp.calculate_qc_metrics(
         adata,

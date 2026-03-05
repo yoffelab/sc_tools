@@ -95,10 +95,16 @@ class TestComputeIntegrationMetrics:
                 adata, "X_good", "missing_batch", "celltype", use_scib="sklearn"
             )
 
-    def test_missing_celltype_key_raises(self):
+    def test_missing_celltype_key_skips_bio(self):
+        """When celltype_key is not in obs, bio metrics are skipped (not raised)."""
         adata = _make_batched_adata()
-        with pytest.raises(KeyError, match="missing_ct"):
-            compute_integration_metrics(adata, "X_good", "batch", "missing_ct", use_scib="sklearn")
+        metrics = compute_integration_metrics(
+            adata, "X_good", "batch", "missing_ct", use_scib="sklearn"
+        )
+        # Should return batch-only metrics (missing_ct not in obs -> treated as absent)
+        assert "asw_batch" in metrics
+        assert "pcr" in metrics
+        assert "asw_celltype" not in metrics
 
     def test_well_mixed_better_asw_batch(self):
         adata = _make_batched_adata(n_obs=300)
@@ -292,3 +298,140 @@ class TestSklearnFallback:
             adata = _make_batched_adata()
             with pytest.raises(ImportError, match="scib-metrics"):
                 compute_integration_metrics(adata, "X_good", "batch", "celltype", use_scib="scib")
+
+
+# ---------------------------------------------------------------------------
+# Optional celltype_key
+# ---------------------------------------------------------------------------
+
+
+class TestOptionalCelltypeKey:
+    def test_compute_integration_metrics_no_celltype(self):
+        """Batch-only metrics returned when celltype_key is None."""
+        adata = _make_batched_adata()
+        metrics = compute_integration_metrics(
+            adata, "X_good", "batch", celltype_key=None, use_scib="sklearn"
+        )
+        assert isinstance(metrics, dict)
+        assert "asw_batch" in metrics
+        assert "pcr" in metrics
+        # Bio metrics should NOT be present
+        assert "asw_celltype" not in metrics
+        assert "ari" not in metrics
+        assert "nmi" not in metrics
+
+    def test_compare_integrations_no_celltype(self):
+        """compare_integrations works with celltype_key=None."""
+        adata = _make_batched_adata()
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key=None,
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) == 1
+        assert "overall_score" in df.columns
+        assert "batch_score" in df.columns
+
+
+# ---------------------------------------------------------------------------
+# New integration methods
+# ---------------------------------------------------------------------------
+
+
+class TestRunCombat:
+    def test_stores_pca_combat(self):
+        """run_combat should store X_pca_combat in obsm."""
+        import scanpy as sc
+
+        # Use non-negative count data (randn has negatives → NaN after log1p)
+        rng = np.random.RandomState(42)
+        n_obs, n_vars, n_batches = 100, 50, 3
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X)
+        adata.obs["batch"] = [f"batch_{i % n_batches}" for i in range(n_obs)]
+
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
+
+        from sc_tools.pp.integrate import run_combat
+
+        run_combat(adata, batch_key="batch")
+        assert "X_pca_combat" in adata.obsm
+        assert adata.obsm["X_pca_combat"].shape[0] == adata.n_obs
+
+
+class TestSoftDepHandling:
+    def test_bbknn_import_error(self):
+        """run_bbknn should raise ImportError with install hint if bbknn not available."""
+        try:
+            import bbknn  # noqa: F401
+
+            pytest.skip("bbknn is installed")
+        except ImportError:
+            from sc_tools.pp.integrate import run_bbknn
+
+            adata = _make_batched_adata()
+            with pytest.raises(ImportError, match="bbknn"):
+                run_bbknn(adata, batch_key="batch")
+
+    def test_scanorama_import_error(self):
+        """run_scanorama should raise ImportError with install hint if not available."""
+        try:
+            import scanorama  # noqa: F401
+
+            pytest.skip("scanorama is installed")
+        except ImportError:
+            from sc_tools.pp.integrate import run_scanorama
+
+            adata = _make_batched_adata()
+            with pytest.raises(ImportError, match="scanorama"):
+                run_scanorama(adata, batch_key="batch")
+
+
+class TestRunIntegrationBenchmark:
+    def test_returns_comparison_df(self):
+        """run_integration_benchmark should return adata + comparison df."""
+        import scanpy as sc
+
+        from sc_tools.bm.integration import run_integration_benchmark
+
+        # Use non-negative count data for combat compatibility
+        rng = np.random.RandomState(42)
+        n_obs, n_vars, n_batches, n_celltypes = 100, 50, 3, 4
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X)
+        adata.obs["batch"] = [f"batch_{i % n_batches}" for i in range(n_obs)]
+        adata.obs["celltype"] = [f"type_{i % n_celltypes}" for i in range(n_obs)]
+        adata.obsm["X_pca"] = rng.randn(n_obs, 10).astype(np.float32)
+
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
+
+        # Only run methods that have no external deps
+        adata_out, df = run_integration_benchmark(
+            adata,
+            modality="visium",
+            batch_key="batch",
+            methods=["combat", "pca"],
+            use_scib="sklearn",
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) >= 2
+        assert "overall_score" in df.columns
+        assert "X_pca_combat" in adata_out.obsm
+
+
+class TestExpandedEmbeddings:
+    def test_known_embeddings_expanded(self):
+        """_KNOWN_EMBEDDINGS should include new methods."""
+        from sc_tools.qc.report_utils import _KNOWN_EMBEDDINGS
+
+        assert "BBKNN" in _KNOWN_EMBEDDINGS
+        assert "ComBat" in _KNOWN_EMBEDDINGS
+        assert "Scanorama" in _KNOWN_EMBEDDINGS
+        assert "scANVI" in _KNOWN_EMBEDDINGS
+        assert "DestVI" in _KNOWN_EMBEDDINGS

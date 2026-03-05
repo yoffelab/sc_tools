@@ -17,6 +17,8 @@ __all__ = [
     "plot_spatial_categorical",
     "plot_spatial_continuous",
     "multipage_spatial_pdf",
+    "plot_imc_composite",
+    "plot_imc_channel",
 ]
 
 
@@ -249,6 +251,160 @@ def plot_spatial_continuous(
     finally:
         if cleanup and "_st_continuous_plot" in adata.obs.columns:
             adata.obs.drop(columns=["_st_continuous_plot"], inplace=True)
+
+
+def plot_imc_composite(
+    adata,
+    library_id: str,
+    ax: plt.Axes,
+    image_key: str = "hires",
+    title: str | None = None,
+) -> None:
+    """Plot IMC RGB composite image stored in ``adata.uns['spatial']``.
+
+    Identical API to ``plot_spatial_plain_he`` — reuses the same
+    ``adata.uns['spatial'][library_id]['images'][image_key]`` structure so
+    that ``sc.pl.spatial(img_key='hires')`` also works.
+
+    Parameters
+    ----------
+    adata
+        AnnData with ``adata.uns['spatial'][library_id]['images'][image_key]``
+        holding a ``(H, W, 3)`` uint8 RGB array.
+    library_id
+        Key in ``adata.uns['spatial']``.
+    ax
+        Matplotlib axes to draw on.
+    image_key
+        Key in ``spatial['images']`` (default ``'hires'``).
+    title
+        Axis title. If ``None``, shows channel info from metadata if available.
+    """
+    spatial_info = adata.uns.get("spatial", {}).get(library_id)
+    if (
+        spatial_info is None
+        or "images" not in spatial_info
+        or image_key not in spatial_info["images"]
+    ):
+        ax.text(
+            0.5,
+            0.5,
+            f"No IMC composite image for library {library_id}",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(title or "IMC Composite", fontsize=12, fontweight="bold")
+        return
+
+    img = spatial_info["images"][image_key]
+    ax.imshow(img, aspect="auto")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    if title is None:
+        rgb = spatial_info.get("metadata", {}).get("rgb_channels", {})
+        if rgb:
+            label = f"R={rgb.get('R', '?')} G={rgb.get('G', '?')} B={rgb.get('B', '?')}"
+        else:
+            label = "IMC Composite"
+        ax.set_title(label, fontsize=12, fontweight="bold")
+    else:
+        ax.set_title(title, fontsize=12, fontweight="bold")
+
+
+def plot_imc_channel(
+    adata,
+    library_id: str,
+    channel: str,
+    ax: plt.Axes,
+    *,
+    cmap: str = "inferno",
+    vmax_percentile: float = 99,
+    title: str | None = None,
+) -> None:
+    """Plot a single IMC channel from the full arcsinh-normalized stack.
+
+    Reads ``adata.uns['spatial'][library_id]['images']['full']`` (shape
+    ``(C, H, W)``) and ``metadata['channels']`` to look up the channel index.
+
+    Parameters
+    ----------
+    adata
+        AnnData with IMC image data in ``adata.uns['spatial']``.
+    library_id
+        Key in ``adata.uns['spatial']``.
+    channel
+        Marker/channel name (resolved via case-insensitive substring match
+        against ``metadata['channels']``).
+    ax
+        Matplotlib axes to draw on.
+    cmap
+        Colormap (default ``'inferno'``).
+    vmax_percentile
+        Percentile used for the upper color scale limit (default 99).
+    title
+        Axis title. Defaults to the channel name.
+    """
+    spatial_info = adata.uns.get("spatial", {}).get(library_id)
+    if spatial_info is None:
+        ax.text(
+            0.5,
+            0.5,
+            f"No spatial data for {library_id}",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(title or channel, fontsize=12, fontweight="bold")
+        return
+
+    full = spatial_info.get("images", {}).get("full")
+    channels = spatial_info.get("metadata", {}).get("channels", [])
+
+    if full is None:
+        ax.text(
+            0.5,
+            0.5,
+            "No full channel stack (images['full']) found",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(title or channel, fontsize=12, fontweight="bold")
+        return
+
+    # Resolve channel index
+    ch_lower = [c.lower() for c in channels]
+    lo = channel.lower()
+    idx = None
+    if lo in ch_lower:
+        idx = ch_lower.index(lo)
+    else:
+        # Partial match
+        matches = [i for i, c in enumerate(ch_lower) if lo in c or c in lo]
+        if matches:
+            idx = matches[0]
+
+    if idx is None or idx >= full.shape[0]:
+        ax.text(
+            0.5,
+            0.5,
+            f"Channel {channel!r} not found",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
+        ax.set_title(title or channel, fontsize=12, fontweight="bold")
+        return
+
+    img_ch = full[idx]
+    vmax = float(np.percentile(img_ch, vmax_percentile))
+    im = ax.imshow(img_ch, cmap=cmap, vmin=0, vmax=vmax if vmax > 0 else 1, aspect="auto")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    ax.set_title(title or (channels[idx] if channels else channel), fontsize=12, fontweight="bold")
 
 
 def multipage_spatial_pdf(

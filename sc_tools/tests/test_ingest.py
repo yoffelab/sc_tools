@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import anndata as ad
@@ -14,13 +15,22 @@ from sc_tools.ingest.config import (
     load_batch_manifest,
     validate_manifest,
 )
-from sc_tools.ingest.imc import build_imc_pipeline_cmd
+from sc_tools.ingest.imc import IMCPanelMapper, build_imc_composite, build_imc_pipeline_cmd
 from sc_tools.ingest.loaders import (
     concat_samples,
+    load_he_image,
     load_imc_sample,
     load_visium_hd_sample,
     load_visium_sample,
     load_xenium_sample,
+)
+from sc_tools.ingest.slurm import (
+    build_batch_sbatch,
+    build_imc_sbatch,
+    build_sbatch_header,
+    build_spaceranger_sbatch,
+    build_xenium_sbatch,
+    write_sbatch_script,
 )
 from sc_tools.ingest.spaceranger import (
     build_batch_commands,
@@ -194,6 +204,56 @@ class TestBuildSpacerangerCmd:
         )
         assert "--localcores=32" in cmd
         assert "--localmem=128" in cmd
+
+    def test_probe_set(self):
+        cmd = build_spaceranger_count_cmd(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            cytaimage="/img.tif",
+            probe_set="/probes/v2.csv",
+        )
+        assert "--probe-set=/probes/v2.csv" in cmd
+
+    def test_sample_filter(self):
+        cmd = build_spaceranger_count_cmd(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            cytaimage="/img.tif",
+            sample_filter="PT01-1_NAT",
+        )
+        assert "--sample=PT01-1_NAT" in cmd
+
+    def test_create_bam_true(self):
+        cmd = build_spaceranger_count_cmd(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            cytaimage="/img.tif",
+            create_bam=True,
+        )
+        assert "--create-bam=true" in cmd
+
+    def test_create_bam_false_default(self):
+        cmd = build_spaceranger_count_cmd(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            cytaimage="/img.tif",
+        )
+        assert "--create-bam=false" in cmd
+
+    def test_custom_spaceranger_path(self):
+        cmd = build_spaceranger_count_cmd(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            cytaimage="/img.tif",
+            spaceranger_path="/opt/sr4/spaceranger",
+        )
+        assert cmd.startswith("/opt/sr4/spaceranger count")
+        assert "spaceranger count" not in cmd.replace("/opt/sr4/spaceranger count", "")
 
 
 class TestBuildBatchCommands:
@@ -608,3 +668,729 @@ class TestLoadXeniumSample:
             result = load_xenium_sample(xenium_dir, "XEN_05")
 
         assert result.var_names.is_unique
+
+
+# ---------------------------------------------------------------------------
+# IMCPanelMapper tests
+# ---------------------------------------------------------------------------
+
+
+def _write_full_csv(tmp_path, rows: list[tuple[int, str]]) -> Path:
+    """Write a *_full.csv style channel index file."""
+    csv_path = tmp_path / "roi_full.csv"
+    lines = [",channel"] + [f"{idx},{name}" for idx, name in rows]
+    csv_path.write_text("\n".join(lines))
+    return csv_path
+
+
+class TestIMCPanelMapper:
+    CHANNELS = [
+        (0, "HH3(In113)"),
+        (1, "CD45RA(Nd143)"),
+        (2, "CD163(Sm147)"),
+        (3, "CD14(Nd148)"),
+        (4, "CD3(Er170)"),
+        (5, "DNA1(Ir191)"),
+        (6, "PanCK(Pt195)"),
+        (7, "CD68(Pt196)"),
+        (8, "<EMPTY>(In115)"),
+    ]
+
+    def test_resolve_exact_protein(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("CD3") == 4
+        assert mapper.resolve("PanCK") == 6
+        assert mapper.resolve("DNA1") == 5
+
+    def test_resolve_case_insensitive(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("cd3") == 4
+        assert mapper.resolve("PANCK") == 6
+
+    def test_resolve_isotope_tag(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("Er170") == 4
+        assert mapper.resolve("Ir191") == 5
+
+    def test_resolve_full_string(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("CD3(Er170)") == 4
+
+    def test_resolve_partial_match(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        # CD45RA matches partial 'CD45'
+        assert mapper.resolve("CD45") == 1
+
+    def test_resolve_missing_returns_none(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("NONEXISTENT") is None
+
+    def test_resolve_empty_channel_returns_none(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.resolve("<EMPTY>") is None
+
+    def test_build_rgb_indices(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        rgb = mapper.build_rgb_indices(r="PanCK", g="CD3", b="DNA1")
+        assert rgb == {"R": 6, "G": 4, "B": 5}
+
+    def test_build_rgb_indices_missing_channel(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        rgb = mapper.build_rgb_indices(r="NONEXISTENT", g="CD3", b="DNA1")
+        assert rgb["R"] is None
+        assert rgb["G"] == 4
+
+    def test_channel_names(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        names = mapper.channel_names()
+        assert names[4] == "CD3"
+        assert names[5] == "DNA1"
+
+    def test_n_channels(self, tmp_path):
+        csv = _write_full_csv(tmp_path, self.CHANNELS)
+        mapper = IMCPanelMapper(full_csv=csv)
+        assert mapper.n_channels() == len(self.CHANNELS)
+
+    def test_set_from_var_names(self):
+        mapper = IMCPanelMapper()
+        mapper.set_from_var_names(["CD3(Er170)", "PanCK(Pt195)", "DNA1(Ir191)"])
+        assert mapper.resolve("CD3") == 0
+        assert mapper.resolve("PanCK") == 1
+        assert mapper.resolve("DNA1") == 2
+
+    def test_panel_csv_ilastik_flags(self, tmp_path):
+        panel_path = tmp_path / "channel_labels.csv"
+        panel_path.write_text(
+            "channel,Target,Metal_Tag,Atom,full,ilastik\n"
+            "CD3(Er170),CD3,Er170,170,1,1\n"
+            "PanCK(Pt195),PanCK,Pt195,195,1,0\n"
+            "DNA1(Ir191),DNA1,Ir191,191,1,1\n"
+        )
+        mapper = IMCPanelMapper(panel_csv=panel_path)
+        ilastik_idx = mapper.get_ilastik_indices()
+        assert len(ilastik_idx) == 2
+
+
+# ---------------------------------------------------------------------------
+# build_imc_composite tests
+# ---------------------------------------------------------------------------
+
+
+def _write_synthetic_tiff(tmp_path: Path, n_ch: int, h: int, w: int) -> Path:
+    """Write a synthetic (C, H, W) uint16 TIFF for testing."""
+    try:
+        import tifffile
+    except ImportError:
+        pytest.skip("tifffile not installed")
+    arr = (np.random.rand(n_ch, h, w) * 1000).astype(np.uint16)
+    tiff_path = tmp_path / "roi_full.tiff"
+    tifffile.imwrite(str(tiff_path), arr)
+    return tiff_path
+
+
+class TestBuildImcComposite:
+    CHANNELS = [
+        (0, "HH3(In113)"),
+        (1, "CD45RA(Nd143)"),
+        (2, "CD3(Er170)"),
+        (3, "DNA1(Ir191)"),
+        (4, "PanCK(Pt195)"),
+        (5, "CD68(Pt196)"),
+    ]
+
+    def test_basic_composite(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=64, w=64)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+
+        result = build_imc_composite(
+            tiff_path=tiff_path,
+            channel_csv=csv_path,
+            r="PanCK",
+            g="CD3",
+            b="DNA1",
+        )
+
+        assert "images" in result
+        assert "hires" in result["images"]
+        assert "full" in result["images"]
+        assert result["images"]["hires"].shape == (64, 64, 3)
+        assert result["images"]["hires"].dtype == np.uint8
+        assert result["images"]["full"].shape == (6, 64, 64)
+        assert result["images"]["full"].dtype == np.float32
+
+    def test_rgb_indices_stored(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=32, w=32)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        result = build_imc_composite(tiff_path, csv_path, r="PanCK", g="CD3", b="DNA1")
+
+        rgb_ch = result["metadata"]["rgb_channels"]
+        assert rgb_ch["R"] == "PanCK"
+        assert rgb_ch["G"] == "CD3"
+        assert rgb_ch["B"] == "DNA1"
+
+        rgb_idx = result["metadata"]["rgb_indices"]
+        assert rgb_idx["R"] == 4
+        assert rgb_idx["G"] == 2
+        assert rgb_idx["B"] == 3
+
+    def test_scalefactors_no_downsample(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=32, w=32)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        result = build_imc_composite(tiff_path, csv_path)
+        assert result["scalefactors"]["tissue_hires_scalef"] == 1.0
+
+    def test_downsample(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=64, w=64)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        result = build_imc_composite(tiff_path, csv_path, downsample=2)
+        assert result["images"]["hires"].shape == (32, 32, 3)
+        assert result["scalefactors"]["tissue_hires_scalef"] == 0.5
+
+    def test_missing_channel_in_rgb(self, tmp_path):
+        """Missing RGB channel produces a zero plane, not an error."""
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=32, w=32)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        result = build_imc_composite(tiff_path, csv_path, r="NONEXISTENT", g="CD3", b="DNA1")
+        assert result["images"]["hires"][..., 0].max() == 0
+
+    def test_arcsinh_normalization(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=32, w=32)
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        result = build_imc_composite(tiff_path, csv_path)
+        assert result["images"]["full"].min() >= 0
+
+    def test_tiff_not_found_raises(self, tmp_path):
+        csv_path = _write_full_csv(tmp_path, self.CHANNELS)
+        with pytest.raises(FileNotFoundError, match="TIFF stack"):
+            build_imc_composite(tmp_path / "missing.tiff", csv_path)
+
+    def test_csv_not_found_raises(self, tmp_path):
+        tiff_path = _write_synthetic_tiff(tmp_path, n_ch=6, h=32, w=32)
+        with pytest.raises(FileNotFoundError, match="Channel CSV"):
+            build_imc_composite(tiff_path, tmp_path / "missing.csv")
+
+
+# ---------------------------------------------------------------------------
+# load_imc_sample with load_images tests
+# ---------------------------------------------------------------------------
+
+
+class TestLoadImcSampleImages:
+    """Tests for load_imc_sample with load_images=True."""
+
+    def _make_imc_processed_dir(self, tmp_path, sample_id: str, n_markers: int = 5):
+        """Create a minimal processed IMC directory with cells.h5ad and tiffs/."""
+        processed_dir = tmp_path / "processed" / sample_id.split("-")[0]
+        tiff_dir = processed_dir / "tiffs"
+        tiff_dir.mkdir(parents=True)
+
+        # Write cells.h5ad
+        n_obs = 20
+        X = np.random.rand(n_obs, n_markers).astype(np.float32)
+        markers = ["CD3", "PanCK", "DNA1", "CD68", "CD45RA"][:n_markers]
+        adata_inner = ad.AnnData(
+            X=X,
+            obs=pd.DataFrame(index=[f"cell_{i}" for i in range(n_obs)]),
+            var=pd.DataFrame(index=markers),
+        )
+        adata_inner.obsm["spatial"] = np.random.rand(n_obs, 2) * 100
+        adata_inner.write_h5ad(processed_dir / "cells.h5ad")
+
+        # Write channel CSV
+        channel_strings = [
+            "CD3(Er170)",
+            "PanCK(Pt195)",
+            "DNA1(Ir191)",
+            "CD68(Pt196)",
+            "CD45RA(Nd143)",
+        ][:n_markers]
+        csv_path = tiff_dir / f"{sample_id}_full.csv"
+        csv_path.write_text(
+            ",channel\n" + "\n".join(f"{i},{n}" for i, n in enumerate(channel_strings))
+        )
+
+        # Write synthetic TIFF
+        try:
+            import tifffile
+
+            arr = (np.random.rand(n_markers, 32, 32) * 1000).astype(np.uint16)
+            tifffile.imwrite(str(tiff_dir / f"{sample_id}_full.tiff"), arr)
+        except ImportError:
+            (tiff_dir / f"{sample_id}_full.tiff").write_bytes(b"dummy")
+
+        return processed_dir
+
+    def test_load_images_populates_uns_spatial(self, tmp_path):
+        try:
+            import tifffile  # noqa: F401
+        except ImportError:
+            pytest.skip("tifffile not installed")
+
+        sample_id = "SAMPLE-01"
+        processed_dir = self._make_imc_processed_dir(tmp_path, sample_id)
+        result = load_imc_sample(processed_dir, sample_id, load_images=True)
+
+        assert "spatial" in result.uns
+        assert sample_id in result.uns["spatial"]
+        spatial = result.uns["spatial"][sample_id]
+        assert "images" in spatial
+        assert "hires" in spatial["images"]
+        assert "full" in spatial["images"]
+        assert spatial["images"]["hires"].dtype == np.uint8
+        assert spatial["images"]["hires"].shape[-1] == 3
+
+    def test_load_images_false_no_spatial(self, tmp_path):
+        sample_id = "SAMPLE-02"
+        processed_dir = self._make_imc_processed_dir(tmp_path, sample_id)
+        result = load_imc_sample(processed_dir, sample_id, load_images=False)
+        assert not result.uns.get("spatial", {})
+
+    def test_load_images_missing_tiffs_dir_warns(self, tmp_path, caplog):
+        """Missing tiffs/ directory logs a warning and does not raise."""
+        import logging
+
+        n_obs, n_vars = 10, 3
+        processed_dir = tmp_path / "processed" / "sample_no_tiffs"
+        processed_dir.mkdir(parents=True)
+        adata_inner = ad.AnnData(
+            X=np.random.rand(n_obs, n_vars).astype(np.float32),
+            obs=pd.DataFrame(index=[f"c_{i}" for i in range(n_obs)]),
+            var=pd.DataFrame(index=[f"m_{i}" for i in range(n_vars)]),
+        )
+        adata_inner.write_h5ad(processed_dir / "cells.h5ad")
+
+        with caplog.at_level(logging.WARNING):
+            result = load_imc_sample(processed_dir, "NO_TIFFS", load_images=True)
+
+        assert "tiffs/" in caplog.text
+        assert result.n_obs == n_obs
+
+
+# ---------------------------------------------------------------------------
+# load_he_image tests
+# ---------------------------------------------------------------------------
+
+
+class TestLoadHeImage:
+    def test_inject_into_existing_adata(self, tmp_path):
+        try:
+            import tifffile
+        except ImportError:
+            pytest.skip("tifffile not installed")
+
+        img = (np.random.rand(64, 64, 3) * 255).astype(np.uint8)
+        he_path = tmp_path / "sample.tiff"
+        tifffile.imwrite(str(he_path), img)
+
+        adata = ad.AnnData(
+            X=np.zeros((5, 3)),
+            obs=pd.DataFrame(index=[f"c_{i}" for i in range(5)]),
+            var=pd.DataFrame(index=["A", "B", "C"]),
+        )
+
+        load_he_image(he_path, "LIB_01", adata)
+
+        assert "spatial" in adata.uns
+        assert "LIB_01" in adata.uns["spatial"]
+        spatial = adata.uns["spatial"]["LIB_01"]
+        assert "images" in spatial
+        assert "hires" in spatial["images"]
+        assert spatial["images"]["hires"].dtype == np.uint8
+        assert spatial["images"]["hires"].shape == (64, 64, 3)
+
+    def test_grayscale_converted_to_rgb(self, tmp_path):
+        try:
+            import tifffile
+        except ImportError:
+            pytest.skip("tifffile not installed")
+
+        img = (np.random.rand(32, 32) * 255).astype(np.uint8)
+        he_path = tmp_path / "gray.tiff"
+        tifffile.imwrite(str(he_path), img)
+
+        adata = ad.AnnData(X=np.zeros((2, 2)))
+        load_he_image(he_path, "LIB_GRAY", adata)
+
+        out = adata.uns["spatial"]["LIB_GRAY"]["images"]["hires"]
+        assert out.shape == (32, 32, 3)
+
+    def test_downsample(self, tmp_path):
+        try:
+            import tifffile
+        except ImportError:
+            pytest.skip("tifffile not installed")
+
+        img = (np.random.rand(64, 64, 3) * 255).astype(np.uint8)
+        he_path = tmp_path / "he.tiff"
+        tifffile.imwrite(str(he_path), img)
+
+        adata = ad.AnnData(X=np.zeros((2, 2)))
+        load_he_image(he_path, "LIB_DS", adata, downsample=2)
+
+        out = adata.uns["spatial"]["LIB_DS"]["images"]["hires"]
+        assert out.shape == (32, 32, 3)
+
+    def test_file_not_found_raises(self, tmp_path):
+        adata = ad.AnnData(X=np.zeros((2, 2)))
+        with pytest.raises(FileNotFoundError):
+            load_he_image(tmp_path / "nonexistent.tiff", "LIB_X", adata)
+
+    def test_custom_image_key(self, tmp_path):
+        try:
+            import tifffile
+        except ImportError:
+            pytest.skip("tifffile not installed")
+
+        img = (np.random.rand(16, 16, 3) * 255).astype(np.uint8)
+        he_path = tmp_path / "he_low.tiff"
+        tifffile.imwrite(str(he_path), img)
+
+        adata = ad.AnnData(X=np.zeros((2, 2)))
+        load_he_image(he_path, "LIB_KEY", adata, image_key="lowres")
+
+        assert "lowres" in adata.uns["spatial"]["LIB_KEY"]["images"]
+
+
+# ---------------------------------------------------------------------------
+# SLURM sbatch generation tests
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSbatchHeader:
+    def test_basic_header(self):
+        header = build_sbatch_header("test_job")
+        assert "#SBATCH --job-name=test_job" in header
+        assert "#SBATCH --partition=scu-cpu" in header
+        assert "#SBATCH --cpus-per-task=32" in header
+        assert "#SBATCH --mem=240G" in header
+        assert "#SBATCH --time=2-00:00:00" in header
+        assert "#SBATCH --output=logs/test_job_%j.out" in header
+        assert "#SBATCH --error=logs/test_job_%j.err" in header
+
+    def test_custom_resources(self):
+        header = build_sbatch_header(
+            "myjob",
+            partition="gpu",
+            cpus_per_task=8,
+            mem="64G",
+            time="4:00:00",
+        )
+        assert "#SBATCH --partition=gpu" in header
+        assert "#SBATCH --cpus-per-task=8" in header
+        assert "#SBATCH --mem=64G" in header
+        assert "#SBATCH --time=4:00:00" in header
+
+    def test_custom_log_dir(self):
+        header = build_sbatch_header("j1", log_dir="output/logs")
+        assert "#SBATCH --output=output/logs/j1_%j.out" in header
+
+    def test_extra_directives(self):
+        header = build_sbatch_header("j1", extra_directives={"account": "mylab"})
+        assert "#SBATCH --account=mylab" in header
+
+
+class TestBuildSpacerangerSbatch:
+    def test_basic_visium_hd(self):
+        script = build_spaceranger_sbatch(
+            sample_id="PT01-2_TUM",
+            fastqs="/data/batch1",
+            transcriptome="/ref/GRCh38",
+            output_dir="/scratch/outputs",
+            cytaimage="/data/batch1/PT01-2_TUM/cyto.tif",
+            slide="H1-ABC",
+            area="D1",
+        )
+        assert "#!/bin/bash" in script
+        assert "#SBATCH --job-name=sr4_PT01-2_TUM" in script
+        assert "set -euo pipefail" in script
+        assert 'SR="spaceranger"' in script
+        assert 'TRANSCRIPTOME="/ref/GRCh38"' in script
+        assert 'CYTAIMAGE="/data/batch1/PT01-2_TUM/cyto.tif"' in script
+        assert "--create-bam=false" in script
+        assert "test -x" in script
+        assert "test -d" in script
+        assert "test -f" in script
+        assert "[VERIFY]" in script
+
+    def test_probe_set_included(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+            probe_set="/probes/v2.csv",
+        )
+        assert 'PROBE_SET="/probes/v2.csv"' in script
+        assert '--probe-set="${PROBE_SET}"' in script
+        assert "Probe set not found" in script
+
+    def test_sample_filter_included(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+            sample_filter="PT01-1",
+        )
+        assert 'SAMPLE_FILTER="PT01-1"' in script
+        assert '--sample="${SAMPLE_FILTER}"' in script
+
+    def test_custom_spaceranger_path(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+            spaceranger_path="/opt/sr4/spaceranger",
+        )
+        assert 'SR="/opt/sr4/spaceranger"' in script
+
+    def test_create_bam_true(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+            create_bam=True,
+        )
+        assert "--create-bam=true" in script
+
+    def test_slurm_overrides(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+            slurm={"partition": "gpu", "mem": "128G"},
+        )
+        assert "#SBATCH --partition=gpu" in script
+        assert "#SBATCH --mem=128G" in script
+
+    def test_no_image_raises(self):
+        with pytest.raises(ValueError, match="image"):
+            build_spaceranger_sbatch(
+                sample_id="S1",
+                fastqs="/data",
+                transcriptome="/ref",
+                output_dir="/out",
+            )
+
+    def test_both_images(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/cyto.tif",
+            image="/he.tif",
+        )
+        assert 'CYTAIMAGE="/cyto.tif"' in script
+        assert 'IMAGE="/he.tif"' in script
+        assert "CytAssist image not found" in script
+        assert "H&E image not found" in script
+
+    def test_cleanup_block(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+        )
+        assert "[CLEANUP]" in script
+        assert "rm -rf" in script
+
+    def test_post_verification_block(self):
+        script = build_spaceranger_sbatch(
+            sample_id="S1",
+            fastqs="/data",
+            transcriptome="/ref",
+            output_dir="/out",
+            cytaimage="/img.tif",
+        )
+        assert "square_008um" in script
+        assert "cell_segmentation" in script
+        assert "cloupe" in script
+        assert "[FAIL]" in script
+
+
+class TestBuildXeniumSbatch:
+    def test_basic(self):
+        script = build_xenium_sbatch(
+            sample_id="XEN_01",
+            xenium_bundle="/data/xenium/run1",
+            output_dir="/out",
+        )
+        assert "#!/bin/bash" in script
+        assert "#SBATCH --job-name=xr_XEN_01" in script
+        assert 'XENIUM_BUNDLE="/data/xenium/run1"' in script
+        assert "xeniumranger" in script
+        assert "--xenium-bundle" in script
+        assert "test -d" in script
+
+    def test_custom_binary(self):
+        script = build_xenium_sbatch(
+            sample_id="XEN_01",
+            xenium_bundle="/data/xenium/run1",
+            output_dir="/out",
+            xenium_ranger_path="/opt/xr/xeniumranger",
+        )
+        assert 'XR="/opt/xr/xeniumranger"' in script
+
+
+class TestBuildImcSbatch:
+    def test_basic(self):
+        script = build_imc_sbatch(
+            sample_id="IMC_01",
+            mcd_file="/data/sample.mcd",
+            panel_csv="/panel.csv",
+            output_dir="/out",
+        )
+        assert "#!/bin/bash" in script
+        assert "#SBATCH --job-name=imc_IMC_01" in script
+        assert 'MCD_FILE="/data/sample.mcd"' in script
+        assert 'PANEL_CSV="/panel.csv"' in script
+        assert "test -f" in script
+        assert "tiffs/" in script
+        assert "cells.h5ad" in script
+
+
+class TestBuildBatchSbatch:
+    def test_spaceranger_batch(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["S1", "S2"],
+                "fastq_dir": ["/data/S1", "/data/S2"],
+                "cytaimage": ["/img/S1.tif", "/img/S2.tif"],
+                "slide": ["H1", "H1"],
+                "area": ["D1", "A1"],
+            }
+        )
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="visium_hd",
+            output_dir="/out",
+            transcriptome="/ref",
+        )
+        assert len(scripts) == 2
+        assert scripts[0][0] == "S1"
+        assert scripts[1][0] == "S2"
+        assert "sr4_S1" in scripts[0][1]
+        assert "sr4_S2" in scripts[1][1]
+
+    def test_xenium_batch(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["X1"],
+                "xenium_dir": ["/data/xenium/X1"],
+            }
+        )
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="xenium",
+            output_dir="/out",
+        )
+        assert len(scripts) == 1
+        assert "xr_X1" in scripts[0][1]
+
+    def test_imc_batch(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["I1"],
+                "mcd_file": ["/data/I1.mcd"],
+                "panel_csv": ["/panel.csv"],
+            }
+        )
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="imc",
+            output_dir="/out",
+        )
+        assert len(scripts) == 1
+        assert "imc_I1" in scripts[0][1]
+
+    def test_skips_missing_transcriptome(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["S1"],
+                "fastq_dir": ["/data/S1"],
+                "cytaimage": ["/img/S1.tif"],
+            }
+        )
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="visium_hd",
+            output_dir="/out",
+            # No transcriptome
+        )
+        assert len(scripts) == 0
+
+    def test_unsupported_modality(self):
+        manifest = pd.DataFrame({"sample_id": ["S1"]})
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="cosmx",
+            output_dir="/out",
+        )
+        assert len(scripts) == 0
+
+    def test_probe_set_from_manifest(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["S1"],
+                "fastq_dir": ["/data/S1"],
+                "cytaimage": ["/img.tif"],
+                "probe_set": ["/probes/custom.csv"],
+            }
+        )
+        scripts = build_batch_sbatch(
+            manifest,
+            modality="visium_hd",
+            output_dir="/out",
+            transcriptome="/ref",
+            probe_set="/probes/default.csv",
+        )
+        assert len(scripts) == 1
+        # Manifest probe_set should override the function arg
+        assert "/probes/custom.csv" in scripts[0][1]
+
+
+class TestWriteSbatchScript:
+    def test_creates_file(self, tmp_path):
+        script = "#!/bin/bash\necho hello\n"
+        path = write_sbatch_script(script, tmp_path / "test.sbatch")
+        assert path.exists()
+        assert path.read_text() == script
+        # Check executable
+        assert path.stat().st_mode & 0o111
+
+    def test_creates_parent_dirs(self, tmp_path):
+        path = write_sbatch_script("#!/bin/bash\n", tmp_path / "sub" / "dir" / "test.sbatch")
+        assert path.exists()
+
+    def test_no_overwrite_by_default(self, tmp_path):
+        script_path = tmp_path / "test.sbatch"
+        script_path.write_text("old")
+        with pytest.raises(FileExistsError):
+            write_sbatch_script("new", script_path)
+
+    def test_overwrite_flag(self, tmp_path):
+        script_path = tmp_path / "test.sbatch"
+        script_path.write_text("old")
+        write_sbatch_script("new", script_path, overwrite=True)
+        assert script_path.read_text() == "new"

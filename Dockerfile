@@ -24,8 +24,8 @@ ADD --chmod=755 https://astral.sh/uv/install.sh /uv-installer.sh
 RUN /uv-installer.sh && rm /uv-installer.sh
 ENV PATH="/root/.local/bin:$PATH"
 
-# Create conda env with Python 3.10
-RUN conda create -n sc_tools python=3.10 -y
+# Create conda env with Python 3.11
+RUN conda create -n sc_tools python=3.11 -y
 ENV PATH="/opt/conda/envs/sc_tools/bin:$PATH"
 
 WORKDIR /workspace

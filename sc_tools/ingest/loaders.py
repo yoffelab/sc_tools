@@ -340,15 +340,23 @@ def load_xenium_sample(
 def load_imc_sample(
     processed_dir: str | Path,
     sample_id: str,
+    *,
+    load_images: bool = False,
+    panel_csv: str | Path | None = None,
+    rgb_channels: tuple[str, str, str] = ("PanCK", "CD3", "DNA1"),
+    image_downsample: int = 1,
 ) -> ad.AnnData:
     """Load one IMC sample from a steinbock/ElementoLab processed directory.
 
-    Expects the standard IMC pipeline output layout::
+    Expects the standard ElementoLab IMC pipeline output layout::
 
         processed/{sample}/
-            tiffs/        # per-channel TIFF images
-            masks/        # segmentation masks
-            cells.h5ad    # single-cell data (steinbock default)
+            tiffs/
+                {roi_id}_full.tiff     # (C, H, W) multi-channel TIFF stack
+                {roi_id}_full.csv      # channel index -> MarkerName(IsotopeTag)
+                {roi_id}_full_mask.tiff
+                {roi_id}_Probabilities.tiff
+            cells.h5ad                 # single-cell data (steinbock default)
 
     Parameters
     ----------
@@ -356,12 +364,45 @@ def load_imc_sample(
         Path to the processed sample directory (e.g. ``processed/{sample}/``).
         Must contain ``cells.h5ad`` (steinbock default) or ``cells/cells.h5ad``.
     sample_id
-        Sample/ROI identifier.
+        Sample/ROI identifier (e.g. ``05122023_Vivek_S21_5251_G3_Group1-01``).
+        Used to locate ``tiffs/{sample_id}_full.tiff`` when ``load_images=True``.
+    load_images
+        If ``True``, read the ``{sample_id}_full.tiff`` multi-channel stack
+        from ``processed_dir/tiffs/``, build an arcsinh-normalized full stack
+        and RGB composite, and store both in ``adata.uns['spatial'][sample_id]``
+        (squidpy/scanpy-compatible format).
+    panel_csv
+        Optional path to a panel metadata CSV (``channel_labels.csv``) with
+        columns ``channel, Target, Metal_Tag, Atom, full, ilastik``. Provides
+        additional name aliases and flags. When ``None``, channels are resolved
+        from the per-ROI ``*_full.csv`` alone.
+    rgb_channels
+        Three marker names ``(R, G, B)`` for the default RGB composite image.
+        Defaults to ``("PanCK", "CD3", "DNA1")``.
+    image_downsample
+        Spatial downsampling factor applied uniformly (1 = no downsampling).
+        Use 2 or 4 to reduce memory for large IMC images.
 
     Returns
     -------
-    AnnData with sample annotation and spatial coordinates.
+    AnnData with sample annotation and spatial coordinates. When
+    ``load_images=True``, ``adata.uns['spatial'][sample_id]`` contains::
+
+        images/
+          hires   (H, W, 3) uint8    — percentile-clipped RGB composite
+          full    (C, H, W) float32  — arcsinh(x/5) normalized full stack
+        scalefactors/
+          tissue_hires_scalef: 1.0/downsample
+          spot_diameter_fullres: 1.0  (1 pixel ~ 1 µm in IMC)
+        metadata/
+          channels: list[str]        — ordered protein names
+          channel_strings: list[str] — full MarkerName(IsotopeTag) strings
+          rgb_channels: {R, G, B}    — resolved protein names used
+          rgb_indices: {R, G, B}     — TIFF stack indices used
+          pixel_size_um: 1.0
     """
+    from .imc import IMCPanelMapper, build_imc_composite
+
     processed_dir = Path(processed_dir)
 
     # Locate the cells h5ad — try common steinbock output locations
@@ -385,6 +426,75 @@ def load_imc_sample(
     if "spatial" not in adata.obsm and "X_spatial" in adata.obsm:
         adata.obsm["spatial"] = adata.obsm["X_spatial"]
 
+    # Optionally load TIFF stack images
+    if load_images:
+        tiff_dir = processed_dir / "tiffs"
+        if not tiff_dir.exists():
+            logger.warning(
+                "load_imc_sample: load_images=True but tiffs/ not found at %s; skipping",
+                tiff_dir,
+            )
+        else:
+            # Locate the *_full.tiff and *_full.csv for this ROI/sample.
+            # Naming convention: {sample_id}_full.tiff / {sample_id}_full.csv
+            tiff_path = tiff_dir / f"{sample_id}_full.tiff"
+            csv_path = tiff_dir / f"{sample_id}_full.csv"
+
+            # Fallback: glob for any *_full.tiff if direct path not found
+            if not tiff_path.exists():
+                candidates = sorted(tiff_dir.glob("*_full.tiff"))
+                if candidates:
+                    tiff_path = candidates[0]
+                    roi_stem = tiff_path.name[: -len("_full.tiff")]
+                    csv_path = tiff_dir / f"{roi_stem}_full.csv"
+                    logger.warning(
+                        "load_imc_sample: exact TIFF %s not found; using %s",
+                        f"{sample_id}_full.tiff",
+                        tiff_path.name,
+                    )
+
+            if not tiff_path.exists():
+                logger.warning(
+                    "load_imc_sample: no *_full.tiff found in %s; skipping image load",
+                    tiff_dir,
+                )
+            elif not csv_path.exists():
+                logger.warning(
+                    "load_imc_sample: channel CSV %s not found; skipping image load",
+                    csv_path,
+                )
+            else:
+                try:
+                    mapper = IMCPanelMapper(full_csv=csv_path, panel_csv=panel_csv)
+                    # Also register var_names so partial matching works without panel CSV
+                    if mapper.n_channels() == 0:
+                        mapper.set_from_var_names(list(adata.var_names))
+
+                    spatial_dict = build_imc_composite(
+                        tiff_path=tiff_path,
+                        channel_csv=csv_path,
+                        panel_mapper=mapper,
+                        r=rgb_channels[0],
+                        g=rgb_channels[1],
+                        b=rgb_channels[2],
+                        downsample=image_downsample,
+                    )
+                    if "spatial" not in adata.uns:
+                        adata.uns["spatial"] = {}
+                    adata.uns["spatial"][sample_id] = spatial_dict
+                    logger.info(
+                        "Loaded IMC images for %s: %d channels, composite R=%s G=%s B=%s",
+                        sample_id,
+                        len(spatial_dict["metadata"]["channels"]),
+                        spatial_dict["metadata"]["rgb_channels"].get("R"),
+                        spatial_dict["metadata"]["rgb_channels"].get("G"),
+                        spatial_dict["metadata"]["rgb_channels"].get("B"),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "load_imc_sample: image loading failed for %s: %s", sample_id, exc
+                    )
+
     logger.info(
         "Loaded IMC sample %s: %d cells x %d markers",
         sample_id,
@@ -392,6 +502,92 @@ def load_imc_sample(
         adata.n_vars,
     )
     return adata
+
+
+def load_he_image(
+    he_path: str | Path,
+    library_id: str,
+    adata: ad.AnnData,
+    *,
+    downsample: int = 1,
+    image_key: str = "hires",
+) -> None:
+    """Load an H&E TIFF and inject it into ``adata.uns['spatial'][library_id]``.
+
+    Works for any modality (IMC, Xenium, Visium HD) that has an accompanying
+    H&E TIFF image. Creates the spatial dict if absent; overwrites
+    ``images[image_key]`` if the key already exists.
+
+    Parameters
+    ----------
+    he_path
+        Path to the H&E TIFF file (any format readable by ``tifffile``).
+    library_id
+        Key under ``adata.uns['spatial']`` where the image will be stored.
+    adata
+        AnnData to modify in place.
+    downsample
+        Spatial downsampling factor applied uniformly (1 = no downsampling).
+    image_key
+        Key within ``adata.uns['spatial'][library_id]['images']`` under which
+        the image is stored (default ``"hires"``).
+    """
+    try:
+        import tifffile
+    except ImportError as e:
+        raise ImportError("tifffile is required for H&E image loading: pip install tifffile") from e
+
+    he_path = Path(he_path)
+    if not he_path.exists():
+        raise FileNotFoundError(f"H&E image not found: {he_path}")
+
+    img = tifffile.imread(str(he_path))
+
+    # Ensure (H, W, C) layout
+    if img.ndim == 2:
+        # Grayscale -> RGB
+        img = np.stack([img, img, img], axis=-1)
+    elif img.ndim == 3 and img.shape[0] in (3, 4):
+        # (C, H, W) -> (H, W, C)
+        img = np.moveaxis(img, 0, -1)
+
+    # Take RGB only (drop alpha if present)
+    img = img[..., :3]
+
+    if downsample > 1:
+        img = img[::downsample, ::downsample, :]
+
+    # Ensure uint8
+    if img.dtype != np.uint8:
+        if img.max() <= 1.0:
+            img = (img * 255).clip(0, 255).astype(np.uint8)
+        else:
+            img = img.clip(0, 255).astype(np.uint8)
+
+    scalef = 1.0 / downsample
+
+    if "spatial" not in adata.uns:
+        adata.uns["spatial"] = {}
+    if library_id not in adata.uns["spatial"]:
+        adata.uns["spatial"][library_id] = {"images": {}, "scalefactors": {}}
+
+    spatial = adata.uns["spatial"][library_id]
+    if "images" not in spatial:
+        spatial["images"] = {}
+    if "scalefactors" not in spatial:
+        spatial["scalefactors"] = {}
+
+    spatial["images"][image_key] = img
+    spatial["scalefactors"].setdefault("tissue_hires_scalef", scalef)
+    spatial["scalefactors"].setdefault("tissue_lowres_scalef", scalef)
+    spatial["scalefactors"].setdefault("spot_diameter_fullres", 1.0)
+
+    logger.info(
+        "Loaded H&E image for library %s: shape %s (key=%s)",
+        library_id,
+        img.shape,
+        image_key,
+    )
 
 
 def concat_samples(

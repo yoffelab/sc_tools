@@ -22,7 +22,15 @@ Usage (individual steps)::
     pp.cluster(adata, resolution=0.8)
 """
 
-from .integrate import run_cytovi, run_harmony, run_scvi
+from .integrate import (
+    run_bbknn,
+    run_combat,
+    run_cytovi,
+    run_harmony,
+    run_scanorama,
+    run_scanvi,
+    run_scvi,
+)
 from .normalize import (
     arcsinh_transform,
     backup_raw,
@@ -48,6 +56,10 @@ __all__ = [
     "run_scvi",
     "run_harmony",
     "run_cytovi",
+    "run_combat",
+    "run_bbknn",
+    "run_scanorama",
+    "run_scanvi",
     # Dimensionality reduction & clustering
     "pca",
     "neighbors",

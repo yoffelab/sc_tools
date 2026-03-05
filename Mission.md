@@ -284,7 +284,7 @@ Sequential; each step builds on the previous. See skills.md Sections 13 and 16.
 | 2 | **Snakemake** | Done | Per-project Snakefiles. Apptainer (Linux/HPC) / Docker (macOS) via `run_container.sh`. |
 | 3 | **Sphinx docs** | Done | `docs/` with pydata-sphinx-theme + myst-nb; `make docs`; `.readthedocs.yaml`; zero warnings. |
 | 4 | **PyPI deployment** | Done | `pyproject.toml` wheel/sdist; `.github/workflows/publish.yml` (trusted publishing). LICENSE added. |
-| 5 | **GitHub Actions** | Pending | `.github/workflows/tests.yml`: lint + pytest + Snakemake dry-run. Last (complex setup). |
+| 5 | **GitHub Actions** | Done | `.github/workflows/ci.yml`: lint, test matrix (py3.10/3.11 x ubuntu/macos), docs, Snakemake dry-run, Docker build. `docs.yml` absorbed. |
 
 ### To Do (later)
 

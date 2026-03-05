@@ -1,5 +1,11 @@
 # sc_tools — Spatial and Single-Cell Omics Toolkit
 
+[![CI](https://github.com/yoffelab/sc_tools/actions/workflows/ci.yml/badge.svg)](https://github.com/yoffelab/sc_tools/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/sci-sc-tools)](https://pypi.org/project/sci-sc-tools/)
+[![Python](https://img.shields.io/pypi/pyversions/sci-sc-tools)](https://pypi.org/project/sci-sc-tools/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docs](https://readthedocs.org/projects/sc-tools/badge/?version=latest)](https://sc-tools.readthedocs.io)
+
 **sc_tools** is a reusable Python toolkit and pipeline for spatial transcriptomics and single-cell omics. It wraps scanpy, squidpy, scVI-tools, and related libraries in a consistent API and provides a phased, Snakemake-driven workflow for multi-modality projects (Visium, Visium HD, Xenium, IMC, CosMx).
 
 The package is installable via `pyproject.toml` and designed to be shared across projects. Project-specific data, results, and figures all live under `projects/<platform>/<project_name>/`.

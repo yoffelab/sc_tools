@@ -28,9 +28,6 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN conda create -n sc_tools python=3.10 -y
 ENV PATH="/opt/conda/envs/sc_tools/bin:$PATH"
 
-# Dask: new query-planning backend (required since 2024+)
-ENV DASK_DATAFRAME__QUERY_PLANNING=true
-
 WORKDIR /workspace
 
 # Install sc_tools package (pyproject.toml defines all deps)

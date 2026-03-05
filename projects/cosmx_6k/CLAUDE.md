@@ -1,4 +1,4 @@
-# cosmx_full_library — Claude Code Configuration
+# cosmx_6k — Claude Code Configuration
 
 ## Sync Before Work
 
@@ -12,7 +12,7 @@ For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
 ## Project Context
 
 **Platform:** cosmx
-**Path:** `projects/cosmx/cosmx_full_library`
+**Path:** `projects/cosmx_6k`
 
 (Describe scientific objective here.)
 
@@ -22,18 +22,18 @@ For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
 
 ```bash
 # From repo root:
-./scripts/run_container.sh projects/cosmx/cosmx_full_library python scripts/<script>.py
-snakemake -d projects/cosmx/cosmx_full_library -s projects/cosmx/cosmx_full_library/Snakefile <target>
+./scripts/run_container.sh projects/cosmx_6k python scripts/<script>.py
+snakemake -d projects/cosmx_6k -s projects/cosmx_6k/Snakefile <target>
 
 # Local conda (no container):
-conda activate cosmx_full_library
-SC_TOOLS_RUNTIME=none snakemake -d projects/cosmx/cosmx_full_library -s projects/cosmx/cosmx_full_library/Snakefile <target>
+conda activate cosmx_6k
+SC_TOOLS_RUNTIME=none snakemake -d projects/cosmx_6k -s projects/cosmx_6k/Snakefile <target>
 
 # Tests:
-pytest projects/cosmx/cosmx_full_library/tests/ -v
+pytest projects/cosmx_6k/tests/ -v
 
 # Create conda env (one-time setup, from repo root):
-#   conda create -n cosmx_full_library python=3.10 -y && conda activate cosmx_full_library
+#   conda create -n cosmx_6k python=3.10 -y && conda activate cosmx_6k
 #   uv pip install -e ".[deconvolution]"
 ```
 

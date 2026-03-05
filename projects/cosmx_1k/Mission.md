@@ -1,6 +1,6 @@
-# Mission: cosmx_6k (cosmx)
+# Mission: cosmx_1k (cosmx)
 
-**Project:** `projects/cosmx/cosmx_6k`
+**Project:** `projects/cosmx_1k`
 **Current Status:** Setup
 **Last Updated:** 2026-03-04
 

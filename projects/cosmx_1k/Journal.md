@@ -1,6 +1,6 @@
 # Research Journal: cosmx_1k (cosmx)
 
-**Project:** `projects/cosmx/cosmx_1k`
+**Project:** `projects/cosmx_1k`
 
 ---
 

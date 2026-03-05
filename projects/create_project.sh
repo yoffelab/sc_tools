@@ -12,7 +12,7 @@
 #      Mission.md, Journal.md, journal_summary.md
 #      CLAUDE.md, Snakefile, config.yaml, pyproject.toml
 #
-# Valid data_type: visium | visium_hd | visium_hd_cell | xenium | imc | cosmx
+# Valid data_type: visium | visium_hd | visium_hd_cell | xenium | imc | cosmx_1k | cosmx_6k | cosmx_full_library
 # =============================================================================
 
 set -e
@@ -26,7 +26,7 @@ fi
 PROJECT_NAME="${1:?Usage: $0 <project_name> <data_type>}"
 DATA_TYPE="${2:?Usage: $0 <project_name> <data_type>}"
 
-VALID_TYPES=(visium visium_hd visium_hd_cell xenium imc cosmx)
+VALID_TYPES=(visium visium_hd visium_hd_cell xenium imc cosmx_1k cosmx_6k cosmx_full_library)
 if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
   echo "Error: data_type must be one of: ${VALID_TYPES[*]}" >&2
   exit 1
@@ -282,6 +282,37 @@ rule validate_p4:
 
 rule phase4:
     input: "results/adata.celltyped.p4.h5ad", "results/.adata.celltyped.p4.validated"
+
+# ---- QC reports (date-versioned HTML) ----
+rule qc_pre_filter:
+    input: "results/adata.raw.p1.h5ad"
+    output: touch("figures/QC/pre_filter_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report pre_filter --adata results/adata.raw.p1.h5ad --figures-dir figures --modality ${DATA_TYPE}"
+    )
+
+rule qc_post_filter:
+    input: "results/adata.raw.p1.h5ad", "results/adata.annotated.p2.h5ad"
+    output: touch("figures/QC/post_filter_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_filter --adata results/adata.raw.p1.h5ad"
+        + " --adata-post results/adata.annotated.p2.h5ad --figures-dir figures --modality ${DATA_TYPE}"
+    )
+
+rule qc_post_integration:
+    input: "results/adata.normalized.p3.h5ad"
+    output: touch("figures/QC/post_integration_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_integration --adata-integrated results/adata.normalized.p3.h5ad"
+        + " --figures-dir figures --modality ${DATA_TYPE}"
+    )
+
+rule qc_report:
+    input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output
+    output: touch("figures/QC/qc_report.done")
 
 # ---- Default ----
 rule all:

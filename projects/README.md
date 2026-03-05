@@ -1,6 +1,6 @@
 # Projects
 
-All analysis projects live under **data-type** folders: `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx/`.
+All analysis projects live under **data-type** folders: `visium/`, `visium_hd/`, `xenium/`, `imc/`, `cosmx_1k/`, `cosmx_6k/`, `cosmx_full_library/`.
 
 ## Create a New Project
 
@@ -10,7 +10,7 @@ From the repository root:
 ./projects/create_project.sh <project_name> <data_type>
 ```
 
-Valid `data_type`: `visium` | `visium_hd` | `visium_hd_cell` | `xenium` | `imc` | `cosmx`
+Valid `data_type`: `visium` | `visium_hd` | `visium_hd_cell` | `xenium` | `imc` | `cosmx_1k` | `cosmx_6k` | `cosmx_full_library`
 
 Example: `./projects/create_project.sh my_study visium_hd` creates `projects/visium_hd/my_study/` with the full directory tree.
 

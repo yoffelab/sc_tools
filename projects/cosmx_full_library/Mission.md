@@ -1,6 +1,6 @@
 # Mission: cosmx_full_library (cosmx)
 
-**Project:** `projects/cosmx/cosmx_full_library`
+**Project:** `projects/cosmx_full_library`
 **Current Status:** Setup
 **Last Updated:** 2026-03-04
 

@@ -48,11 +48,13 @@ This document outlines the directory structure, data flow, and script inventory.
 │   ├── visium_hd/
 │   ├── xenium/
 │   ├── imc/
-│   └── cosmx/
+│   ├── cosmx_1k/
+│   ├── cosmx_6k/
+│   └── cosmx_full_library/
 └── .gitignore, .githooks/
 ```
 
-**Creating a new project:** Run `./projects/create_project.sh <project_name> <data_type>`. Valid `data_type`: `visium` | `visium_hd` | `visium_hd_cell` | `xenium` | `imc` | `cosmx`.
+**Creating a new project:** Run `./projects/create_project.sh <project_name> <data_type>`. Valid `data_type`: `visium` | `visium_hd` | `visium_hd_cell` | `xenium` | `imc` | `cosmx_1k` | `cosmx_6k` | `cosmx_full_library`.
 
 ---
 
@@ -83,13 +85,48 @@ Checkpoints must satisfy the following so scripts and validators can rely on the
 
 | Checkpoint | Required `adata` contents |
 |------------|---------------------------|
-| **adata.p0.h5ad** (per-sample) | `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; single sample only (not concatenated). Set by `sc_tools.ingest.loaders`. |
+| **adata.p0.h5ad** (per-sample) | `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; single sample only (not concatenated). Set by `sc_tools.ingest.loaders`. **IMC only (optional):** `adata.uns['spatial'][sample_id]` may contain image data when `load_imc_sample(load_images=True)` is used — see IMC image schema below. |
 | **adata.raw.p1.h5ad** | `obs['sample']`, `obs['raw_data_dir']` (or equivalent), `obsm['spatial']`; `X` raw counts; no normalization; all samples concatenated. |
 | **adata.annotated.p2.h5ad** | All of p1; `obs` includes clinical/metadata columns from `metadata/sample_metadata.csv` (or join equivalent); optional `uns` keys for images/masks. |
 | **adata.normalized.p3.h5ad** | Normalized/batch-corrected representation (e.g. `obsm['X_scvi']`); `obs['leiden']` (or cluster column); `adata.raw` backed up. |
 | **adata.normalized.scored.p35.h5ad** | All of p3 (or p2 where p3 not used); signature scores in `obsm['signature_score']` (raw) and `obsm['signature_score_z']` (z-scored), column names = full path (e.g. `Myeloid/Macrophage_Core`); `uns['signature_score_report']` for per-signature n_present, n_missing, status; optional `obs['celltype']`/`celltype_broad` if automated typing run. |
 | **adata.celltyped.p4.h5ad** | All of p35; `obs['celltype']`, `obs['celltype_broad']` from `metadata/celltype_map.json`. |
 | **adata.{level}.{feature}.h5ad** | `obs` indexed by `level` (roi or patient); `X` or layer holds aggregated `feature` (mean expression or celltype frequency). |
+
+### 2.2b IMC image schema in adata.uns['spatial'] (optional Phase 0b)
+
+When `load_imc_sample(load_images=True)` is called, the per-ROI TIFF stack is loaded and stored in the standard squidpy/scanpy format, making `sc.pl.spatial(img_key="hires")` work without modification:
+
+```
+adata.uns['spatial'][sample_id]
+  images/
+    hires   (H, W, 3) uint8    — percentile-clipped RGB composite (PanCK=R, CD3=G, DNA1=B default)
+    full    (C, H, W) float32  — arcsinh(x/5) normalized full channel stack
+    mask    (H, W) int32       — labeled cell segmentation mask (if load_mask=True)
+  scalefactors/
+    tissue_hires_scalef: 1.0/downsample
+    tissue_lowres_scalef: 1.0/downsample
+    spot_diameter_fullres: 1.0   (1 pixel ~ 1 um in IMC)
+  metadata/
+    channels: list[str]         — ordered protein names (before "(")
+    channel_strings: list[str]  — full MarkerName(IsotopeTag) strings
+    rgb_channels: {R, G, B}     — resolved protein names used for composite
+    rgb_indices: {R, G, B}      — TIFF stack channel indices used
+    pixel_size_um: 1.0
+```
+
+**TIFF file naming** (ElementoLab/steinbock convention):
+- `processed/{sample}/tiffs/{roi_id}_full.tiff` — (C, H, W) multi-channel intensity stack
+- `processed/{sample}/tiffs/{roi_id}_full.csv` — channel index CSV (`index, MarkerName(IsotopeTag)`)
+- `processed/{sample}/tiffs/{roi_id}_full_mask.tiff` — labeled cell segmentation mask
+- `processed/{sample}/tiffs/{roi_id}_full_nucmask.tiff` — labeled nuclear mask
+- `processed/{sample}/tiffs/{roi_id}_Probabilities.tiff` — ilastik probability map
+
+**Channel CSV format** (`*_full.csv`): two columns, first = 0-based index, second = `MarkerName(IsotopeTag)` (e.g. `CD3(Er170)`, `PanCK(Pt195)`, `<EMPTY>(In115)`).
+
+**Panel CSV format** (`channel_labels.csv` / `data/{sample}.channel_labels.csv`): columns `channel, Target, Metal_Tag, Atom, full, ilastik`. `Target` = protein name; `ilastik=1` = used for ilastik segmentation.
+
+**`IMCPanelMapper`** (`sc_tools.ingest.IMCPanelMapper`): resolves any name form (protein name, `MarkerName(IsotopeTag)`, isotope tag, partial substring) to a TIFF stack channel index. Reads `*_full.csv` via `from_full_csv()` and optionally `channel_labels.csv` via `from_panel_csv()`.
 
 ### 2.3 Other project paths (metadata, optional results, figures)
 
@@ -99,8 +136,11 @@ Checkpoints must satisfy the following so scripts and validators can rely on the
 | `metadata/celltype_map.json` | cluster_id→celltype mapping for Phase 4. |
 | `metadata/gene_signatures.json` | Gene signatures for scoring (and per-signature `metadata/{name}.json` for obsm storage). |
 | `results/adata.deconvolution.h5ad` | Cell-type proportions (optional; Phase 3.5b). |
-| `figures/QC/raw/` | Pre-normalization QC reports. |
-| `figures/QC/post/` | Post-normalization QC reports. |
+| `figures/QC/raw/` | Pre-normalization QC standalone plots. |
+| `figures/QC/post/` | Post-normalization QC standalone plots. |
+| `figures/QC/pre_filter_qc_YYYYMMDD.html` | Pre-filter QC HTML report (Phase 1 entry). Date-versioned. |
+| `figures/QC/post_filter_qc_YYYYMMDD.html` | Post-filter QC HTML report (Phase 1-2 exit). Date-versioned. |
+| `figures/QC/post_integration_qc_YYYYMMDD.html` | Post-integration QC HTML report (Phase 3 exit). Date-versioned. |
 | `figures/manuscript/` | Publication figures. |
 
 **Legacy / migration:** Existing projects may still use `adata.annotation.masked.h5ad`, `scvi.leiden.phenotyped.h5ad`, `adata.img.genescores.h5ad` until scripts are updated. New pipelines and scripts **must** write the standard checkpoint names above. Validators should accept either legacy or standard names and report which convention is used.

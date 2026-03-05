@@ -1,8 +1,8 @@
-# cosmx_6k (cosmx) Snakemake pipeline
-# Run from repo root: snakemake -d projects/cosmx/cosmx_6k -s projects/cosmx/cosmx_6k/Snakefile [target]
+# cosmx_1k (cosmx) Snakemake pipeline
+# Run from repo root: snakemake -d projects/cosmx_1k -s projects/cosmx_1k/Snakefile [target]
 # Or from project dir: snakemake -d . -s Snakefile [target]
 # Runtime: auto-detected via run_container.sh (Docker on macOS, Apptainer on Linux).
-# Local conda: conda activate cosmx_6k && SC_TOOLS_RUNTIME=none snakemake -d . -s Snakefile <target>
+# Local conda: conda activate cosmx_1k && SC_TOOLS_RUNTIME=none snakemake -d . -s Snakefile <target>
 
 configfile: "config.yaml"
 

@@ -31,7 +31,7 @@ projects/imc/*/figures
 projects/imc/*/outputs
 projects/xenium/*/data
 projects/xenium/*/results
-projects/cosmx/*/data
+projects/cosmx_*/data
 
 # Large files (even if not in gitignore)
 *.h5ad

@@ -1,6 +1,6 @@
 # Research Journal: cosmx_full_library (cosmx)
 
-**Project:** `projects/cosmx/cosmx_full_library`
+**Project:** `projects/cosmx_full_library`
 
 ---
 

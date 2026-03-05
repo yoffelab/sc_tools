@@ -57,6 +57,9 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **visium_hd_cell modality:** SpaceRanger 4 cell segmentation support. `load_visium_hd_cell_sample()` reads from `outs/cell_segmentation/`. Cell-level QC thresholds (like xenium). Routes to xenium recipe in `preprocess()`. `create_project.sh` accepts `visium_hd_cell` as valid data type.
 - [x] **Concatenation:** `concat_samples()` merges per-sample AnnData with `calculate_qc_metrics()` applied.
 - [ ] **IMC end-to-end ingestion pipeline (priority):** Wire `build_imc_pipeline_cmd()` + `load_imc_sample()` into a complete Snakemake workflow for IMC projects. Includes: Phase 0a Snakemake rules (run ElementoLab pipeline per MCD on HPC → `processed/{sample}/`), Phase 0b rules (load each sample → `data/{sample_id}/adata.p0.h5ad`), and batch manifest templates for IMC (`metadata/phase0/`). Must be done **before** the generic checkpoint script below. Target projects: lymph_dlbcl, ggo-imc.
+- [x] **IMC image loading (Phase 0b):** `load_imc_sample(load_images=True, panel_csv=...)` reads the per-ROI `{roi_id}_full.tiff` multi-channel stack (C, H, W) and companion `{roi_id}_full.csv` channel index file from `processed/{sample}/tiffs/`. Builds arcsinh-normalized full stack + RGB composite (PanCK=R, CD3=G, DNA1=B defaults). Stores in `adata.uns['spatial'][sample_id]` (squidpy/scanpy-compatible). `IMCPanelMapper` resolves names from `MarkerName(IsotopeTag)` format (exact, case-insensitive, isotope tag, partial); reads both `*_full.csv` (per-ROI channel index) and `channel_labels.csv` (project panel with full/ilastik flags). Optional mask loading (`load_mask=True`) for `*_full_mask.tiff`. 18 new unit tests; 74 total pass, lint clean.
+- [x] **H&E image loading (any modality):** `load_he_image(he_path, library_id, adata)` injects any TIFF (RGB, grayscale, or CHW format) into `adata.uns['spatial'][library_id]['images']`. Handles grayscale-to-RGB, uint16/float-to-uint8, channel-first-to-HWC, and downsample. 5 unit tests.
+- [x] **IMC spatial plotting:** `sc_tools.pl.plot_imc_composite()` — same API as `plot_spatial_plain_he`; renders `images['hires']` RGB composite with channel label title. `sc_tools.pl.plot_imc_channel()` — renders single channel from `images['full']` (C, H, W) stack with inferno colormap and percentile-based vmax. Both exported in `sc_tools.pl.__all__`.
 - [ ] **Phase 0b checkpoint script:** Per-sample `data/{sample_id}/adata.p0.h5ad` saved by `scripts/ingest.py` before concatenation. Snakemake rule `adata_p0` produces sentinel `data/{sample_id}/.adata.p0.done`. Depends on IMC ingestion pipeline being wired first.
 - [ ] **SpatialData (optional):** `data/{sample_id}/spatialdata.zarr` for Visium HD and Xenium when full image pyramids / subcellular coords needed. Loader via `spatialdata-io`.
 
@@ -103,9 +106,20 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] `apply_qc_filter()`: backup + spot filter + sample removal + save.
 
 #### QC HTML Report (sc_tools.qc.report)
-- [x] `generate_qc_report()`: self-contained HTML with summary cards, per-sample metrics table, embedded plots. Jinja2 template at `sc_tools/data/qc_report_template.html`.
+- [x] `generate_qc_report()`: self-contained HTML with summary cards, per-sample metrics table, embedded plots. Jinja2 template at `sc_tools/data/qc_report_template.html`. **Deprecated** in favor of three date-versioned reports below.
 - [x] Integrated into `scripts/run_qc_report.py` with `--modality`, `--mad-multiplier`, `--thresholds`, `--apply-filter` CLI args.
 - [x] 15 new unit tests (28 total in test_qc.py); all pass, lint clean.
+
+#### Date-Versioned QC Reports (restructured)
+- [x] **`generate_pre_filter_report()`**: Phase 1 entry. Output: `figures/QC/pre_filter_qc_YYYYMMDD.html`.
+- [x] **`generate_post_filter_report()`**: Phase 1-2 exit. Pre-vs-post comparison, HVG/SVG. Output: `figures/QC/post_filter_qc_YYYYMMDD.html`.
+- [x] **`generate_post_integration_report()`**: Phase 3 exit. UMAP grid, cluster distribution, integration metrics. Output: `figures/QC/post_integration_qc_YYYYMMDD.html`.
+- [x] **`generate_all_qc_reports()`**: Orchestrator. `report_utils.py` for shared helpers.
+- [x] **`sc_tools.pl.qc_plots`**: `qc_umap_grid()`, `qc_cluster_distribution()`.
+- [x] **`bm/integration.py`**: `celltype_key` now optional (None = batch-only metrics).
+- [x] **CLI**: `--report pre_filter|post_filter|post_integration|all`. New args: `--adata-integrated`, `--batch-key`, `--celltype-key`, `--embedding-keys`, `--segmentation-masks-dir`.
+- [x] **Snakemake**: Three QC rules replace one (ggo_visium + create_project.sh). Optional segmentation scoring.
+- [x] 12 new tests; 58 total pass, lint clean.
 
 - [ ] **Future:** MA plots (per gene/protein across samples).
 
@@ -241,9 +255,11 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - [ ] Create IMC batch manifest templates under `metadata/phase0/`.
 - [ ] Validate against existing processed data on HPC.
 
-**2. PyPI deployment (CI/CD step 4)**
-- [ ] Ensure `pyproject.toml` builds clean wheel/sdist.
-- [ ] GitHub Action for publishing on release (trusted publishing).
+**2. PyPI deployment (CI/CD step 4) — DONE**
+- [x] Ensure `pyproject.toml` builds clean wheel/sdist.
+- [x] GitHub Action for publishing on release (trusted publishing).
+- [x] LICENSE file (MIT, Yoffe Lab). `requires-python >= 3.10`. Package-data for bundled JSON/HTML.
+- [ ] One-time PyPI setup: add trusted publisher for `yoffelab/sc_tools` repo on pypi.org.
 
 **3. Phase 0b checkpoint script**
 - [ ] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.p0.h5ad`.
@@ -267,7 +283,7 @@ Sequential; each step builds on the previous. See skills.md Sections 13 and 16.
 | 1 | **Linting** | Done | Ruff in `pyproject.toml`; `make lint` runs `ruff check` + `ruff format --check`. |
 | 2 | **Snakemake** | Done | Per-project Snakefiles. Apptainer (Linux/HPC) / Docker (macOS) via `run_container.sh`. |
 | 3 | **Sphinx docs** | Done | `docs/` with pydata-sphinx-theme + myst-nb; `make docs`; `.readthedocs.yaml`; zero warnings. |
-| 4 | **PyPI deployment** | Next | `pyproject.toml` wheel/sdist; GitHub Action on release (trusted publishing). |
+| 4 | **PyPI deployment** | Done | `pyproject.toml` wheel/sdist; `.github/workflows/publish.yml` (trusted publishing). LICENSE added. |
 | 5 | **GitHub Actions** | Pending | `.github/workflows/tests.yml`: lint + pytest + Snakemake dry-run. Last (complex setup). |
 
 ### To Do (later)

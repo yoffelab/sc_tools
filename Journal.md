@@ -10,6 +10,30 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-03-04] - PyPI deployment (CI/CD step 4)
+
+- **Action:** Implemented PyPI deployment infrastructure for sc-tools v0.1.0.
+- **Changes:** (1) Created `LICENSE` (MIT, Yoffe Lab 2026). (2) Updated `pyproject.toml`: added `requires-python >= 3.10`, `[tool.setuptools.package-data]` for bundled JSON/HTML files, modernized license field to SPDX string format (setuptools deprecation fix). (3) Created `.github/workflows/publish.yml` using trusted publishing (OIDC, no API tokens) with `pypa/gh-action-pypi-publish@release/v1`.
+- **Verification:** `python -m build` produces clean wheel and sdist (no warnings). Wheel contains all 7 data files (hallmark_human.json, 6 HTML templates) and LICENSE. `make lint` passes.
+- **Remaining:** One-time PyPI setup needed -- add trusted publisher for `yoffelab/sc_tools` on pypi.org before first release.
+- **Next CI/CD step:** GitHub Actions tests.yml (step 5).
+
+### [2026-03-04] - IMC image loading: IMCPanelMapper, build_imc_composite, load_he_image, IMC spatial plotting
+
+- **Action:** Implemented Phase 0b IMC image loading and H&E injection, grounded in actual ggo_human data structure exploration before writing any code.
+- **Key discovery:** IMC TIFF structure is NOT individual per-channel files (as originally assumed). The ElementoLab pipeline produces a single multi-channel stack per ROI: `{roi_id}_full.tiff` (C, H, W) with companion `{roi_id}_full.csv` (index → `MarkerName(IsotopeTag)` mapping). Additional files: `_full_mask.tiff` (cell segmentation), `_full_nucmask.tiff` (nuclear mask), `_Probabilities.tiff` (ilastik). Also confirmed two CSV formats: per-ROI `*_full.csv` (two-column: index, channel name) and project-level `channel_labels.csv` (columns: channel, Target, Metal_Tag, Atom, full, ilastik).
+- **Changes — `sc_tools/ingest/imc.py`:**
+  - `IMCPanelMapper`: maps protein/marker names to TIFF stack channel indices. `from_full_csv()` parses `*_full.csv` (reads `MarkerName(IsotopeTag)` format, extracts protein name + isotope tag). `from_panel_csv()` parses `channel_labels.csv` (adds isotope aliases + full/ilastik flags). `set_from_var_names()` bootstraps from adata.var_names. Resolution precedence: exact protein name → full string → isotope tag → partial substring → None (warning). `build_rgb_indices()` returns TIFF stack indices for R/G/B. `get_ilastik_indices()` returns channels with ilastik=1.
+  - `build_imc_composite()`: reads single `*_full.tiff` via tifffile → arcsinh(x/5) normalized (C, H, W) float32. Builds (H, W, 3) uint8 RGB composite via percentile clipping. Optional mask/probabilities loading. Returns standard squidpy spatial dict with images/hires, images/full, scalefactors (spot_diameter_fullres=1.0 for 1 px=1 um IMC), metadata/channels, rgb_channels, rgb_indices, pixel_size_um.
+- **Changes — `sc_tools/ingest/loaders.py`:**
+  - `load_imc_sample()`: added `load_images`, `panel_csv`, `rgb_channels`, `image_downsample` params. When `load_images=True`, looks for `tiffs/{sample_id}_full.tiff` + `{sample_id}_full.csv`; falls back to glob `*_full.tiff` with warning. Stores result in `adata.uns['spatial'][sample_id]`. All failures warn and continue (never raise).
+  - `load_he_image()`: new function. Injects any TIFF (RGB/grayscale/CHW) into `adata.uns['spatial'][library_id]` for any modality. Handles grayscale-to-RGB, uint16/float-to-uint8, CHW-to-HWC, alpha-drop, downsample.
+- **Changes — `sc_tools/pl/spatial.py`:** Added `plot_imc_composite()` (renders `images['hires']` RGB with channel label title; identical API to `plot_spatial_plain_he`) and `plot_imc_channel()` (renders single channel from `images['full']` by name with inferno colormap and percentile vmax).
+- **Changes — `sc_tools/ingest/__init__.py`:** Exported `IMCPanelMapper`, `build_imc_composite`, `load_he_image`.
+- **Tests:** 18 new tests across `TestIMCPanelMapper`, `TestBuildImcComposite`, `TestLoadImcSampleImages`, `TestLoadHeImage`. 291 total pass, 11 skipped, lint clean.
+- **Architecture.md:** Added Section 2.2b with full IMC image schema (uns structure, TIFF naming conventions, CSV formats, IMCPanelMapper description). Updated Section 2.2 adata.p0.h5ad row to note optional image storage.
+- **Rationale:** Loading the actual ggo_human project data first revealed the critical difference — single multi-channel TIFF vs. individual per-channel TIFFs. The `IMCPanelMapper` design handles the `MarkerName(IsotopeTag)` naming convention robustly across both `*_full.csv` and `channel_labels.csv` input formats. Storing images in the standard squidpy `uns['spatial']` format preserves `sc.pl.spatial` compatibility at no extra cost.
+
 ### [2026-03-04] - Phase 0 split into 0a/0b; per-sample AnnData/SpatialData checkpoints; CosMx loader
 
 - **Action:** Clarified Phase 0 architecture across all documentation. Split Phase 0 into two sub-steps and added per-sample AnnData/SpatialData as the Phase 0b checkpoint. Added CosMx loader as a pending TODO.

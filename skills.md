@@ -394,6 +394,45 @@ Before placing any figure in `figures/manuscript/`:
 - [ ] No unnecessary gridlines or chart junk
 - [ ] Figure saved with `bbox_inches="tight"` to minimize whitespace
 
+### 12.8. Figure Intent, Insight, and Readability
+
+Every figure must communicate a specific insight. A figure without a clear takeaway is not a meaningful figure. These principles apply to ALL figure production — original work and reproduction alike.
+
+#### 12.8.1 Figure Intent and Insight (General)
+
+- **Every figure has a claim.** Before coding, state in one sentence what the reader should conclude from each panel. If you cannot articulate the insight, the figure is not ready to produce.
+- **Direction of effect matters.** When a panel shows a statistical comparison (box plot, bar plot, violin), verify: which group is higher/lower? Is the difference significant? The direction and significance must match the stated insight. Example: if the insight is "Cytotoxic LME has worse survival", the KM curve for Cytotoxic must be below others, and the log-rank p-value must be significant. If the bars go the wrong way, something is wrong with the data, the grouping, or the claim — investigate before publishing.
+- **Write the caption first.** The caption is the contract between the code and the narrative. Draft it before coding. Each panel gets a sentence describing what it shows and what the reader should see.
+- **Validate insight after generation.** After producing a figure, read it as a reviewer would: Does the visual tell the story the caption claims? Do the statistics support the direction of effect? If a box plot shows "Group A is higher" but the medians are equal, the insight is wrong or the figure needs fixing.
+
+#### 12.8.2 Data Presentation for Readability (General)
+
+- **Heatmaps**: Z-score normalize (row or column depending on comparison axis). Raw intensity values are almost never publication-readable. Row-normalize when comparing features across groups; column-normalize when comparing groups across features.
+- **Color scales**: Diverging palettes (RdBu_r, coolwarm) for z-scored data centered at 0. Sequential palettes (viridis, magma, YlOrRd) for proportions, counts, and unsigned metrics. Never use jet or rainbow.
+- **Row/column ordering**: Use hierarchical clustering OR biological category grouping (T cells together, myeloid together, stromal together). Never use arbitrary or alphabetical ordering for biological data.
+- **Consistent colors**: Define a project-level color dictionary for major categories (e.g., cell types, patient groups, conditions). Store in a shared `figure_config.py` and import in every figure script. Reuse across ALL figures for visual coherence.
+- **Violins/boxes**: Show individual data points when n < 50. Add BH-corrected significance annotations (Wilcoxon rank-sum for 2-group, Kruskal-Wallis + Dunn for multi-group).
+- **KM curves**: Number-at-risk table below the plot. Exact log-rank p-value on the plot face. n per group in the legend (e.g., "Cold (n=115)").
+- **Bar plots**: Define error bars explicitly (SD, SEM, or 95% CI). Label n per group.
+- **UMAP/embeddings**: Rasterize points for PDF size. Axis labels (UMAP1, UMAP2). Color-blind safe palettes: Okabe-Ito for <=8 categories, Paul Tol for >8.
+- **Forest plots**: Point estimate (HR) with 95% CI. Reference group label. Sort by effect size or biological grouping.
+
+#### 12.8.3 Figure Reproduction (Manuscript-Specific)
+
+When reproducing figures from a published manuscript or aligning with a collaborator's existing figures:
+
+- **Align with manuscript claims.** Read the manuscript text AND figure captions. Map every panel in the caption to a subplot in the script. Missing panels = incomplete figure.
+- **Cross-reference Methods.** Use exact methodology from the paper (clustering parameters, statistical tests, normalization). Do not substitute methods without documenting the deviation.
+- **Quantitative validation.** If the manuscript says "5 LME classes including Cold (35%)", the output must show all 5 classes with proportions matching within 5%. If the manuscript reports p=0.0064 for OS, the reproduced p-value should be in the same order of magnitude.
+- **Direction-of-effect validation.** Compare every statistical panel against the manuscript text. If the paper says "Cytotoxic LME is enriched for M1 macrophages", the violin/bar for M1 in Cytotoxic must be the highest. If it is not, trace the discrepancy (wrong grouping variable, label mismatch, data subset difference) before proceeding.
+
+#### 12.8.4 Iterative Figure QA
+
+- After generating, visually compare with the original or caption description.
+- Per-figure checklist: Does it tell the same story? All panels present? Axes readable at print size? Statistical claims match direction and significance?
+- Fix and regenerate until quality matches or exceeds the original.
+- Document comparison: what matched, what diverged, and why (e.g., different cohort size, updated method).
+
 ---
 
 # Part IV: Engineering, Reproducibility, and CI
@@ -456,7 +495,329 @@ Workflow standards, metadata management, testing, and continuous improvement.
 
 ---
 
-# Appendix
+## 18. HPC Cluster Workflow (brb / cayuga)
+
+All production analysis runs on SLURM-managed clusters. This section defines how to structure jobs, exploit parallelism, use GPU acceleration, and orchestrate complex workflows — including multi-agent patterns.
+
+---
+
+### 18.1 Cluster Reference
+
+| Cluster | SLURM | Scratch | CPU partitions | GPU partitions |
+|---------|-------|---------|----------------|----------------|
+| **brb** | UP | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` (c7–c42) | `scu-gpu` (L40S / A40 / RTX6000) |
+| **cayuga** | DOWN (2026-03-05, version mismatch) | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` | `scu-gpu` (A100 / A40) |
+
+**Critical rules:**
+- **Never write to `~/`** (login node home). All outputs go to `/athena/elementolab/scratch/juk4007/` or project-relative paths under scratch.
+- **Never run compute on the login node** — use `srun` (interactive) or `sbatch` (batch). Even `pip install` should be done in an `srun --pty bash` session.
+- Scratch is shared Lustre (`/athena/elementolab/scratch/`). Read-heavy workflows (e.g. opening large `.h5ad` mid-job) are slow on Lustre — copy to `/tmp` on the compute node first.
+- The `/athena/` Lustre mount is identical on brb and cayuga; files written by one cluster are immediately visible on the other.
+
+**Conda on brb:**
+```bash
+eval "$(conda shell.bash hook 2>/dev/null)"
+conda activate sc_tools    # py3.11, scanpy 1.11.5, scvi 1.4.2, harmonypy
+```
+
+**GPU flags on brb** (NOT `gpu:a100:1` — brb has L40S/A40/RTX6000):
+```bash
+#SBATCH --gres=gpu:1
+```
+
+---
+
+### 18.2 SLURM Job Patterns
+
+#### Single job (preprocessing, integration, scoring)
+
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=sc_tools_preprocess
+#SBATCH --partition=scu-cpu
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --time=4:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+mkdir -p logs
+eval "$(conda shell.bash hook 2>/dev/null)" && conda activate sc_tools
+cd /athena/elementolab/scratch/juk4007/sc_tools
+python projects/visium_hd/robin/scripts/preprocess.py
+```
+
+#### Array jobs — embarrassingly parallel per sample (SpaceRanger, per-sample QC, cell segmentation)
+
+```bash
+#!/usr/bin/env bash
+#SBATCH --job-name=spaceranger
+#SBATCH --partition=scu-cpu
+#SBATCH --array=0-15%4          # 16 samples, 4 concurrent
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=240G
+#SBATCH --time=2-00:00:00
+#SBATCH --output=logs/spaceranger_%A_%a.out
+
+SAMPLES=($(cut -f1 metadata/phase0/all_samples.tsv | tail -n +2))
+SAMPLE="${SAMPLES[$SLURM_ARRAY_TASK_ID]}"
+spaceranger count --id="$SAMPLE" ...
+```
+
+Key flags:
+- `--array=0-N%K` — N+1 tasks, at most K concurrent (throttle for I/O-heavy jobs)
+- `$SLURM_ARRAY_TASK_ID` — 0-based index into sample list
+- `%A_%a` in output path — parent job ID + array index
+
+#### Dependency chain (pipeline phases as SLURM jobs)
+
+```bash
+JOB1=$(sbatch --parsable spaceranger_array.sbatch)
+JOB2=$(sbatch --parsable --dependency=afterok:$JOB1 ingest_concat.sbatch)
+JOB3=$(sbatch --parsable --dependency=afterok:$JOB2 preprocess.sbatch)
+```
+
+`afterok` — only start if all array tasks of the parent succeeded. Use `afterany` to proceed regardless of failure (e.g. for cleanup jobs).
+
+#### Interactive GPU session (debugging, notebook exploration)
+
+```bash
+srun --partition=scu-gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=2:00:00 --pty bash
+```
+
+---
+
+### 18.3 Parallelization by Workload Type
+
+#### SpaceRanger / Xenium Ranger — array per sample
+
+- One SLURM array task per sample. No inter-sample dependencies.
+- Each task: 32 CPUs, 220–240G RAM, up to 48h wall time.
+- Write outputs directly to scratch: `data/{sample_id}/outs/`.
+- Use `%4`–`%8` concurrency limit to avoid Lustre saturation.
+- Validate completion by checking for `outs/filtered_feature_bc_matrix.h5` before downstream rules.
+
+#### Cell segmentation (SpaceRanger 4) — array per sample, GPU optional
+
+- SR4 segmentation is CPU-only in standard mode; runs within the SpaceRanger array job.
+- For custom Cellpose/StarDist segmentation: separate GPU array job.
+- `--gres=gpu:1`, 4–8 CPUs, 32G RAM per task.
+
+#### Per-sample QC and loading (Phase 0b → Phase 1) — array per sample
+
+- Load per-sample adata, apply `filter_spots()`, save `adata.p0.h5ad`.
+- Each task: 4–8 CPUs, 32–64G RAM (depending on modality; Visium HD needs more).
+- Concatenation (`concat_samples()`) runs as a single downstream job after all per-sample jobs complete.
+
+#### scVI integration — single GPU job
+
+- scVI training is single-process; does not benefit from multi-GPU (ELBO computation is sequential across batches).
+- Use 1 A40 or L40S GPU, 8–16 CPUs (data loading), 64–128G RAM.
+- For large datasets (>500K cells): backed AnnData, increase `batch_size` in scVI, use `num_workers=4` for the data loader.
+- `sc_tools.pp.run_scvi()` auto-detects GPU (`use_gpu=True` by default when CUDA available).
+
+```bash
+#SBATCH --partition=scu-gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=128G
+#SBATCH --time=12:00:00
+```
+
+#### Harmony — CPU only, fast
+
+- Harmony runs on PCA embeddings, not raw counts — no GPU needed.
+- Single job, 8–16 CPUs, 32–64G RAM. Runtime: minutes for <1M cells.
+- `sc_tools.pp.run_harmony()` handles the harmonypy call.
+
+#### rapids-singlecell — GPU-accelerated clustering and UMAP (post-integration)
+
+- Replace scanpy `pp.neighbors`, `tl.umap`, `tl.leiden` with rapids-singlecell equivalents for large datasets (>100K cells, meaningful speedup at >500K).
+- Requires RAPIDS environment (separate from base `sc_tools` conda env; install with `[gpu]` extra).
+- Memory: GPU VRAM must hold the neighbor graph and embedding. A40 (48GB) handles ~1M cells comfortably.
+- Workflow: integrate with scVI/Harmony on GPU → keep in GPU memory → cluster + UMAP → transfer back to AnnData.
+
+```bash
+#SBATCH --partition=scu-gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=64G
+#SBATCH --time=2:00:00
+```
+
+```python
+import rapids_singlecell as rsc
+rsc.get.anndata_to_GPU(adata)          # move X and obsm to GPU
+rsc.pp.neighbors(adata, use_rep="X_scVI")
+rsc.tl.umap(adata)
+rsc.tl.leiden(adata, resolution=0.5)
+rsc.get.anndata_to_CPU(adata)          # move back before saving
+```
+
+#### Deconvolution (cell2location / Tangram) — GPU, per library
+
+- **Always batch by `library_id`** to avoid OOM. One job per library or one array task per library.
+- cell2location: 1 GPU, 16–32 CPUs, 128G RAM per library. Runtime: 1–4h per library.
+- Tangram: 1 GPU, 8–16 CPUs, 64G RAM per library.
+- Merge results after all libraries complete.
+
+```bash
+#SBATCH --array=0-7%2    # 8 libraries, 2 concurrent (GPU-limited)
+#SBATCH --partition=scu-gpu
+#SBATCH --gres=gpu:1
+#SBATCH --mem=128G
+```
+
+---
+
+### 18.4 Resource Guidelines
+
+| Task | CPUs | RAM | GPU | Wall time |
+|------|------|-----|-----|-----------|
+| SpaceRanger count | 32 | 240G | — | 48h |
+| Cell segmentation (SR4) | 32 | 220G | — | 24h |
+| Per-sample QC / load | 4–8 | 32–64G | — | 1h |
+| Concat + global QC | 8 | 64–128G | — | 2h |
+| scVI training | 8–16 | 64–128G | 1 | 8–12h |
+| Harmony | 8 | 32G | — | 30min |
+| rapids neighbors+UMAP+leiden | 4 | 64G | 1 | 30min–2h |
+| Deconvolution (per library) | 8–16 | 64–128G | 1 | 1–4h |
+| Signature scoring | 8 | 32G | — | 30min |
+| Phase 5 figures | 4 | 32G | — | 1h |
+
+Always add 20–30% headroom to RAM estimates (Lustre buffering, Python overhead).
+
+---
+
+### 18.5 Monitoring and Debugging
+
+```bash
+# Live queue status
+squeue -u juk4007
+squeue -u juk4007 -o "%.10i %.12j %.8T %.10M %.6C %.8m %R"  # verbose
+
+# Job accounting (finished/failed)
+sacct -j JOBID --format=JobID,JobName,State,ExitCode,Elapsed,MaxRSS
+
+# Live resource usage of a running job
+sstat -j JOBID --format=MaxRSS,MaxVMSize,AveCPU
+
+# Check GPU utilization interactively (ssh to compute node)
+ssh NODENAME "nvidia-smi"
+watch -n5 "squeue -u juk4007"
+
+# Cancel all jobs
+scancel -u juk4007
+
+# Cancel a job array but keep completed tasks
+scancel JOBID_ARRAYID
+```
+
+**Lustre log-checking pattern** (avoid slow NFS read in a tight loop):
+```bash
+ssh brb "cp /athena/elementolab/scratch/juk4007/logs/job_12345.out /tmp/ && cat /tmp/job_12345.out | tail -50"
+```
+
+---
+
+### 18.6 Spack
+
+Spack is available on cayuga/brb for system-level software (compilers, MPI, HDF5). For Python analysis, **prefer conda + pip** over Spack modules. Use Spack only when:
+- A system-level library (e.g. libhdf5, OpenMPI) is missing and apt is unavailable.
+- A compiled tool (e.g. STAR, BWA) is needed outside of conda.
+
+```bash
+spack find hdf5                  # check available versions
+spack load hdf5@1.12             # add to PATH / LD_LIBRARY_PATH
+spack unload hdf5                # remove
+```
+
+For HDF5 with h5py: prefer `conda install h5py` which bundles its own libhdf5, rather than relying on Spack.
+
+---
+
+### 18.7 Multi-Agent Orchestration
+
+Complex HPC workflows benefit from splitting responsibilities across multiple agents (or Claude Code sessions). Each agent handles an isolated concern with a well-defined input/output contract.
+
+#### Agent decomposition pattern
+
+```
+Orchestrator agent
+  ├── [Agent A] Job submission — reads manifest, writes sbatch, submits array
+  ├── [Agent B] Status monitor — polls squeue/sacct, reports completions and failures
+  ├── [Agent C] Per-phase analysis — runs preprocessing/integration for one phase
+  └── [Agent D] Figure/report generation — reads checkpoints, produces outputs
+```
+
+#### Rules for multi-agent HPC work
+
+1. **Shared state via files, not memory.** Agents communicate through checkpoint files (`adata.p0.h5ad`, `results/integration_method.txt`, sentinel files `.phase1.done`). No shared in-memory state.
+2. **One agent per phase.** Each agent handles one pipeline phase (or one cluster of related jobs). Hand off via checkpoint file existence.
+3. **Idempotent operations.** Every script and sbatch must be safe to re-run: check for existing output before recomputing. Use Snakemake rules — they enforce input/output contracts automatically.
+4. **Explicit status files.** Write `results/.phase1.done` (via `touch`) on success; write `results/.phase1.failed` with error message on failure. Downstream agents gate on these sentinels.
+5. **Parallel branches are independent.** Phase 3.5 (Demographics) and 3.5b (Gene scoring) can run as parallel agents from the same Phase 3 checkpoint. Neither blocks the other.
+6. **Job submission agent is separate from analysis agent.** One agent writes and submits sbatch files; a separate agent (or the same agent in a later turn) monitors and acts on results. Do not poll in a tight loop — poll with `gh run list` or `sacct` at 60–120 second intervals.
+
+#### Example: launching parallel per-sample ingestion in Claude Code
+
+```python
+# In a Task tool call, launch one subagent per batch
+# Each subagent submits one sbatch array job for its batch
+task_ids = []
+for batch in ["batch1", "batch2"]:
+    task_ids.append(
+        launch_task(
+            agent="general-purpose",
+            prompt=f"Submit SLURM array job for {batch} samples. "
+                   f"Read metadata/phase0/{batch}_samples.tsv. "
+                   f"Write sbatch to scripts/ingest_{batch}.sbatch. Submit with sbatch."
+        )
+    )
+# Wait for both, then submit downstream concat job
+```
+
+#### Recommended split for sc_tools pipeline on brb
+
+| Stage | Agent role | Parallelism |
+|-------|-----------|-------------|
+| Phase 0a (SpaceRanger) | Job submission agent | Array: 1 task/sample |
+| Phase 0b (load) | Job submission agent | Array: 1 task/sample |
+| Phase 1 (QC + concat) | Single analysis agent | Sequential (depends on all 0b) |
+| Phase 3 (integration benchmark) | Benchmark agent | Array: 1 task/method (9 methods) |
+| Phase 3.5 + 3.5b | Two parallel agents | Independent branches |
+| Phase 5 (figures) | Figure agent per figure set | Parallel by figure group |
+
+#### Integration benchmark as parallel array (9 methods)
+
+Rather than running 9 integration methods sequentially, submit as a SLURM array. Each task runs one method from `sc_tools.bm`:
+```bash
+#SBATCH --array=0-8
+METHODS=(scvi harmony cytovi scvi+harmony raw pca bbknn scanorama desc)
+METHOD="${METHODS[$SLURM_ARRAY_TASK_ID]}"
+python -c "
+import sc_tools.bm as bm, anndata as ad
+adata = ad.read_h5ad('results/adata.normalized.p3.h5ad')
+bm.run_single_method(adata, method='$METHOD', output_dir='results/tmp/integration_test')
+"
+```
+
+---
+
+### 18.8 Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| OOM during scVI on large datasets | Use backed AnnData; reduce `batch_size`; increase `--mem` |
+| Lustre lock contention (many jobs writing same dir) | Stagger array job start with `%K` throttle; write to per-task subdirs |
+| Job array silently skips tasks | Check `sacct -j JOBID` — tasks may be in `PENDING` due to resource limits |
+| `conda activate` fails in sbatch | Always include `eval "$(conda shell.bash hook 2>/dev/null)"` before `conda activate` |
+| GPU idle but VRAM full | Inspect with `nvidia-smi`; prior job may have leaked a process — kill with `fuser -k /dev/nvidia0` |
+| Slow h5ad save to Lustre | Save to `/tmp` then `rsync` to Lustre at end of job |
+| Array task IDs off-by-one | Use `tail -n +2` when building sample arrays from TSV to skip header |
+| `rapids-singlecell` not available | Install with `pip install rapids-singlecell` in sc_tools conda env on GPU node; not in base env |
+
+---
 
 ## Common Libraries
 

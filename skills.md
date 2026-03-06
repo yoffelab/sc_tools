@@ -503,26 +503,38 @@ All production analysis runs on SLURM-managed clusters. This section defines how
 
 ### 18.1 Cluster Reference
 
-| Cluster | SLURM | Scratch | CPU partitions | GPU partitions |
-|---------|-------|---------|----------------|----------------|
-| **brb** | UP | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` (c7–c42) | `scu-gpu` (L40S / A40 / RTX6000) |
-| **cayuga** | UP | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` | `scu-gpu` (A100 / A40) |
+| Cluster | OS / SLURM | Scratch | CPU nodes | GPU nodes | Max wall time |
+|---------|-----------|---------|-----------|-----------|---------------|
+| **brb** | — | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` (c7–c42) | `scu-gpu`: L40S, A40, RTX6000 | — |
+| **cayuga** | Rocky 8.7 / SLURM 25.05 | `/athena/cayuga_####/scratch/juk4007/` (symlink: `/athena/elementolab/`) | `scu-cpu` (c0001–c0023; 112–128 CPUs, 512–768 GB RAM) | `scu-gpu`: g0001 A100 80GB×4, g0002–g0003 A40 48GB×4 each, g0004 H100×4 (restricted) | 7 days |
+
+**GPU request syntax differs between clusters:**
+
+| Cluster | Generic GPU | Specific A40 | Specific A100 |
+|---------|-------------|-------------|---------------|
+| **brb** | `--gres=gpu:1` | — | — |
+| **cayuga** | — | `--gres=gpu:a40:1` | `--gres=gpu:a100:1` |
+
+**On cayuga, always specify GPU type** — `--gres=gpu:1` alone will not work. Prefer A100 (80GB) for large models (scVI on >500K cells, cell2location); A40 (48GB) for clustering, UMAP, moderate deconvolution.
 
 **Critical rules:**
-- **Never write to `~/`** (login node home). All outputs go to `/athena/elementolab/scratch/juk4007/` or project-relative paths under scratch.
+- **Never write to `~/`** (login node home). All outputs go to scratch (see paths above).
 - **Never run compute on the login node** — use `srun` (interactive) or `sbatch` (batch). Even `pip install` should be done in an `srun --pty bash` session.
-- Scratch is shared Lustre (`/athena/elementolab/scratch/`). Read-heavy workflows (e.g. opening large `.h5ad` mid-job) are slow on Lustre — copy to `/tmp` on the compute node first.
-- The `/athena/` Lustre mount is identical on brb and cayuga; files written by one cluster are immediately visible on the other.
+- Scratch is shared Lustre (`/athena/`). Read-heavy workflows (e.g. opening large `.h5ad` mid-job) are slow on Lustre — copy to `/tmp` on the compute node first.
+- The `/athena/elementolab/` symlink is accessible from both clusters; files written on one are visible on the other.
+- Cayuga requires WCM or Cornell VPN. Login: `cayuga-login1` / `cayuga-login2`.
 
-**Conda on brb:**
+**Conda on brb/cayuga:**
 ```bash
 eval "$(conda shell.bash hook 2>/dev/null)"
 conda activate sc_tools    # py3.11, scanpy 1.11.5, scvi 1.4.2, harmonypy
 ```
 
-**GPU flags on brb** (NOT `gpu:a100:1` — brb has L40S/A40/RTX6000):
+**Cayuga uses Lmod modules** (in addition to conda):
 ```bash
-#SBATCH --gres=gpu:1
+module avail              # list available modules
+module load singularity   # load Apptainer/Singularity
+module list               # show loaded modules
 ```
 
 ---
@@ -582,7 +594,12 @@ JOB3=$(sbatch --parsable --dependency=afterok:$JOB2 preprocess.sbatch)
 #### Interactive GPU session (debugging, notebook exploration)
 
 ```bash
+# brb
 srun --partition=scu-gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=2:00:00 --pty bash
+
+# cayuga (must specify GPU type)
+srun --partition=scu-gpu --gres=gpu:a40:1 --cpus-per-task=8 --mem=64G --time=2:00:00 --pty bash
+srun --partition=scu-gpu --gres=gpu:a100:1 --cpus-per-task=8 --mem=64G --time=2:00:00 --pty bash
 ```
 
 ---

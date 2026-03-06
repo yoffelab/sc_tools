@@ -83,10 +83,9 @@ def main():
                 logger.info(f"  Mapped {col}: {n_mapped:,}/{adata.n_obs:,}")
         p2.file.close()
 
-    # Clean dtypes
-    for col in adata.obs.columns:
-        if adata.obs[col].dtype == "category":
-            adata.obs[col] = adata.obs[col].astype(str)
+    # Clean dtypes for h5ad compatibility
+    from h5ad_utils import clean_adata_for_h5ad
+    clean_adata_for_h5ad(adata)
 
     # Save
     out_path = RESULTS_DIR / "adata.stromal.spatial.communities.h5ad"

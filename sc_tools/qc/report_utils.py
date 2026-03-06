@@ -87,13 +87,19 @@ def get_modality_terms(modality: str) -> dict[str, str | bool]:
 # Known integration embedding keys in priority order
 _KNOWN_EMBEDDINGS = {
     "scVI": "X_scVI",
+    "scVI (raw)": "X_scVI_raw",
     "scANVI": "X_scANVI",
+    "scANVI (raw)": "X_scANVI_raw",
     "Harmony": "X_pca_harmony",
     "CytoVI": "X_cytovi",
+    "CytoVI (arcsinh)": "X_cytovi",
     "BBKNN": "X_umap_bbknn",
     "ComBat": "X_pca_combat",
     "Scanorama": "X_scanorama",
     "DestVI": "X_destvi",
+    "IMC Phenotyping": "X_pca_imc_phenotyping",
+    "IMC Pheno + Harmony": "X_imc_pheno_harmony",
+    "Z-score + Harmony": "X_zscore_harmony",
     "Unintegrated (PCA)": "X_pca",
 }
 
@@ -285,6 +291,7 @@ def compute_integration_section(
     embedding_keys: dict[str, str],
     batch_key: str,
     celltype_key: str | None = None,
+    comparison_df: pd.DataFrame | None = None,
 ) -> dict | None:
     """Compute integration comparison and generate plots.
 
@@ -299,6 +306,9 @@ def compute_integration_section(
     celltype_key
         Column in ``adata.obs`` with cell type labels. ``None`` to skip bio
         metrics.
+    comparison_df
+        Pre-computed benchmark DataFrame. When provided, skips calling
+        ``compare_integrations()`` and uses this directly for plotting.
 
     Returns
     -------
@@ -311,7 +321,6 @@ def compute_integration_section(
         return None
 
     try:
-        from sc_tools.bm.integration import compare_integrations
         from sc_tools.pl.benchmarking import (
             plot_integration_comparison_table,
             plot_integration_radar,
@@ -321,18 +330,24 @@ def compute_integration_section(
         logger.warning("Integration benchmarking modules not available")
         return None
 
-    try:
-        comparison_df = compare_integrations(
-            adata,
-            embedding_keys,
-            batch_key=batch_key,
-            celltype_key=celltype_key,
-            include_unintegrated=True,
-            use_scib="sklearn",
-        )
-    except Exception:
-        logger.warning("Integration comparison failed", exc_info=True)
-        return None
+    if comparison_df is None:
+        try:
+            from sc_tools.bm.integration import compare_integrations
+
+            comparison_df = compare_integrations(
+                adata,
+                embedding_keys,
+                batch_key=batch_key,
+                celltype_key=celltype_key,
+                include_unintegrated=True,
+                use_scib="sklearn",
+            )
+        except ImportError:
+            logger.warning("sc_tools.bm.integration not available")
+            return None
+        except Exception:
+            logger.warning("Integration comparison failed", exc_info=True)
+            return None
 
     if comparison_df.empty:
         return None

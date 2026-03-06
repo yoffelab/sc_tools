@@ -334,6 +334,7 @@ def generate_post_integration_report(
     title: str = "Post-integration QC Report",
     date_stamp: str | None = None,
     segmentation_masks_dir: str | Path | None = None,
+    comparison_df: pd.DataFrame | None = None,
 ) -> Path:
     """Generate a post-integration QC HTML report (Phase 3 exit).
 
@@ -361,6 +362,10 @@ def generate_post_integration_report(
         YYYYMMDD string (default: today).
     segmentation_masks_dir
         Optional path to mask TIFFs for segmentation scoring.
+    comparison_df
+        Pre-computed integration benchmark DataFrame. When provided, skips
+        recomputing ``compare_integrations()`` (saves significant time on
+        large datasets).
 
     Returns
     -------
@@ -423,7 +428,22 @@ def generate_post_integration_report(
     best_score: float | None = None
 
     if embedding_keys and batch_key in adata.obs.columns:
-        result = compute_integration_section(adata, embedding_keys, batch_key, celltype_key)
+        if comparison_df is not None:
+            # Use pre-computed benchmark results (skip expensive recomputation)
+            result = compute_integration_section(
+                adata,
+                embedding_keys,
+                batch_key,
+                celltype_key,
+                comparison_df=comparison_df,
+            )
+        else:
+            result = compute_integration_section(
+                adata,
+                embedding_keys,
+                batch_key,
+                celltype_key,
+            )
         if result is not None:
             integration_plots = result["plots"]
             comp_df = result["comparison_df"]

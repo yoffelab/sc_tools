@@ -263,10 +263,33 @@ def save_checkpoint(adata: ad.AnnData, panel: str, phase: str = "p1"):
     out_path = RESULTS_DIR / f"adata.{panel}.raw.{phase}.h5ad"
     logger.info(f"Saving: {out_path}")
 
-    # Clean up obs dtypes for h5ad compatibility
+    # Clean up for h5ad compatibility — force all non-numeric obs/var to string
     for col in adata.obs.columns:
-        if adata.obs[col].dtype == "category":
-            adata.obs[col] = adata.obs[col].astype(str)
+        s = adata.obs[col]
+        # Try numeric first
+        numeric = pd.to_numeric(s, errors="coerce")
+        if numeric.notna().sum() == s.notna().sum() and s.notna().any():
+            adata.obs[col] = numeric
+        else:
+            # Force to string — handles categories, mixed types, objects
+            adata.obs[col] = s.astype(str).replace({"nan": "", "None": "", "<NA>": ""})
+    for col in adata.var.columns:
+        s = adata.var[col]
+        numeric = pd.to_numeric(s, errors="coerce")
+        if numeric.notna().sum() == s.notna().sum() and s.notna().any():
+            adata.var[col] = numeric
+        else:
+            adata.var[col] = s.astype(str).replace({"nan": "", "None": "", "<NA>": ""})
+
+    # Fix _index column in var/raw.var (reserved name in anndata)
+    if "_index" in adata.var.columns:
+        adata.var = adata.var.drop(columns=["_index"])
+    if adata.raw is not None and "_index" in adata.raw.var.columns:
+        raw_var = adata.raw.var.copy()
+        raw_var = raw_var.drop(columns=["_index"])
+        # Rebuild raw without _index
+        from anndata import Raw
+        adata._raw = Raw(adata, X=adata.raw.X, var=raw_var, varm=adata.raw.varm)
 
     adata.write_h5ad(out_path)
     logger.info(f"  Saved: {adata.shape[0]:,} cells x {adata.shape[1]} markers")

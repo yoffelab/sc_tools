@@ -6,6 +6,9 @@ SLURM headers, input verification, output cleanup, command execution,
 and post-run verification -- matching the pattern of hand-written scripts
 in the robin project.
 
+Also provides Phase 0 inventory generation: a human-readable markdown file
+tracking all samples, their inputs, and run status.
+
 Design decisions:
 - Shell variables (${SR}, ${CYTAIMAGE}, etc.) in script body for readability
 - Per-sample scripts (not array jobs) for easier failure handling
@@ -16,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import stat
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -798,3 +802,294 @@ def write_sbatch_script(
 
     logger.info("Wrote sbatch script: %s", path)
     return path
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 status tracking
+# ---------------------------------------------------------------------------
+
+
+def load_phase0_status(status_path: str | Path) -> dict[str, dict]:
+    """Load phase0_status.tsv into a dict keyed by sample_id.
+
+    Parameters
+    ----------
+    status_path
+        Path to ``phase0_status.tsv`` (tab-separated with columns
+        ``sample_id``, ``status``, ``notes``).
+
+    Returns
+    -------
+    Dict of ``{sample_id: {"status": ..., "notes": ...}}``.
+    Returns empty dict if the file does not exist.
+    """
+    import pandas as pd
+
+    path = Path(status_path)
+    if not path.exists():
+        return {}
+
+    df = pd.read_csv(path, sep="\t")
+    result: dict[str, dict] = {}
+    for _, row in df.iterrows():
+        sid = str(row["sample_id"])
+        result[sid] = {
+            "status": str(row.get("status", "pending")),
+            "notes": str(row.get("notes", "")) if row.get("notes") is not None else "",
+        }
+        # Clean up pandas nan strings
+        if result[sid]["notes"] in ("nan", "None"):
+            result[sid]["notes"] = ""
+    return result
+
+
+def save_phase0_status(status: dict[str, dict], output_path: str | Path) -> Path:
+    """Save status dict to phase0_status.tsv.
+
+    Parameters
+    ----------
+    status
+        Dict of ``{sample_id: {"status": ..., "notes": ...}}``.
+    output_path
+        Path to write the TSV file.
+
+    Returns
+    -------
+    Path to the written file.
+    """
+    import pandas as pd
+
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+    for sid, info in sorted(status.items()):
+        rows.append(
+            {
+                "sample_id": sid,
+                "status": info.get("status", "pending"),
+                "notes": info.get("notes", ""),
+            }
+        )
+
+    df = pd.DataFrame(rows, columns=["sample_id", "status", "notes"])
+    df.to_csv(path, sep="\t", index=False)
+    logger.info("Wrote phase0 status: %s", path)
+    return path
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 inventory markdown generation
+# ---------------------------------------------------------------------------
+
+# Modality -> list of (column_header, manifest_column, display_transform)
+# display_transform: "filename" strips to basename, "raw" keeps as-is
+_MODALITY_COLUMNS: dict[str, list[tuple[str, str, str]]] = {
+    "visium": [
+        ("Sample", "sample_id", "raw"),
+        ("Slide", "slide", "raw"),
+        ("Area", "area", "raw"),
+        ("Image", "image", "filename"),
+        ("FASTQs", "fastq_dir", "raw"),
+    ],
+    "visium_hd": [
+        ("Sample", "sample_id", "raw"),
+        ("Slide", "slide", "raw"),
+        ("Area", "area", "raw"),
+        ("CytAssist", "cytaimage", "filename"),
+        ("H&E", "image", "filename"),
+        ("FASTQs", "fastq_dir", "raw"),
+    ],
+    "visium_hd_cell": [
+        ("Sample", "sample_id", "raw"),
+        ("Slide", "slide", "raw"),
+        ("Area", "area", "raw"),
+        ("CytAssist", "cytaimage", "filename"),
+        ("H&E", "image", "filename"),
+        ("FASTQs", "fastq_dir", "raw"),
+    ],
+    "xenium": [
+        ("Sample", "sample_id", "raw"),
+        ("Xenium Bundle", "xenium_dir", "raw"),
+    ],
+    "imc": [
+        ("Sample", "sample_id", "raw"),
+        ("MCD File", "mcd_file", "filename"),
+        ("Panel CSV", "panel_csv", "filename"),
+    ],
+}
+
+# Config keys to show in the Global Inputs table, by modality
+_GLOBAL_INPUT_KEYS: dict[str, list[tuple[str, str]]] = {
+    "visium": [
+        ("SpaceRanger", "spaceranger_path"),
+        ("Transcriptome", "transcriptome"),
+        ("Probe Set", "probe_set"),
+    ],
+    "visium_hd": [
+        ("SpaceRanger", "spaceranger_path"),
+        ("Transcriptome", "transcriptome"),
+        ("Probe Set", "probe_set"),
+    ],
+    "visium_hd_cell": [
+        ("SpaceRanger", "spaceranger_path"),
+        ("Transcriptome", "transcriptome"),
+        ("Probe Set", "probe_set"),
+    ],
+    "xenium": [
+        ("Xenium Ranger", "xenium_ranger_path"),
+    ],
+    "imc": [
+        ("IMC Pipeline", "pipeline_dir"),
+    ],
+}
+
+
+def _cell_value(row: pd.Series, col: str, transform: str) -> str:
+    """Extract a display value from a manifest row."""
+    val = row.get(col)
+    if val is None or str(val) in ("", "nan", "None"):
+        return "-"
+    val_str = str(val)
+    if transform == "filename":
+        return Path(val_str).name
+    return val_str
+
+
+def generate_phase0_inventory(
+    manifest: pd.DataFrame,
+    modality: str,
+    *,
+    config: dict | None = None,
+    status: dict[str, dict] | None = None,
+    output_path: str | Path | None = None,
+) -> str:
+    """Generate a Phase 0 inventory markdown document.
+
+    Produces a human-readable markdown file summarizing all samples from the
+    batch manifest, their inputs, and run status. Intended to be committed
+    to git as a living tracking document.
+
+    Parameters
+    ----------
+    manifest
+        DataFrame from batch manifest TSV (must have ``sample_id`` column;
+        optionally ``batch`` for grouping).
+    modality
+        One of ``"visium"``, ``"visium_hd"``, ``"visium_hd_cell"``,
+        ``"xenium"``, ``"imc"``.
+    config
+        Optional config dict (e.g. from config.yaml) for global inputs
+        table (transcriptome, spaceranger_path, etc.).
+    status
+        Optional dict of ``{sample_id: {"status": ..., "notes": ...}}``.
+        Samples not present default to ``"pending"``.
+    output_path
+        If provided, write the markdown to this file path.
+
+    Returns
+    -------
+    The inventory markdown as a string.
+    """
+    if status is None:
+        status = {}
+    if config is None:
+        config = {}
+
+    col_defs = _MODALITY_COLUMNS.get(modality, _MODALITY_COLUMNS["visium"])
+    global_keys = _GLOBAL_INPUT_KEYS.get(modality, [])
+
+    # Count statuses
+    total = len(manifest)
+    status_counts: dict[str, int] = {}
+    for _, row in manifest.iterrows():
+        sid = str(row["sample_id"])
+        s = status.get(sid, {}).get("status", "pending")
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    summary_parts = [f"{total} total"]
+    for s_name in ("passed", "failed", "running", "blocked", "pending"):
+        count = status_counts.get(s_name, 0)
+        if count > 0:
+            summary_parts.append(f"{count} {s_name}")
+
+    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    lines: list[str] = []
+
+    # Header
+    lines.append("# Phase 0 Inventory")
+    lines.append("")
+    lines.append(f"**Modality:** {modality}")
+    lines.append(f"**Generated:** {today}")
+    lines.append(f"**Samples:** {', '.join(summary_parts)}")
+    lines.append("")
+
+    # Global Inputs
+    if global_keys:
+        lines.append("## Global Inputs")
+        lines.append("")
+        lines.append("| Input | Path | Status |")
+        lines.append("|-------|------|--------|")
+        for label, key in global_keys:
+            val = config.get(key, "-")
+            if val is None:
+                val = "-"
+            lines.append(f"| {label} | {val} | - |")
+        lines.append("")
+
+    # Per-Sample Status grouped by batch
+    lines.append("## Per-Sample Status")
+    lines.append("")
+
+    # Determine batch grouping
+    if "batch" in manifest.columns:
+        batches = manifest["batch"].unique()
+    else:
+        batches = ["default"]
+
+    for batch in batches:
+        if "batch" in manifest.columns:
+            batch_df = manifest[manifest["batch"] == batch]
+        else:
+            batch_df = manifest
+
+        lines.append(f"### Batch: {batch}")
+        lines.append("")
+
+        # Table header
+        headers = [cd[0] for cd in col_defs] + ["Status", "Notes"]
+        lines.append("| " + " | ".join(headers) + " |")
+        lines.append("|" + "|".join(["---"] * len(headers)) + "|")
+
+        # Table rows
+        for _, row in batch_df.iterrows():
+            sid = str(row["sample_id"])
+            sample_status = status.get(sid, {})
+            s_val = sample_status.get("status", "pending")
+            notes = sample_status.get("notes", "")
+
+            cells = [_cell_value(row, cd[1], cd[2]) for cd in col_defs]
+            cells.extend([s_val, notes])
+            lines.append("| " + " | ".join(cells) + " |")
+
+        lines.append("")
+
+    # Status Legend
+    lines.append("## Status Legend")
+    lines.append("")
+    lines.append("- **pending**: Not yet processed")
+    lines.append("- **passed**: Pipeline completed successfully")
+    lines.append("- **failed**: Pipeline failed (see notes)")
+    lines.append("- **blocked**: Cannot process until blocker resolved")
+    lines.append("- **running**: Currently submitted to SLURM")
+    lines.append("")
+
+    result = "\n".join(lines)
+
+    if output_path is not None:
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(result)
+        logger.info("Wrote phase0 inventory: %s", path)
+
+    return result

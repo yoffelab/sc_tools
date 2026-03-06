@@ -30,6 +30,9 @@ from sc_tools.ingest.slurm import (
     build_sbatch_header,
     build_spaceranger_sbatch,
     build_xenium_sbatch,
+    generate_phase0_inventory,
+    load_phase0_status,
+    save_phase0_status,
     write_sbatch_script,
 )
 from sc_tools.ingest.spaceranger import (
@@ -1394,3 +1397,207 @@ class TestWriteSbatchScript:
         script_path.write_text("old")
         write_sbatch_script("new", script_path, overwrite=True)
         assert script_path.read_text() == "new"
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 status tracking tests
+# ---------------------------------------------------------------------------
+
+
+class TestLoadSavePhase0Status:
+    def test_round_trip(self, tmp_path):
+        status = {
+            "S1": {"status": "passed", "notes": "all good"},
+            "S2": {"status": "failed", "notes": "missing FASTQ"},
+        }
+        path = save_phase0_status(status, tmp_path / "phase0_status.tsv")
+        loaded = load_phase0_status(path)
+        assert loaded["S1"]["status"] == "passed"
+        assert loaded["S1"]["notes"] == "all good"
+        assert loaded["S2"]["status"] == "failed"
+        assert loaded["S2"]["notes"] == "missing FASTQ"
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        result = load_phase0_status(tmp_path / "nonexistent.tsv")
+        assert result == {}
+
+    def test_header_only_file(self, tmp_path):
+        tsv = tmp_path / "phase0_status.tsv"
+        tsv.write_text("sample_id\tstatus\tnotes\n")
+        result = load_phase0_status(tsv)
+        assert result == {}
+
+    def test_creates_parent_dirs(self, tmp_path):
+        status = {"S1": {"status": "pending", "notes": ""}}
+        path = save_phase0_status(status, tmp_path / "sub" / "dir" / "status.tsv")
+        assert path.exists()
+
+    def test_empty_notes_handled(self, tmp_path):
+        tsv = tmp_path / "status.tsv"
+        tsv.write_text("sample_id\tstatus\tnotes\nS1\tpassed\t\n")
+        loaded = load_phase0_status(tsv)
+        assert loaded["S1"]["notes"] == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 0 inventory markdown generation tests
+# ---------------------------------------------------------------------------
+
+
+def _make_visium_hd_manifest():
+    """Create a minimal visium_hd manifest for testing."""
+    return pd.DataFrame(
+        {
+            "sample_id": ["PT01-1", "PT01-2", "PT02-1", "PT02-2"],
+            "fastq_dir": ["/data/PT01-1", "/data/PT01-2", "/data/PT02-1", "/data/PT02-2"],
+            "cytaimage": [
+                "/img/PT01-1/cytassist.tif",
+                "/img/PT01-2/cytassist.tif",
+                "/img/PT02-1/cytassist.tif",
+                "/img/PT02-2/cytassist.tif",
+            ],
+            "image": ["/img/PT01-1/he.tif", None, "/img/PT02-1/he.tif", None],
+            "slide": ["H1-ABC", "H1-ABC", "H2-DEF", "H2-DEF"],
+            "area": ["D1", "A1", "D1", "A1"],
+            "batch": ["batch1", "batch1", "batch2", "batch2"],
+        }
+    )
+
+
+class TestGeneratePhase0Inventory:
+    def test_visium_hd_columns(self):
+        manifest = _make_visium_hd_manifest()
+        md = generate_phase0_inventory(manifest, "visium_hd")
+        assert "**Modality:** visium_hd" in md
+        assert "| Sample | Slide | Area | CytAssist | H&E | FASTQs | Status | Notes |" in md
+
+    def test_xenium_columns(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["X1", "X2"],
+                "xenium_dir": ["/bundles/X1", "/bundles/X2"],
+                "batch": ["batch1", "batch1"],
+            }
+        )
+        md = generate_phase0_inventory(manifest, "xenium")
+        assert "| Sample | Xenium Bundle | Status | Notes |" in md
+        assert "/bundles/X1" in md
+
+    def test_imc_columns(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["IMC1"],
+                "mcd_file": ["/raw/sample1.mcd"],
+                "panel_csv": ["/raw/panel.csv"],
+                "batch": ["batch1"],
+            }
+        )
+        md = generate_phase0_inventory(manifest, "imc")
+        assert "| Sample | MCD File | Panel CSV | Status | Notes |" in md
+        # Filenames only (not full paths)
+        assert "sample1.mcd" in md
+        assert "panel.csv" in md
+
+    def test_status_rendering(self):
+        manifest = _make_visium_hd_manifest()
+        status = {
+            "PT01-1": {"status": "passed", "notes": "cell_seg done"},
+            "PT01-2": {"status": "failed", "notes": "bad FASTQ"},
+        }
+        md = generate_phase0_inventory(manifest, "visium_hd", status=status)
+        assert "passed" in md
+        assert "cell_seg done" in md
+        assert "failed" in md
+        assert "bad FASTQ" in md
+        # Samples without status default to pending
+        assert "pending" in md
+
+    def test_summary_counts(self):
+        manifest = _make_visium_hd_manifest()
+        status = {
+            "PT01-1": {"status": "passed", "notes": ""},
+            "PT01-2": {"status": "failed", "notes": ""},
+        }
+        md = generate_phase0_inventory(manifest, "visium_hd", status=status)
+        assert "4 total" in md
+        assert "1 passed" in md
+        assert "1 failed" in md
+        assert "2 pending" in md
+
+    def test_batch_grouping(self):
+        manifest = _make_visium_hd_manifest()
+        md = generate_phase0_inventory(manifest, "visium_hd")
+        assert "### Batch: batch1" in md
+        assert "### Batch: batch2" in md
+
+    def test_no_batch_column(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["S1", "S2"],
+                "fastq_dir": ["/data/S1", "/data/S2"],
+                "image": ["/img/S1.tif", "/img/S2.tif"],
+                "slide": ["H1", "H1"],
+                "area": ["D1", "A1"],
+            }
+        )
+        md = generate_phase0_inventory(manifest, "visium")
+        assert "### Batch: default" in md
+
+    def test_global_inputs_from_config(self):
+        manifest = _make_visium_hd_manifest()
+        config = {
+            "spaceranger_path": "/tools/spaceranger-4.0.1/spaceranger",
+            "transcriptome": "/ref/GRCh38-2024-A",
+            "probe_set": "/probes/v2.1.0.csv",
+        }
+        md = generate_phase0_inventory(manifest, "visium_hd", config=config)
+        assert "## Global Inputs" in md
+        assert "/tools/spaceranger-4.0.1/spaceranger" in md
+        assert "/ref/GRCh38-2024-A" in md
+
+    def test_filename_transform(self):
+        manifest = _make_visium_hd_manifest()
+        md = generate_phase0_inventory(manifest, "visium_hd")
+        # cytaimage should show filename only
+        assert "cytassist.tif" in md
+        # H&E image should show filename only
+        assert "he.tif" in md
+
+    def test_missing_values_show_dash(self):
+        manifest = _make_visium_hd_manifest()
+        md = generate_phase0_inventory(manifest, "visium_hd")
+        # PT01-2 has no H&E image -> should show "-"
+        lines = md.split("\n")
+        pt012_line = [l for l in lines if "PT01-2" in l][0]
+        # Should have a dash for the missing H&E
+        assert "| - |" in pt012_line
+
+    def test_writes_to_file(self, tmp_path):
+        manifest = _make_visium_hd_manifest()
+        output = tmp_path / "phase0_inventory.md"
+        md = generate_phase0_inventory(manifest, "visium_hd", output_path=output)
+        assert output.exists()
+        assert output.read_text() == md
+
+    def test_status_legend_present(self):
+        manifest = _make_visium_hd_manifest()
+        md = generate_phase0_inventory(manifest, "visium_hd")
+        assert "## Status Legend" in md
+        assert "**pending**" in md
+        assert "**passed**" in md
+        assert "**failed**" in md
+
+    def test_visium_columns(self):
+        manifest = pd.DataFrame(
+            {
+                "sample_id": ["V1"],
+                "fastq_dir": ["/data/V1"],
+                "image": ["/img/V1/he_image.tif"],
+                "slide": ["H1"],
+                "area": ["D1"],
+                "batch": ["batch1"],
+            }
+        )
+        md = generate_phase0_inventory(manifest, "visium")
+        assert "| Sample | Slide | Area | Image | FASTQs | Status | Notes |" in md
+        assert "he_image.tif" in md

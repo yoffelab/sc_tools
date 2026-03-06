@@ -134,15 +134,36 @@ rule phase35b:
         f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
         f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
 
-# ---- QC report (Phase 1 style: 2x2, 2x4, multipage, violin, scatter, HVG, SVG) ----
-rule qc_report:
-    output: touch("figures/QC/qc_report.done")
-    input: "results/adata.annotated.p2.h5ad", "results/adata.normalized.scored.p35.h5ad"
+# ---- QC reports (date-versioned HTML: pre-filter, post-filter, post-integration) ----
+rule qc_pre_filter:
+    input: "results/adata.raw.p1.h5ad"
+    output: touch("figures/QC/pre_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --raw results/adata.annotated.p2.h5ad --post results/adata.normalized.scored.p35.h5ad --figures-dir figures"
-        + " && touch figures/QC/qc_report.done"
+        + " --report pre_filter --adata results/adata.raw.p1.h5ad --figures-dir figures --modality visium"
     )
+
+rule qc_post_filter:
+    input: "results/adata.raw.p1.h5ad", "results/adata.annotated.p2.h5ad"
+    output: touch("figures/QC/post_filter_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_filter --adata results/adata.raw.p1.h5ad"
+        + " --adata-post results/adata.annotated.p2.h5ad --figures-dir figures --modality visium"
+    )
+
+rule qc_post_integration:
+    input: "results/adata.normalized.p3.h5ad"
+    output: touch("figures/QC/post_integration_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_integration --adata-integrated results/adata.normalized.p3.h5ad"
+        + " --figures-dir figures --modality visium"
+    )
+
+rule qc_report:
+    input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output
+    output: touch("figures/QC/qc_report.done")
 
 # ---- Phase 4: Manual Cell Typing (skippable) ----
 rule tls_clustered:

@@ -31,6 +31,9 @@ from .slurm import (
     build_sbatch_header,
     build_spaceranger_sbatch,
     build_xenium_sbatch,
+    generate_phase0_inventory,
+    load_phase0_status,
+    save_phase0_status,
     write_sbatch_script,
 )
 from .spaceranger import build_batch_commands, build_spaceranger_count_cmd
@@ -56,4 +59,7 @@ __all__ = [
     "build_imc_sbatch",
     "build_batch_sbatch",
     "write_sbatch_script",
+    "generate_phase0_inventory",
+    "load_phase0_status",
+    "save_phase0_status",
 ]

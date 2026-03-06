@@ -272,10 +272,9 @@ def main():
         else:
             logger.warning(f"  No 'sample' column in {panel} obs")
 
-        # Clean dtypes
-        for col in adata.obs.columns:
-            if adata.obs[col].dtype == "category":
-                adata.obs[col] = adata.obs[col].astype(str)
+        # Clean dtypes for h5ad compatibility
+        from h5ad_utils import clean_adata_for_h5ad
+        clean_adata_for_h5ad(adata)
 
         logger.info(f"Saving: {output_path}")
         adata.write_h5ad(output_path)

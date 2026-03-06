@@ -25,6 +25,7 @@ __all__ = [
     "run_bbknn",
     "run_scanorama",
     "run_scanvi",
+    "run_imc_phenotyping",
 ]
 
 
@@ -160,27 +161,61 @@ def run_harmony(
         Passed to ``harmony_integrate``.
     """
     try:
-        import harmonypy  # noqa: F401
+        import harmonypy
     except ImportError:
         raise ImportError(
             "harmonypy is required for Harmony integration. Install with:\n  pip install harmonypy"
         ) from None
-
-    import scanpy as sc
 
     if basis not in adata.obsm:
         raise ValueError(f"'{basis}' not found in adata.obsm. Run PCA first.")
 
     logger.info("Harmony (batch_key='%s', basis='%s')", batch_key, basis)
 
-    sc.external.pp.harmony_integrate(
-        adata,
-        key=batch_key,
-        basis=basis,
-        adjusted_basis=key_added,
-        **kwargs,
+    # Call harmonypy directly instead of scanpy wrapper to avoid shape bugs.
+    # harmonypy auto-detects PyTorch and its Z_corr can be a torch tensor
+    # whose conversion to numpy may produce wrong shapes.
+    import numpy as np
+
+    data_mat = np.asarray(adata.obsm[basis], dtype=np.float64)
+    meta_data = adata.obs
+    vars_use = [batch_key]
+
+    ho = harmonypy.run_harmony(data_mat, meta_data, vars_use, **kwargs)
+
+    # Z_corr may be a torch tensor; detach and convert to numpy explicitly
+    z_corr = ho.Z_corr
+    try:
+        # If it's a torch tensor, detach and move to CPU first
+        z_corr = z_corr.detach().cpu().numpy()
+    except AttributeError:
+        z_corr = np.asarray(z_corr)
+
+    logger.info("Harmony Z_corr type=%s shape=%s", type(z_corr).__name__, z_corr.shape)
+
+    # Z_corr shape is (n_pcs, n_cells); transpose to (n_cells, n_pcs)
+    if z_corr.ndim == 2:
+        if z_corr.shape == (data_mat.shape[1], data_mat.shape[0]):
+            result = z_corr.T
+        elif z_corr.shape == (data_mat.shape[0], data_mat.shape[1]):
+            result = z_corr  # already (n_cells, n_pcs)
+        else:
+            raise ValueError(
+                f"Harmony Z_corr has unexpected shape {z_corr.shape}, "
+                f"expected ({data_mat.shape[1]}, {data_mat.shape[0]}) or transposed"
+            )
+    else:
+        raise ValueError(
+            f"Harmony returned 1D Z_corr shape {z_corr.shape}; "
+            f"expected 2D ({data_mat.shape[1]}, {data_mat.shape[0]})"
+        )
+
+    adata.obsm[key_added] = np.ascontiguousarray(result, dtype=np.float32)
+    logger.info(
+        "Harmony corrected embedding stored in obsm['%s'] shape %s",
+        key_added,
+        result.shape,
     )
-    logger.info("Harmony corrected embedding stored in obsm['%s']", key_added)
 
 
 def run_cytovi(
@@ -487,3 +522,116 @@ def run_scanvi(
 
     adata.obsm["X_scANVI"] = scanvi_model.get_latent_representation()
     logger.info("scANVI latent stored in obsm['X_scANVI'] (shape=%s)", adata.obsm["X_scANVI"].shape)
+
+
+def run_imc_phenotyping(
+    adata: AnnData,
+    batch_key: str = "sample",
+    roi_key: str = "roi",
+    z_score_per: str = "roi",
+    z_score_cap: float = 3.0,
+    key_added: str = "X_pca_imc_phenotyping",
+    n_pcs: int = 50,
+    **kwargs: Any,
+) -> None:
+    """Run ElementoLab IMC phenotyping batch correction pipeline.
+
+    Reproduces the batch correction from ``imc.ops.clustering.phenotyping()``
+    (ElementoLab/imc). Pipeline: log1p -> per-ROI z-score (capped) -> global
+    scale -> ComBat -> scale -> PCA -> BBKNN (batch-aware neighbors).
+
+    Stores corrected PCA in ``adata.obsm[key_added]`` and batch-aware
+    neighbor graph in ``obsp``.
+
+    Parameters
+    ----------
+    adata
+        Annotated data with raw or arcsinh-normalized intensities.
+        Modified in place (X is overwritten with corrected values).
+    batch_key
+        Column in ``adata.obs`` for batch correction (ComBat + BBKNN).
+    roi_key
+        Column in ``adata.obs`` for per-ROI z-scoring. Falls back to
+        ``batch_key`` if not present.
+    z_score_per
+        Z-score within ``"roi"`` (default) or ``"sample"`` groups.
+    z_score_cap
+        Cap z-scores at ±this value. Default 3.0.
+    key_added
+        Key for the corrected PCA embedding in ``obsm``.
+    n_pcs
+        Number of PCs to compute after correction.
+    **kwargs
+        Passed to ``scanpy.pp.combat``.
+    """
+    import anndata as ad
+    import numpy as np
+    import scanpy as sc
+
+    group_key = roi_key if roi_key in adata.obs.columns else batch_key
+    if group_key not in adata.obs.columns:
+        raise ValueError(f"Neither '{roi_key}' nor '{batch_key}' found in adata.obs")
+
+    logger.info(
+        "IMC phenotyping pipeline (batch_key='%s', z_score_per='%s', cap=%.1f)",
+        batch_key,
+        group_key,
+        z_score_cap,
+    )
+
+    # Step 1: log1p (skip if already log-transformed)
+    x_max = float(adata.X.max()) if hasattr(adata.X, "max") else float(np.max(adata.X))
+    if x_max > 50:
+        logger.info("Applying log1p (X max=%.1f suggests raw intensities)", x_max)
+        sc.pp.log1p(adata)
+    else:
+        logger.info("Skipping log1p (X max=%.1f suggests already transformed)", x_max)
+
+    # Step 2: Per-ROI/sample z-score with capping
+    logger.info("Z-scoring per %s (cap=±%.1f)", group_key, z_score_cap)
+    groups = adata.obs[group_key].unique()
+    parts = []
+    for grp in groups:
+        mask = adata.obs[group_key] == grp
+        a_sub = adata[mask].copy()
+        sc.pp.scale(a_sub, max_value=z_score_cap)
+        # Also cap negative values (matching imc pipeline)
+        a_sub.X[a_sub.X < -z_score_cap] = -z_score_cap
+        parts.append(a_sub)
+    adata_z = ad.concat(parts)
+    # Reorder to match original
+    adata_z = adata_z[adata.obs_names].copy()
+    adata.X = adata_z.X
+    del adata_z, parts
+
+    # Step 3: Global scale
+    sc.pp.scale(adata)
+
+    # Step 4: ComBat batch correction
+    if batch_key in adata.obs.columns and adata.obs[batch_key].nunique() > 1:
+        logger.info("Running ComBat (batch_key='%s')", batch_key)
+        sc.pp.combat(adata, key=batch_key, **kwargs)
+        sc.pp.scale(adata)
+    else:
+        logger.info("Skipping ComBat (single batch or batch_key missing)")
+
+    # Step 5: PCA
+    n_comps = min(n_pcs, adata.n_vars - 1, adata.n_obs - 1)
+    sc.tl.pca(adata, n_comps=n_comps)
+    adata.obsm[key_added] = adata.obsm["X_pca"].copy()
+
+    # Step 6: BBKNN (batch-aware neighbors)
+    try:
+        import bbknn
+
+        logger.info("Running BBKNN for batch-aware neighbor graph")
+        bbknn.bbknn(adata, batch_key=batch_key)
+    except ImportError:
+        logger.info("bbknn not installed, using standard neighbors")
+        sc.pp.neighbors(adata, use_rep=key_added)
+
+    logger.info(
+        "IMC phenotyping corrected PCA stored in obsm['%s'] (%d PCs)",
+        key_added,
+        n_comps,
+    )

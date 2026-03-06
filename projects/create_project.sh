@@ -40,6 +40,10 @@ for d in "${SUBDIRS[@]}"; do
   mkdir -p "${PROJECT_ROOT}/${d}"
 done
 
+# ---- Phase 0 status template ----
+mkdir -p "${PROJECT_ROOT}/metadata/phase0"
+printf "sample_id\tstatus\tnotes\n" > "${PROJECT_ROOT}/metadata/phase0/phase0_status.tsv"
+
 # ---- Mission.md ----
 cat > "${PROJECT_ROOT}/Mission.md" << MISSION_EOF
 # Mission: ${PROJECT_NAME} (${DATA_TYPE})

@@ -203,10 +203,35 @@ def main():
 
         adata = attach_clinical(adata, clinical_data, panel)
 
-        # Clean dtypes
+        # Clean dtypes for h5ad compatibility — force all non-numeric to string
         for col in adata.obs.columns:
-            if adata.obs[col].dtype == "category":
-                adata.obs[col] = adata.obs[col].astype(str)
+            s = adata.obs[col]
+            numeric = pd.to_numeric(s, errors="coerce")
+            if numeric.notna().sum() == s.notna().sum() and s.notna().any():
+                adata.obs[col] = numeric
+            else:
+                adata.obs[col] = s.astype(str).replace(
+                    {"nan": "", "None": "", "<NA>": ""}
+                )
+        for col in adata.var.columns:
+            s = adata.var[col]
+            numeric = pd.to_numeric(s, errors="coerce")
+            if numeric.notna().sum() == s.notna().sum() and s.notna().any():
+                adata.var[col] = numeric
+            else:
+                adata.var[col] = s.astype(str).replace(
+                    {"nan": "", "None": "", "<NA>": ""}
+                )
+        # Fix _index reserved column
+        if "_index" in adata.var.columns:
+            adata.var = adata.var.drop(columns=["_index"])
+        if adata.raw is not None and "_index" in adata.raw.var.columns:
+            raw_var = adata.raw.var.copy()
+            raw_var = raw_var.drop(columns=["_index"])
+            from anndata import Raw
+            adata._raw = Raw(
+                adata, X=adata.raw.X, var=raw_var, varm=adata.raw.varm
+            )
 
         logger.info(f"Saving: {output_path}")
         adata.write_h5ad(output_path)

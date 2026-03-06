@@ -2,18 +2,18 @@
 #SBATCH --job-name=dlbcl_imc_pipeline
 #SBATCH --partition=scu-cpu
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=1-00:00:00
+#SBATCH --mem=128G
+#SBATCH --time=2-00:00:00
 #SBATCH --output=outputs/logs/pipeline_%j.out
 #SBATCH --error=outputs/logs/pipeline_%j.err
 
-set -euo pipefail
+set -eo pipefail
 
 echo "=== DLBCL IMC Pipeline ==="
-echo "Job ID: ${SLURM_JOB_ID}"
+echo "Job ID: ${SLURM_JOB_ID:-nohup}"
 echo "Node: $(hostname)"
 echo "Date: $(date)"
-echo "CPUs: ${SLURM_CPUS_PER_TASK}"
+echo "CPUs: ${SLURM_CPUS_PER_TASK:-$(nproc)}"
 echo ""
 
 cd /home/fs01/juk4007/elementolab/sc_tools/projects/imc/lymph_dlbcl
@@ -27,7 +27,13 @@ echo "Working dir: $(pwd)"
 echo ""
 
 # Ensure output dirs exist
-mkdir -p outputs/logs figures/manuscript figures/QC metadata
+mkdir -p outputs/logs figures/manuscript figures/QC metadata results/seurat_converted
+
+# h5ad files already uploaded to results/seurat_converted/
+echo "=== Checking h5ad files ==="
+ls -lh results/seurat_converted/tcell_2_preprocessing/t2_SO_seurat.h5ad 2>/dev/null || echo "WARNING: immune h5ad missing"
+ls -lh results/seurat_converted/stroma_2_preprocessing/S1_seurat_SO.h5ad 2>/dev/null || echo "WARNING: stromal h5ad missing"
+echo ""
 
 # ============================================================
 # Phase 0: Download clinical metadata + validate h5ad

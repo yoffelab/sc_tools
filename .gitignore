@@ -95,6 +95,7 @@ projects/imc/*/outputs/
 
 # Documentation binaries
 *.pptx
+*.doc
 *.docx
 *.xlsx
 *.pdf
@@ -130,8 +131,8 @@ containers/*.sif
 
 # Model weights and large QC/generated (>1MB) — pre-commit blocks size; keep ignored
 # Explicit: do not commit CSVs or other data > 1MB (see .cursor/rules/git-no-large-files.mdc)
-projects/visium_hd/robin_round2/metadata/cluster_rank_genes.csv
-projects/visium_hd/robin_round2/metadata/leiden_rank_genes.csv
+# Adobe Illustrator / manuscript binary files (always large)
+*.ai
 *.pt
 *web_summary.html
 projects/visium_hd/*/models/
@@ -170,7 +171,6 @@ projects/imc/imc_data/
 projects/imc/imc_utuc/
 projects/imc/jj_tmp/
 projects/imc/pancreas_liver_meta/
-projects/imc/pancreas_liver_meta_backup/
 projects/imc/*/processed/
 projects/imc/bcg_bladder/*.csv
 projects/imc/brca-unet/*.csv

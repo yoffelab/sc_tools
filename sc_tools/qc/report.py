@@ -40,6 +40,7 @@ __all__ = [
     "generate_pre_filter_report",
     "generate_post_filter_report",
     "generate_post_integration_report",
+    "generate_post_celltyping_report",
     "generate_segmentation_qc_report",
     "generate_all_qc_reports",
 ]
@@ -498,6 +499,250 @@ def generate_post_integration_report(
 
 
 # ---------------------------------------------------------------------------
+# Post-celltyping QC report
+# ---------------------------------------------------------------------------
+
+
+def generate_post_celltyping_report(
+    adata: AnnData,
+    output_dir: str | Path,
+    *,
+    celltype_key: str = "celltype",
+    embedding_keys: dict[str, str] | None = None,
+    batch_key: str | None = None,
+    sample_col: str = "library_id",
+    cluster_key: str = "leiden",
+    modality: str = "visium",
+    title: str = "Post-celltyping QC Report",
+    date_stamp: str | None = None,
+    segmentation_masks_dir: str | Path | None = None,
+    comparison_df: pd.DataFrame | None = None,
+    integration_test_dir: str | Path | None = None,
+) -> Path:
+    """Generate a post-celltyping QC HTML report (Phase 4 exit).
+
+    Re-evaluates integration quality using validated cell type labels,
+    making bio conservation metrics (ARI, NMI, ASW celltype) meaningful.
+    Optionally re-scores all candidate integration embeddings stored in
+    ``integration_test_dir``.
+
+    Parameters
+    ----------
+    adata
+        Cell-typed AnnData (with validated cell type labels).
+    output_dir
+        Directory for the output HTML file.
+    celltype_key
+        Column in ``adata.obs`` with validated cell type labels.
+        **Required** -- raises ``ValueError`` if missing.
+    embedding_keys
+        Dict mapping method name to ``obsm`` key (auto-detected if None).
+    batch_key
+        Batch column in ``obs`` (auto-detected from raw_data_dir/batch/library_id).
+    sample_col
+        Sample column for cluster distribution plot.
+    cluster_key
+        Cluster column (default: ``leiden``).
+    modality
+        Modality string for display.
+    title
+        Report title.
+    date_stamp
+        YYYYMMDD string (default: today).
+    segmentation_masks_dir
+        Optional path to mask TIFFs for segmentation scoring.
+    comparison_df
+        Pre-computed integration benchmark DataFrame. When provided, skips
+        recomputing ``compare_integrations()``.
+    integration_test_dir
+        Path to ``results/tmp/integration_test/`` directory containing
+        per-method ``{method}.h5ad`` files from Phase 3 benchmark. If
+        provided, embeddings are loaded and re-scored with validated
+        cell type labels.
+
+    Returns
+    -------
+    Path to the generated HTML file.
+
+    Raises
+    ------
+    ValueError
+        If *celltype_key* is not found in ``adata.obs``.
+    """
+    import anndata as ad
+
+    from ..qc.report_utils import auto_detect_embeddings
+
+    if celltype_key not in adata.obs.columns:
+        raise ValueError(
+            f"celltype_key {celltype_key!r} not found in adata.obs. "
+            f"Post-celltyping report requires validated cell type labels."
+        )
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    ds = get_date_stamp(date_stamp)
+
+    # Auto-detect batch key
+    if batch_key is None:
+        for candidate in ["raw_data_dir", "batch", "library_id", "sample"]:
+            if candidate in adata.obs.columns:
+                batch_key = candidate
+                break
+    if batch_key is None:
+        batch_key = sample_col
+
+    # Auto-detect embeddings
+    if embedding_keys is None:
+        embedding_keys = auto_detect_embeddings(adata)
+
+    # Load integration test embeddings if available
+    if integration_test_dir is not None:
+        integration_test_dir = Path(integration_test_dir)
+        if integration_test_dir.exists():
+            for h5ad_file in sorted(integration_test_dir.glob("*.h5ad")):
+                method_name = h5ad_file.stem
+                try:
+                    test_adata = ad.read_h5ad(h5ad_file)
+                    # Find the embedding key in the test adata
+                    for obsm_key in test_adata.obsm:
+                        if obsm_key.startswith("X_") and obsm_key != "X_pca":
+                            if obsm_key not in adata.obsm:
+                                # Transfer embedding to main adata (matching obs)
+                                common = adata.obs_names.intersection(test_adata.obs_names)
+                                if len(common) > 0:
+                                    import numpy as np
+
+                                    emb = np.zeros(
+                                        (adata.n_obs, test_adata.obsm[obsm_key].shape[1]),
+                                        dtype=np.float32,
+                                    )
+                                    idx_main = [adata.obs_names.get_loc(c) for c in common]
+                                    idx_test = [test_adata.obs_names.get_loc(c) for c in common]
+                                    emb[idx_main] = test_adata.obsm[obsm_key][idx_test]
+                                    adata.obsm[obsm_key] = emb
+                                    embedding_keys[method_name] = obsm_key
+                                    logger.info(
+                                        "Loaded embedding %s from %s (%d common cells)",
+                                        obsm_key,
+                                        h5ad_file.name,
+                                        len(common),
+                                    )
+                            elif obsm_key not in embedding_keys.values():
+                                embedding_keys[method_name] = obsm_key
+                            break
+                except Exception:
+                    logger.warning(
+                        "Failed to load integration test %s", h5ad_file.name, exc_info=True
+                    )
+
+    # Read selected integration method if available
+    selected_method = None
+    for candidate_dir in [output_dir.parent, output_dir]:
+        method_file = candidate_dir / "integration_method.txt"
+        if method_file.exists():
+            selected_method = method_file.read_text().strip()
+            break
+    if integration_test_dir is not None:
+        method_file = integration_test_dir.parent / "integration_method.txt"
+        if method_file.exists():
+            selected_method = method_file.read_text().strip()
+
+    has_umap = "X_umap" in adata.obsm
+    plots: dict[str, str] = {}
+
+    # UMAP grid (include celltype)
+    if has_umap:
+        from ..pl.qc_plots import qc_umap_grid
+
+        color_keys = []
+        for k in [sample_col, batch_key, cluster_key, celltype_key]:
+            if k in adata.obs.columns and k not in color_keys:
+                color_keys.append(k)
+
+        if color_keys:
+            fig = qc_umap_grid(adata, color_keys=color_keys)
+            plots["umap_grid"] = fig_to_base64(fig)
+
+    # Cluster distribution
+    if cluster_key in adata.obs.columns and sample_col in adata.obs.columns:
+        from ..pl.qc_plots import qc_cluster_distribution
+
+        fig = qc_cluster_distribution(adata, cluster_key=cluster_key, sample_col=sample_col)
+        plots["cluster_dist"] = fig_to_base64(fig)
+
+    # Integration metrics WITH validated celltypes (bio metrics now meaningful)
+    integration_plots: dict[str, str] | None = None
+    best_method: str | None = None
+    best_score: float | None = None
+
+    if embedding_keys and batch_key in adata.obs.columns:
+        result = compute_integration_section(
+            adata,
+            embedding_keys,
+            batch_key,
+            celltype_key,
+            comparison_df=comparison_df,
+        )
+        if result is not None:
+            integration_plots = result["plots"]
+            comp_df = result["comparison_df"]
+            if len(comp_df) > 0:
+                best_method = str(comp_df.iloc[0]["method"])
+                best_score = float(comp_df.iloc[0]["overall_score"])
+
+    # Cluster count
+    n_clusters = 0
+    if cluster_key in adata.obs.columns:
+        n_clusters = int(adata.obs[cluster_key].nunique())
+
+    n_celltypes = int(adata.obs[celltype_key].nunique())
+
+    # Number of samples
+    n_samples = 1
+    if sample_col in adata.obs.columns:
+        n_samples = int(adata.obs[sample_col].nunique())
+
+    # Segmentation
+    seg_data = None
+    seg_plots_dict: dict[str, str] | None = None
+    if segmentation_masks_dir is not None:
+        seg_result = compute_segmentation_section(adata, segmentation_masks_dir, sample_col)
+        if seg_result is not None:
+            seg_data = seg_result["df"]
+            seg_plots_dict = seg_result["plots"]
+
+    terms = get_modality_terms(modality)
+
+    context = {
+        "title": title,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "modality": modality,
+        "terms": terms,
+        "n_samples": n_samples,
+        "n_spots": int(adata.n_obs),
+        "n_clusters": n_clusters,
+        "n_celltypes": n_celltypes,
+        "n_embeddings": len(embedding_keys) if embedding_keys else 0,
+        "best_method": best_method,
+        "best_score": best_score,
+        "selected_method": selected_method,
+        "has_celltype": True,
+        "celltype_key": celltype_key,
+        "plots": plots,
+        "integration_plots": integration_plots,
+        "segmentation": seg_data,
+        "seg_plots": seg_plots_dict,
+    }
+
+    html = render_template(_POST_INTEGRATION_TEMPLATE, context)
+    output_path = output_dir / f"post_celltyping_qc_{ds}.html"
+    output_path.write_text(html)
+    logger.info("Post-celltyping QC report written: %s", output_path)
+    return output_path
+
+
+# ---------------------------------------------------------------------------
 # Segmentation QC report
 # ---------------------------------------------------------------------------
 
@@ -635,9 +880,11 @@ def generate_all_qc_reports(
         Post-filter AnnData (for post-filter report). Skipped if None.
     adata_integrated
         Post-integration AnnData (for post-integration report). Skipped if None.
-    sample_col, modality, date_stamp, embedding_keys, batch_key, celltype_key,
-    cluster_key, segmentation_masks_dir
-        Passed through to individual report generators.
+    **kwargs
+        Remaining keyword arguments (``sample_col``, ``modality``, ``date_stamp``,
+        ``embedding_keys``, ``batch_key``, ``celltype_key``, ``cluster_key``,
+        ``segmentation_masks_dir``) are passed through to individual report
+        generators.
 
     Returns
     -------

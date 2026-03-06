@@ -48,9 +48,23 @@ if the required package is missing.
 
 .. autofunction:: run_scvi
 
+.. autofunction:: run_scanvi
+
 .. autofunction:: run_harmony
 
+.. autofunction:: run_combat
+
+.. autofunction:: run_bbknn
+
+.. autofunction:: run_scanorama
+
 .. autofunction:: run_cytovi
+
+.. currentmodule:: sc_tools.pp.integrate
+
+.. autofunction:: run_imc_phenotyping
+
+.. currentmodule:: sc_tools.pp
 
 Dimensionality Reduction and Clustering
 ----------------------------------------

@@ -4,25 +4,67 @@ Validates AnnData checkpoints against the metadata contracts defined in
 Architecture.md Section 2.2. Each phase has required obs/obsm/uns keys
 and structural requirements.
 
+Phase naming
+------------
+The preferred identifiers are **semantic slugs** defined in ``sc_tools.pipeline``:
+
+    qc_filter       formerly p1  — QC-filtered, concatenated AnnData
+    metadata_attach formerly p2  — clinical metadata attached
+    preprocess      formerly p3  — normalized, integrated, clustered
+    scoring         formerly p35 — gene signatures scored
+    celltype_manual formerly p4  — manual cell types applied
+
+The old p-code scheme (``p1``, ``p2``, ``p3``, ``p35``, ``p4``) is **deprecated
+(old nomenclature)**. Old codes are still accepted for backward compatibility and
+will emit a :class:`DeprecationWarning` at runtime.
+
 Usage:
     from sc_tools.validate import validate_checkpoint, validate_file
 
-    # Validate in-memory AnnData
-    issues = validate_checkpoint(adata, phase="p1")
+    # Preferred: semantic slug names
+    issues = validate_checkpoint(adata, phase="qc_filter")
+    issues = validate_checkpoint(adata, phase="metadata_attach")
+    issues = validate_checkpoint(adata, phase="preprocess")
+    issues = validate_checkpoint(adata, phase="scoring")
+    issues = validate_checkpoint(adata, phase="celltype_manual")
 
-    # Validate from file
+    # Deprecated (old nomenclature) — still accepted, emits DeprecationWarning:
+    issues = validate_checkpoint(adata, phase="p1")   # -> qc_filter
+    issues = validate_checkpoint(adata, phase="p2")   # -> metadata_attach
+    issues = validate_checkpoint(adata, phase="p3")   # -> preprocess
+    issues = validate_checkpoint(adata, phase="p35")  # -> scoring
+    issues = validate_checkpoint(adata, phase="p4")   # -> celltype_manual
+
+    # Validate from file (preferred naming)
+    issues = validate_file("results/adata.raw.h5ad", phase="qc_filter")
+    # Legacy filename + legacy code (both still accepted during migration):
     issues = validate_file("results/adata.raw.p1.h5ad", phase="p1")
 """
 
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 
 import anndata as ad
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Legacy phase-code → new slug mapping (old nomenclature, deprecated)
+# ──────────────────────────────────────────────────────────────────────────────
+# The p0/p1/p2/p3/p35/p4 numbering scheme has been replaced by semantic slugs.
+# See sc_tools.pipeline for the full phase DAG and slug definitions.
+# These aliases remain for backward compatibility only.
+_LEGACY_PHASE_MAP: dict[str, str] = {
+    "p1": "qc_filter",
+    "p2": "metadata_attach",
+    "p3": "preprocess",
+    "p35": "scoring",
+    "p4": "celltype_manual",
+}
 
 # Default obs columns that don't count as "clinical metadata" for p2
 _DEFAULT_OBS_COLS = frozenset(
@@ -71,7 +113,14 @@ def validate_checkpoint(
     adata
         AnnData object to validate.
     phase
-        Phase identifier: "p1", "p2", "p3", "p35", or "p4".
+        Phase identifier. Preferred — semantic slugs (new nomenclature):
+        ``"qc_filter"``, ``"metadata_attach"``, ``"preprocess"``,
+        ``"scoring"``, ``"celltype_manual"``.
+
+        Legacy p-codes (old nomenclature, **deprecated**) are still accepted
+        and emit a :class:`DeprecationWarning`:
+        ``"p1"`` → qc_filter, ``"p2"`` → metadata_attach,
+        ``"p3"`` → preprocess, ``"p35"`` → scoring, ``"p4"`` → celltype_manual.
     strict
         If True, raise CheckpointValidationError on failures.
     fix
@@ -88,17 +137,40 @@ def validate_checkpoint(
     ValueError
         If phase is not recognized.
     """
-    validators = {
-        "p1": validate_p1,
-        "p2": validate_p2,
-        "p3": validate_p3,
-        "p35": validate_p35,
-        "p4": validate_p4,
-    }
-    if phase not in validators:
-        raise ValueError(f"Unknown phase '{phase}'. Must be one of: {list(validators.keys())}")
+    # ── Resolve legacy p-codes → canonical slugs ──────────────────────────────
+    # p1/p2/p3/p35/p4 is OLD NOMENCLATURE. Emit deprecation warning and resolve
+    # to the canonical semantic slug so all downstream logic uses slugs.
+    canonical = phase
+    if phase in _LEGACY_PHASE_MAP:
+        canonical = _LEGACY_PHASE_MAP[phase]
+        warnings.warn(
+            f"Phase code '{phase}' is deprecated (old nomenclature). "
+            f"Use the semantic slug '{canonical}' instead. "
+            "The p1/p2/p3/p35/p4 naming scheme has been replaced by slugs "
+            "defined in sc_tools.pipeline (qc_filter, metadata_attach, "
+            "preprocess, scoring, celltype_manual). "
+            "See Architecture.md Section 2.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
-    issues = validators[phase](adata, fix=fix)
+    # ── Slug → validator dispatch ─────────────────────────────────────────────
+    _slug_validators = {
+        "qc_filter": validate_p1,  # Phase 1 / qc_filter
+        "metadata_attach": validate_p2,  # Phase 2 / metadata_attach
+        "preprocess": validate_p3,  # Phase 3 / preprocess
+        "scoring": validate_p35,  # Phase 3.5b / scoring
+        "celltype_manual": validate_p4,  # Phase 4 / celltype_manual
+    }
+
+    if canonical not in _slug_validators:
+        raise ValueError(
+            f"Unknown phase '{phase}'. "
+            f"Accepted slugs (preferred): {list(_slug_validators.keys())}. "
+            f"Accepted legacy p-codes (deprecated): {list(_LEGACY_PHASE_MAP.keys())}."
+        )
+
+    issues = _slug_validators[canonical](adata, fix=fix)
 
     if issues:
         for issue in issues:
@@ -112,13 +184,19 @@ def validate_checkpoint(
 
 
 def validate_p1(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
-    """Validate Phase 1 checkpoint (raw ingested data).
+    """Validate qc_filter / Phase 1 checkpoint (QC-filtered, concatenated data).
 
-    Required:
-    - obs['sample']
-    - obs['raw_data_dir'] (fix: rename from 'batch' if present)
-    - obsm['spatial']
-    - X contains non-negative values (raw counts)
+    .. deprecated:: old nomenclature
+        Call via ``validate_checkpoint(adata, phase="qc_filter")`` using the
+        semantic slug. The name ``validate_p1`` / phase code ``"p1"`` is old
+        nomenclature retained for backward compatibility.
+
+    Checks that the following are present:
+
+    - ``obs['sample']``
+    - ``obs['raw_data_dir']`` (fix: rename from ``batch`` if present)
+    - ``obsm['spatial']``
+    - ``X`` contains non-negative values (raw counts)
     """
     issues = []
 
@@ -162,10 +240,16 @@ def validate_p1(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
 
 
 def validate_p2(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
-    """Validate Phase 2 checkpoint (metadata-annotated).
+    """Validate metadata_attach / Phase 2 checkpoint (clinical metadata attached).
 
-    Required:
-    - All of p1
+    .. deprecated:: old nomenclature
+        Call via ``validate_checkpoint(adata, phase="metadata_attach")`` using
+        the semantic slug. The name ``validate_p2`` / phase code ``"p2"`` is old
+        nomenclature retained for backward compatibility.
+
+    Checks that the following are present:
+
+    - All of qc_filter (p1)
     - At least one clinical metadata column beyond default obs columns
     """
     issues = validate_p1(adata, fix=fix)
@@ -182,13 +266,19 @@ def validate_p2(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
 
 
 def validate_p3(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
-    """Validate Phase 3 checkpoint (preprocessed).
+    """Validate preprocess / Phase 3 checkpoint (normalized, integrated, clustered).
 
-    Required:
+    .. deprecated:: old nomenclature
+        Call via ``validate_checkpoint(adata, phase="preprocess")`` using the
+        semantic slug. The name ``validate_p3`` / phase code ``"p3"`` is old
+        nomenclature retained for backward compatibility.
+
+    Checks that the following are present:
+
     - An integration/reduction representation in obsm
-      (X_scvi, X_pca_harmony, X_cytovi, or X_pca)
-    - A cluster column in obs (leiden, cluster, or louvain)
-    - adata.raw is not None (backup of raw counts)
+      (``X_scvi``, ``X_pca_harmony``, ``X_cytovi``, or ``X_pca``)
+    - A cluster column in obs (``leiden``, ``cluster``, or ``louvain``)
+    - ``adata.raw`` is not None (backup of raw counts)
     """
     issues = []
 
@@ -213,12 +303,18 @@ def validate_p3(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
 
 
 def validate_p35(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
-    """Validate Phase 3.5b checkpoint (scored).
+    """Validate scoring / Phase 3.5b checkpoint (gene signatures scored).
 
-    Required:
-    - obsm['signature_score']
-    - obsm['signature_score_z']
-    - uns['signature_score_report']
+    .. deprecated:: old nomenclature
+        Call via ``validate_checkpoint(adata, phase="scoring")`` using the
+        semantic slug. The name ``validate_p35`` / phase code ``"p35"`` is old
+        nomenclature retained for backward compatibility.
+
+    Checks that the following are present:
+
+    - ``obsm['signature_score']``
+    - ``obsm['signature_score_z']``
+    - ``uns['signature_score_report']``
     """
     issues = []
 
@@ -235,12 +331,18 @@ def validate_p35(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
 
 
 def validate_p4(adata: ad.AnnData, *, fix: bool = False) -> list[str]:
-    """Validate Phase 4 checkpoint (cell-typed).
+    """Validate celltype_manual / Phase 4 checkpoint (cell types applied).
 
-    Required:
-    - All of p35
-    - obs['celltype']
-    - obs['celltype_broad']
+    .. deprecated:: old nomenclature
+        Call via ``validate_checkpoint(adata, phase="celltype_manual")`` using
+        the semantic slug. The name ``validate_p4`` / phase code ``"p4"`` is old
+        nomenclature retained for backward compatibility.
+
+    Checks that the following are present:
+
+    - All of scoring (p35)
+    - ``obs['celltype']``
+    - ``obs['celltype_broad']``
     """
     issues = validate_p35(adata, fix=fix)
 
@@ -267,7 +369,12 @@ def validate_file(
     path
         Path to .h5ad file.
     phase
-        Phase identifier: "p1", "p2", "p3", "p35", or "p4".
+        Phase identifier. Preferred — semantic slugs (new nomenclature):
+        ``"qc_filter"``, ``"metadata_attach"``, ``"preprocess"``,
+        ``"scoring"``, ``"celltype_manual"``.
+        Legacy p-codes (old nomenclature, **deprecated**): ``"p1"`` through
+        ``"p4"`` and ``"p35"`` are still accepted but emit a
+        :class:`DeprecationWarning`.
     strict
         If True, raise CheckpointValidationError on failures.
     fix

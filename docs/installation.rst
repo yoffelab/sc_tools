@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-- Python 3.10 or later
+- Python 3.11 or later
 - `conda <https://conda.io>`_ (recommended for environment management)
 
 Environment setup
@@ -46,7 +46,7 @@ Install only what you need:
      - gseapy, pyucell
      - ``pip install -e ".[geneset]"``
    * - ``integration``
-     - harmonypy
+     - harmonypy, bbknn, scanorama
      - ``pip install -e ".[integration]"``
    * - ``spatial``
      - utag (spatial-aware clustering)
@@ -54,8 +54,32 @@ Install only what you need:
    * - ``gpu``
      - torch, rapids-singlecell
      - ``pip install -e ".[gpu]"``
+   * - ``storage``
+     - fsspec, s3fs, sshfs, gcsfs, adlfs, zarr, ome-zarr
+     - ``pip install -e ".[storage]"``
+   * - ``storage-box``
+     - boxfs (Box storage via OAuth)
+     - ``pip install -e ".[storage-box]"``
+   * - ``registry``
+     - SQLAlchemy, Alembic (project/dataset tracking)
+     - ``pip install -e ".[registry]"``
+   * - ``mcp``
+     - Model Context Protocol servers
+     - ``pip install -e ".[mcp]"``
+   * - ``benchmark``
+     - scikit-image, scib-metrics, plotly, cellpose, stardist
+     - ``pip install -e ".[benchmark]"``
+   * - ``benchmark-extended``
+     - All of benchmark + deepcell, torch, transformers, segmentation-models-pytorch
+     - ``pip install -e ".[benchmark-extended]"``
+   * - ``viz``
+     - marsilea (publication composite figures)
+     - ``pip install -e ".[viz]"``
+   * - ``decoupler``
+     - decoupleR (TF/pathway activity)
+     - ``pip install -e ".[decoupler]"``
    * - ``dev``
-     - pytest, ruff
+     - pytest, ruff, igraph, leidenalg
      - ``pip install -e ".[dev]"``
    * - ``docs``
      - sphinx, pydata-sphinx-theme, myst-nb

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "sc_tools"
 author = "Junbum Kim"
 release = "0.1.0"
-copyright = "2024, Junbum Kim"  # noqa: A001
+copyright = "2024-2026, Junbum Kim"  # noqa: A001
 
 # -- Extensions ---------------------------------------------------------------
 extensions = [
@@ -68,6 +68,9 @@ intersphinx_mapping = {
     "anndata": ("https://anndata.readthedocs.io/en/stable", None),
     "scanpy": ("https://scanpy.readthedocs.io/en/stable", None),
 }
+
+# -- Exclude patterns (suppress myst-nb jupyter_execute toctree warnings) ----
+exclude_patterns = ["_build", "_build/jupyter_execute/**"]
 
 # -- HTML theme ---------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"

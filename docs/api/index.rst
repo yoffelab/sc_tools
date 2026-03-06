@@ -18,7 +18,19 @@ Import the package as ``import sc_tools as st`` and access modules via
    * - :doc:`tl`
      - **Tools** — signature scoring, gene set loading, ORA/GSEA, deconvolution, colocalization.
    * - :doc:`qc`
-     - **Quality control** — QC metrics, spot filtering, sample classification, HTML report.
+     - **Quality control** — QC metrics, spot filtering, sample classification, HTML reports.
+   * - :doc:`ingest`
+     - **Ingestion** — batch manifests, modality loaders (Visium/HD/Xenium/IMC), SLURM helpers.
+   * - :doc:`validate`
+     - **Validation** — checkpoint metadata contracts (Architecture.md Section 2.2).
+   * - :doc:`pipeline`
+     - **Pipeline DAG** — phase specs, dependency graph, available-next queries.
+   * - :doc:`bm`
+     - **Benchmarking** — integration comparison, segmentation quality metrics.
+   * - :doc:`storage`
+     - **Storage** — fsspec URI abstraction for local, S3, SFTP, GCS, Azure, Box.
+   * - :doc:`registry`
+     - **Registry** — SQLAlchemy project/dataset/job tracking (SQLite or PostgreSQL).
    * - :doc:`memory`
      - **Memory / GPU** — GPU detection, memory profiling, aggressive cleanup.
    * - :doc:`utils`
@@ -32,5 +44,11 @@ Import the package as ``import sc_tools as st`` and access modules via
    pl
    tl
    qc
+   ingest
+   validate
+   pipeline
+   bm
+   storage
+   registry
    memory
    utils

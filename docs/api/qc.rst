@@ -52,10 +52,22 @@ Per-sample metrics, adaptive MAD outlier detection, pass/fail classification.
 
 .. autofunction:: apply_qc_filter
 
-HTML Report
------------
+HTML Reports
+------------
 
 .. autofunction:: generate_qc_report
+
+.. autofunction:: generate_pre_filter_report
+
+.. autofunction:: generate_post_filter_report
+
+.. autofunction:: generate_post_integration_report
+
+.. autofunction:: generate_post_celltyping_report
+
+.. autofunction:: generate_segmentation_qc_report
+
+.. autofunction:: generate_all_qc_reports
 
 QC Plots
 --------

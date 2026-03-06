@@ -1,6 +1,8 @@
 ---
 name: journal-and-mission
-description: Sync project state, record decisions, and update Mission.md as todo list. Use when starting a session, finishing significant work, or tracking progress in sc_tools and subprojects.
+tier: 1
+description: "[Tier 1 — Core] Sync project state, record decisions, and update Mission.md as todo list. Use when starting a session, finishing significant work, or tracking progress in sc_tools and subprojects."
+allowed-tools: Read Write Edit Glob
 ---
 
 # Journal and Mission Workflow
@@ -38,5 +40,3 @@ Keep short (a few bullets or one paragraph per section):
 - **Scope:** Current phase and overall goal
 - **Recent:** Last major decisions and outcomes
 - **Conventions:** Any key naming/path conventions relevant now
-
-$ARGUMENTS

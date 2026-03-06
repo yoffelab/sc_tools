@@ -506,7 +506,7 @@ All production analysis runs on SLURM-managed clusters. This section defines how
 | Cluster | SLURM | Scratch | CPU partitions | GPU partitions |
 |---------|-------|---------|----------------|----------------|
 | **brb** | UP | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` (c7–c42) | `scu-gpu` (L40S / A40 / RTX6000) |
-| **cayuga** | DOWN (2026-03-05, version mismatch) | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` | `scu-gpu` (A100 / A40) |
+| **cayuga** | UP | `/athena/elementolab/scratch/juk4007/` | `scu-cpu` | `scu-gpu` (A100 / A40) |
 
 **Critical rules:**
 - **Never write to `~/`** (login node home). All outputs go to `/athena/elementolab/scratch/juk4007/` or project-relative paths under scratch.
@@ -630,12 +630,14 @@ srun --partition=scu-gpu --gres=gpu:1 --cpus-per-task=8 --mem=64G --time=2:00:00
 - Single job, 8–16 CPUs, 32–64G RAM. Runtime: minutes for <1M cells.
 - `sc_tools.pp.run_harmony()` handles the harmonypy call.
 
-#### rapids-singlecell — GPU-accelerated clustering and UMAP (post-integration)
+#### rapids-singlecell — **default** GPU-accelerated clustering and UMAP (post-integration)
 
-- Replace scanpy `pp.neighbors`, `tl.umap`, `tl.leiden` with rapids-singlecell equivalents for large datasets (>100K cells, meaningful speedup at >500K).
-- Requires RAPIDS environment (separate from base `sc_tools` conda env; install with `[gpu]` extra).
-- Memory: GPU VRAM must hold the neighbor graph and embedding. A40 (48GB) handles ~1M cells comfortably.
-- Workflow: integrate with scVI/Harmony on GPU → keep in GPU memory → cluster + UMAP → transfer back to AnnData.
+**Use rapids-singlecell by default on any GPU node.** It is a drop-in replacement for scanpy `pp.neighbors`, `tl.umap`, `tl.leiden` and is faster even for moderate datasets (>50K cells); the speedup is decisive above 200K cells.
+
+- A40 (48GB VRAM) handles ~1M cells comfortably for neighbors + UMAP + Leiden.
+- `sc_tools.pp` auto-detects GPU; rapids path is taken whenever `rapids_singlecell` is importable.
+- Workflow: integrate on GPU (scVI/Harmony) → stay in GPU memory → cluster + UMAP → transfer back before saving.
+- Do not fall back to scanpy for these steps on GPU nodes — always use rapids.
 
 ```bash
 #SBATCH --partition=scu-gpu
@@ -720,19 +722,118 @@ ssh brb "cp /athena/elementolab/scratch/juk4007/logs/job_12345.out /tmp/ && cat 
 
 ---
 
-### 18.6 Spack
+### 18.6 Package Installation on HPC: Handling Slow or Hanging Conda
 
-Spack is available on cayuga/brb for system-level software (compilers, MPI, HDF5). For Python analysis, **prefer conda + pip** over Spack modules. Use Spack only when:
-- A system-level library (e.g. libhdf5, OpenMPI) is missing and apt is unavailable.
-- A compiled tool (e.g. STAR, BWA) is needed outside of conda.
+`conda install` on HPC Lustre filesystems frequently hangs or takes 10–30+ minutes due to (1) the SAT solver scanning thousands of packages, (2) Lustre locking when conda tries to lock the package cache, and (3) NFS latency on `~/.conda`. **Never wait — use the alternatives below.**
 
-```bash
-spack find hdf5                  # check available versions
-spack load hdf5@1.12             # add to PATH / LD_LIBRARY_PATH
-spack unload hdf5                # remove
+#### Decision tree
+
+```
+Need a Python package?
+  ├── Already in sc_tools pyproject.toml extras?  →  pip install -e ".[extra]"  (fastest)
+  ├── Pure Python / has a wheel on PyPI?           →  pip install PKG  or  uv pip install PKG
+  ├── Needs compiled CUDA extension (rapids)?      →  pip + NVIDIA index (see below)
+  ├── Needs a compiled system library?             →  Spack  (see below)
+  └── Nothing else works?                         →  mamba/micromamba  (still better than conda)
 ```
 
-For HDF5 with h5py: prefer `conda install h5py` which bundles its own libhdf5, rather than relying on Spack.
+#### Option 1 — pip / uv (preferred for Python packages)
+
+pip resolves and installs in seconds; uv is even faster (Rust-based resolver).
+
+```bash
+# Plain pip — use inside the activated conda env
+pip install rapids-singlecell
+
+# uv — fastest resolver; compatible with conda envs
+uv pip install rapids-singlecell
+```
+
+#### Option 2 — rapids-singlecell specifically: NVIDIA PyPI index
+
+conda install of RAPIDS reliably hangs or produces solver conflicts. **Use pip with NVIDIA index instead:**
+
+```bash
+# CUDA 12 (A40 / L40S / A100 on brb/cayuga)
+pip install "rapids-singlecell[rapids12]" --extra-index-url=https://pypi.nvidia.com
+
+# CUDA 11 fallback
+pip install "rapids-singlecell[rapids11]" --extra-index-url=https://pypi.nvidia.com
+
+# Or install pre-releases (bundled CUDA kernels, no toolkit needed at install time)
+pip install --pre rapids-singlecell-cu12 --extra-index-url=https://pypi.nvidia.com
+```
+
+Check CUDA version first: `nvcc --version` or `nvidia-smi | grep "CUDA Version"`.
+
+#### Option 3 — mamba / micromamba (drop-in conda replacement, ~10x faster resolver)
+
+When a package truly requires conda (e.g. compiled bioinformatics tools with complex native deps):
+
+```bash
+# mamba — install once into the base conda env
+conda install -n base -c conda-forge mamba
+
+# Then use mamba everywhere instead of conda
+mamba install -c conda-forge scanpy
+
+# micromamba — statically linked, no base env required
+# Install to scratch (avoid home dir):
+"${SHELL}" <(curl -L micro.mamba.pm/install.sh)   # follow prompt; set prefix to scratch
+micromamba install -c conda-forge -n sc_tools scanpy
+```
+
+**Lustre lockfile hang fix** — if mamba/micromamba still hangs on Lustre, disable lockfiles:
+```bash
+micromamba config set use_lockfiles false
+# or for mamba:
+conda config --set use_locks false
+```
+
+Move the conda package cache off Lustre to local node scratch:
+```bash
+conda config --add pkgs_dirs /tmp/conda_pkgs_$USER
+```
+
+#### Option 4 — Spack (system-level compiled libraries only)
+
+Use Spack when you need a compiled system library (libhdf5, OpenMPI, a compiled bioinformatics tool) and neither conda nor pip can provide it. **Do not use Spack for Python packages — pip/conda handles those better.**
+
+```bash
+spack find hdf5                    # list available versions
+spack load hdf5@1.12               # add to PATH / LD_LIBRARY_PATH for current shell
+spack load --sh hdf5@1.12          # emit shell commands (useful in sbatch)
+spack unload hdf5
+
+# In an sbatch script:
+. $(spack location -i hdf5@1.12)/share/spack/setup-env.sh
+spack load hdf5@1.12
+```
+
+Useful Spack packages on brb/cayuga: `hdf5`, `openmpi`, `cuda`, `libffi`, `zlib`, `star`, `bwa`, `samtools`.
+
+#### Option 5 — Apptainer container (nuclear option)
+
+If a package is impossible to install in the conda env (version conflicts, missing compilers), pull an official container image:
+
+```bash
+# rapids-singlecell official container (CUDA + full stack)
+apptainer pull rsc.sif ghcr.io/scverse/rapids_singlecell:latest
+
+# Run a script inside it
+apptainer exec --nv rsc.sif python my_script.py
+```
+
+The `--nv` flag passes through the host GPU.
+
+#### Summary: what to try and in what order
+
+| Package type | First try | Second try | Last resort |
+|---|---|---|---|
+| Pure Python | `pip install` / `uv pip install` | mamba | conda |
+| RAPIDS/GPU | `pip --extra-index-url pypi.nvidia.com` | apptainer pull rsc.sif | mamba (slow) |
+| Bioinformatics tool | `conda install -c bioconda` via mamba | Spack | build from source |
+| System library | Spack | conda | contact sysadmin |
 
 ---
 
@@ -808,6 +909,7 @@ bm.run_single_method(adata, method='$METHOD', output_dir='results/tmp/integratio
 
 | Pitfall | Fix |
 |---------|-----|
+| `conda install` hangs on Lustre | Use `pip` / `uv pip` instead; for RAPIDS use NVIDIA PyPI index; for conda-only packages use mamba with `use_locks: false` |
 | OOM during scVI on large datasets | Use backed AnnData; reduce `batch_size`; increase `--mem` |
 | Lustre lock contention (many jobs writing same dir) | Stagger array job start with `%K` throttle; write to per-task subdirs |
 | Job array silently skips tasks | Check `sacct -j JOBID` — tasks may be in `PENDING` due to resource limits |

@@ -1,0 +1,10 @@
+{
+  "pancytokeratin": ["panck", "pan-ck", "pan_ck", "cytokeratin", "krt", "epcam", "epithelial"],
+  "cd3": ["cd3e", "cd3d", "cd3g", "cd3epsilon", "tcrcd3"],
+  "cd8": ["cd8a", "cd8b", "cd8alpha"],
+  "hladr": ["hla-dr", "hla.dr", "hla_dr", "mhcii"],
+  "asma": ["acta2", "alpha-sma", "smooth_muscle_actin", "sma"],
+  "ki67": ["mki67", "ki-67"],
+  "cd20": ["ms4a1"],
+  "cd31": ["pecam1", "pecam"]
+}

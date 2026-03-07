@@ -76,6 +76,82 @@
   {% endif %}
 </div>
 
+<!-- Ranking Table -->
+{% if ranking_rows %}
+<section>
+  <h2>Integration Benchmark Ranking</h2>
+  <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">
+    Ranked by overall score (0.6 &times; batch + 0.4 &times; bio). Batch score is the primary metric for integration selection pre-celltyping.
+  </p>
+  <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 16px;margin:12px 0;">
+    <strong>Note:</strong> Bio metrics (ASW Cell, ARI, NMI) use preliminary Leiden cluster labels and are informational only.
+    See Report 4 (Post-celltyping) for validated bio metrics.
+  </div>
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40px;">Rank</th>
+        {% if ranking_rows[0].group is defined and ranking_rows[0].group %}<th>Group</th>{% endif %}
+        <th>Method</th>
+        <th style="text-align: right;">Overall</th>
+        <th style="text-align: right; font-weight: 700; background: #e8f4f8;">Batch</th>
+        <th style="text-align: right;">Bio</th>
+        <th style="text-align: right; color: #888;">ASW Batch</th>
+        <th style="text-align: right; color: #888;">PCR</th>
+        <th style="text-align: right; color: #888;">Graph Conn</th>
+        <th style="text-align: right; color: #888;">ASW Cell</th>
+        <th style="text-align: right; color: #888;">ARI</th>
+        <th style="text-align: right; color: #888;">NMI</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in ranking_rows %}
+      <tr{% if loop.index == 1 %} style="background: #e8f5e9; font-weight: 600;"{% endif %}>
+        <td>{{ row.rank }}</td>
+        {% if row.group is defined and ranking_rows[0].group %}<td>{{ row.group }}</td>{% endif %}
+        <td>{{ row.method }}</td>
+        <td style="text-align: right;">{% if row.overall is not none %}{{ "%.3f" | format(row.overall) }}{% endif %}</td>
+        <td style="text-align: right; font-weight: 700;">{% if row.batch is not none %}{{ "%.3f" | format(row.batch) }}{% endif %}</td>
+        <td style="text-align: right;">{% if row.bio is not none %}{{ "%.3f" | format(row.bio) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.asw_batch is not none %}{{ "%.3f" | format(row.asw_batch) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.pcr is not none %}{{ "%.3f" | format(row.pcr) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.graph_conn is not none %}{{ "%.3f" | format(row.graph_conn) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.asw_celltype is not none %}{{ "%.3f" | format(row.asw_celltype) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.ari is not none %}{{ "%.3f" | format(row.ari) }}{% endif %}</td>
+        <td style="text-align: right; color: #888;">{% if row.nmi is not none %}{{ "%.3f" | format(row.nmi) }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <details style="margin-top: 12px;">
+    <summary style="cursor: pointer; color: #666; font-size: 0.85rem;">Metric definitions</summary>
+    <div style="font-size: 0.8rem; color: #888; margin-top: 8px; line-height: 1.8;">
+      <strong>Batch removal metrics</strong> (higher = better batch mixing):<br>
+      &bull; <strong>ASW Batch</strong> &mdash; Average silhouette width for batch labels (1 &minus; |score|; penalizes batch-specific clusters)<br>
+      &bull; <strong>PCR</strong> &mdash; Principal component regression; variance in PCs explained by batch (1 &minus; R&sup2;; lower batch influence = better)<br>
+      &bull; <strong>Graph Conn</strong> &mdash; Graph connectivity; fraction of cells in the largest connected subgraph per cell type (batch-mixed neighborhoods)<br>
+      <strong>Bio conservation metrics</strong> (higher = better biological separation):<br>
+      &bull; <strong>ASW Cell</strong> &mdash; Average silhouette width for cell type labels (distinct cell types form tight clusters)<br>
+      &bull; <strong>ARI</strong> &mdash; Adjusted Rand Index; agreement between Leiden clusters and known cell types<br>
+      &bull; <strong>NMI</strong> &mdash; Normalized Mutual Information; information shared between clusters and cell types<br>
+      <strong>Composite scores:</strong> Batch = mean(ASW Batch, PCR, Graph Conn). Bio = mean(ASW Cell, ARI, NMI). Overall = 0.6 &times; Batch + 0.4 &times; Bio.
+    </div>
+  </details>
+</section>
+{% endif %}
+
+<!-- Radar Chart -->
+{% if integration_plots and integration_plots.integration_radar %}
+<section>
+  <h2>Integration Metrics Radar</h2>
+  <div class="plotly-container">
+    {{ integration_plots.integration_radar }}
+  </div>
+</section>
+{% endif %}
+
 <!-- UMAP Grid -->
 {% if plots.umap_grid %}
 <section>
@@ -84,6 +160,21 @@
     <div class="plot-item">
       <img src="data:image/png;base64,{{ plots.umap_grid }}" alt="UMAP Grid">
       <div class="caption">UMAP colored by sample, batch, cluster{% if has_celltype %}, cell type{% endif %}</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Per-Embedding UMAP Grid -->
+{% if plots.embedding_umaps %}
+<section>
+  <h2>Per-Embedding UMAP Comparison</h2>
+  <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">
+    Each panel shows a UMAP computed from a different integration embedding, colored by sample. Well-integrated methods should show samples mixing together.
+  </p>
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ plots.embedding_umaps }}" alt="Per-Embedding UMAPs">
     </div>
   </div>
 </section>
@@ -99,41 +190,6 @@
       <div class="caption">Cluster composition per sample</div>
     </div>
   </div>
-</section>
-{% endif %}
-
-<!-- Integration Metrics -->
-{% if integration_plots %}
-<section>
-  <h2>Integration Quality Metrics</h2>
-
-  {% if integration_plots.integration_table %}
-  <h3 style="margin: 16px 0 8px; color: #555;">Comparison Table</h3>
-  <div class="plotly-container">
-    {{ integration_plots.integration_table }}
-  </div>
-  {% endif %}
-
-  {% if integration_plots.integration_radar %}
-  <h3 style="margin: 16px 0 8px; color: #555;">Radar Chart</h3>
-  <div class="plotly-container">
-    {{ integration_plots.integration_radar }}
-  </div>
-  {% endif %}
-
-  {% if integration_plots.integration_ranking %}
-  <h3 style="margin: 16px 0 8px; color: #555;">Ranking</h3>
-  <div class="plotly-container">
-    {{ integration_plots.integration_ranking }}
-  </div>
-  {% endif %}
-
-  {% if integration_plots.batch_vs_bio %}
-  <h3 style="margin: 16px 0 8px; color: #555;">Batch Removal vs Bio Conservation</h3>
-  <div class="plotly-container">
-    {{ integration_plots.batch_vs_bio }}
-  </div>
-  {% endif %}
 </section>
 {% endif %}
 
@@ -172,6 +228,16 @@
   </div>
   {% endfor %}
   {% endif %}
+</section>
+{% endif %}
+
+<!-- Batch vs Bio Scatter (supplementary) -->
+{% if integration_plots and integration_plots.batch_vs_bio %}
+<section>
+  <h2>Batch Removal vs Bio Conservation</h2>
+  <div class="plotly-container">
+    {{ integration_plots.batch_vs_bio }}
+  </div>
 </section>
 {% endif %}
 

@@ -10,6 +10,135 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-03-06] - Automated cell typing (sc_tools.tl.celltype) + post-celltyping QC report overhaul
+
+**Plan A: sc_tools.tl.celltype subpackage (automated cell typing)**
+
+Implemented a new `sc_tools/tl/celltype/` subpackage following the same Protocol-based backend registry pattern as `sc_tools.tl.deconvolution`. Key design decisions:
+
+- **Subpackage not flat file**: 7+ backends would exceed 700 lines. Subpackage follows `sc_tools.bm` precedent and allows deferred imports per backend.
+- **Protocol + registry**: `CelltypeBackend` Protocol + `_BACKENDS` dict + `register_celltype_backend()`. Allows external code to register custom backends without modifying sc_tools.
+- **Cluster-level assignment as default**: Spatial data (Visium, IMC) has noisy spots; cluster-level majority voting is the production standard. Per-cell assignment available via `assign_by="cell"` (ScType) or `majority_voting=False` (CellTypist).
+- **Soft deps inside run() body**: Never at module top-level, so importing `sc_tools.tl.celltype` never fails.
+- **Storage schema**: `obs[f'celltype_auto_{method}']` (Categorical), `obs[f'celltype_auto_{method}_score']` (float64), `obsm[f'celltype_proba_{method}']` (optional, DataFrame), `uns[f'celltype_auto_{method}']` (metadata dict with date, version, markers).
+- **`apply_celltype_map()`**: Absorbs project-local `apply_leiden_mapping()` from robin into sc_tools. Accepts dict or JSON path, writes `obs[celltype]`, `obs[celltype_broad]`, `uns[f'{key}_colors']`.
+- **Backends implemented**: ScType (pure numpy), custom hierarchical gating (DFS), CellTypist (soft dep), ensemble (majority_vote, weighted_vote). Stubs for scArches, Geneformer, scGPT, SingleR.
+- **Bundled data**: `marker_db/immune_human_rna.json`, `immune_human_protein.json`, `protein_aliases.json`; `gating_templates/immune_broad.yaml`, `lymph_node.yaml`.
+- **pyproject.toml**: `[celltyping]` (celltypist, scarches), `[foundation]` (transformers, datasets, accelerate) extras added.
+- **Tests**: 37 new tests (TDD first); 574 total pass, 12 skipped, lint clean.
+
+**Plan B: post-celltyping QC report overhaul + tabbed navigation**
+
+- **New template** `post_celltyping_qc_template.html`: purple header (#6c3483) to distinguish from other reports. Sections: celltype composition (stacked bar + table), Phase 3 vs Phase 4 benchmark (bio column bold/primary), radar, UMAP grid, celltype distribution per sample, optional marker dotplot, segmentation, batch-vs-bio scatter.
+- **`ranking_rows` bug fix**: `generate_post_celltyping_report()` was using `_POST_INTEGRATION_TEMPLATE` and never building `ranking_rows` — table was empty in report 4. Fixed by building ranking sorted by `bio_score` (primary for Phase 4 with validated celltypes).
+- **New params**: `comparison_df_p3` (Phase 3 leiden-based metrics for side-by-side), `marker_genes` (optional dotplot dict).
+- **`qc_celltype_abundance()`**: Stacked bar chart in `sc_tools/pl/qc_plots.py`; uses `adata.uns[celltype_colors]` or Okabe-Ito palette; exported from `sc_tools.pl`.
+- **Tabbed navigation** (Option B — inline embed): At generation time, glob `output_dir` for prior-phase reports, extract body content + head CSS via regex, inject as tab panels. Report 2 embeds report 1; report 3 embeds 1+2; report 4 embeds 1+2+3. All CSS/JS inline — fully self-contained HTML.
+- **4 new helpers** in `report_utils.py`: `_find_latest_report`, `_extract_body_content`, `_extract_head_css`, `_wrap_with_tabs`. No external deps (stdlib `re` only). Fallback: if no prior reports found, standalone HTML written as before.
+- **Report 3 template improvements**: Yellow callout box for bio metrics disclaimer, `#e8f4f8` Batch column header to signal it is primary metric.
+- **Snakemake**: `qc_post_celltyping` rule added to robin and ggo_visium Snakefiles; `qc_report` aggregator updated.
+- **CLI**: `--marker-genes` and `--comparison-df-p3` args added to `run_qc_report.py`.
+- **Tests**: 17 new tests (TDD first); 574 total pass, lint clean.
+
+### [2026-03-06] - Option A: dual phase-name support in validate.py + CLI + Snakefile template
+
+- **Action:** Updated three files to accept both old p-codes (deprecated, old nomenclature) and new semantic slugs simultaneously.
+- **`sc_tools/validate.py`:**
+  - Added `_LEGACY_PHASE_MAP = {"p1": "qc_filter", "p2": "metadata_attach", "p3": "preprocess", "p35": "scoring", "p4": "celltype_manual"}`.
+  - `validate_checkpoint()` now resolves legacy codes -> slugs and emits `DeprecationWarning` (message names both old code and new slug, references Architecture.md).
+  - Module docstring lists all accepted slugs and maps them to old codes explicitly.
+  - All `validate_p1` through `validate_p4` docstrings marked "deprecated old nomenclature; use slug via `validate_checkpoint`".
+- **`scripts/validate_checkpoint.py`:**
+  - `--phase` choices expanded to all 10 values (5 slugs + 5 legacy p-codes).
+  - Help text and epilog clearly show slug-to-old-code mapping and note p-codes are deprecated.
+  - Explicit stderr message when legacy p-code detected in argv before delegating to validate.py.
+- **`projects/create_project.sh` Snakefile template:**
+  - Added phase-naming convention comment block at top of generated Snakefile.
+  - All rule names updated to slug names: `adata_qc_filter`, `validate_qc_filter`, `qc_filter`, `adata_metadata_attach`, `validate_metadata_attach`, `metadata_attach`, `adata_preprocess`, `validate_preprocess`, `preprocess`, `adata_scoring`, `validate_scoring`, `scoring`, `adata_celltype_manual`, `validate_celltype_manual`, `celltype_manual`.
+  - All checkpoint filenames updated to new format: `adata.raw.h5ad`, `adata.annotated.h5ad`, `adata.normalized.h5ad`, `adata.scored.h5ad`, `adata.celltyped.h5ad`.
+  - All `--phase` CLI args updated to slugs.
+  - Mission.md template phase table updated to slug names.
+  - CLAUDE.md template Key Files table updated to new checkpoint filenames.
+- **Tests:** 22 new tests in `TestValidateCheckpoint` (5 slug-acceptance tests, 2 deprecation-warning tests, 1 unknown-slug-raises test). 522 total pass.
+
+---
+
+### [2026-03-06] - Registry schema extension: technology taxonomy + phase DAG + per-phase tracking
+
+- **Action:** Implemented three interlocking extensions to the registry and pipeline design: (1) `sc_tools/pipeline.py` phase DAG, (2) technology taxonomy columns on projects/datasets tables, (3) `project_phases` per-phase tracking table + Alembic migrations.
+- **Phase DAG (`sc_tools/pipeline.py`):**
+  - `PhaseSpec` dataclass: `label`, `depends_on`, `branch`, `checkpoint`, `optional`, `iterative`.
+  - `STANDARD_PHASES` dict with 10 slugs replacing the p0a/p0b/p1/p2/p3/p35/p4 naming scheme: `ingest_raw`, `ingest_load`, `qc_filter`, `metadata_attach`, `preprocess`, `demographics`, `scoring`, `celltype_manual`, `biology`, `meta_analysis`.
+  - `extend_dag(slug, spec)` for project-specific or experimental phases (no library change needed).
+  - `get_available_next(completed)` respects `iterative=True` (celltype_manual can be re-entered).
+  - `get_phase_checkpoint(slug, **kwargs)` returns the expected output path for a phase.
+  - `validate_dag()` checks all `depends_on` references.
+- **Registry schema additions (`sc_tools/registry.py`):**
+  - `projects` table: added `domain` (spatial_transcriptomics, spatial_proteomics, imaging, single_cell, bulk) and `imaging_modality` (brightfield, fluorescence, multiplexed_fluorescence, probe_based, mass_spec_imaging, sequencing_based).
+  - `datasets` table: added `file_role` (primary, supplementary, entry_point, spatialdata, image, metadata), `validated` (bool), `n_obs`, `n_vars`.
+  - New `project_phases` table: composite PK `(project_id, phase)`, upserted on each update. Tracks status (not_started, in_progress, complete, failed, skipped), entry_phase flag, primary_dataset_id FK, n_obs/n_vars/n_samples, notes, timestamps.
+  - New methods: `upsert_phase`, `get_phase`, `list_phases`, `mark_dataset_validated`. Updated `mark_phase_complete` to also upsert project_phases. Updated `status()` to return per-project phase count summary.
+- **Alembic migrations:**
+  - `0001_initial_schema.py`: baseline (stamp target for existing DBs; creates original 4 tables).
+  - `0002_tech_taxonomy_and_phase_tracking.py`: adds new columns and `project_phases` table. Uses `batch_alter_table` for SQLite compatibility.
+- **MCP server (`sc_tools/mcp/registry_server.py`):** Two new tools: `get_phase_status`, `set_phase_status`. Updated `registry_status` to include phase counts. Updated `register_dataset` with `file_role`/`validated`/`n_obs`/`n_vars` params. Updated `mark_phase_complete` to sync both legacy list and project_phases table.
+- **Documentation:** Fixed README.md Mermaid diagram (TD layout, no nested subgraphs, new phase slug names). Updated phase tables in README.md, Architecture.md Section 2.1, and CLAUDE.md. Added Phase DAG reference and slug-to-old-code mapping table in Architecture.md Section 2.
+- **Tests:** 59 new tests (500 total pass, 12 skipped). 33 in `test_pipeline.py`, 26 new in `test_registry.py` (3 new classes: TestProjectTaxonomy, TestDatasetFileRole, TestProjectPhases). All lint clean.
+- **Key design decision:** Phase slugs stored as strings in the DB; the DAG lives in Python code. This means adding a new phase requires only adding a dict entry in `pipeline.py` or calling `extend_dag()`. No migration needed for new phases.
+
+### [2026-03-06] - Integration benchmark (9 methods) on ggo_human IMC + 4th QC report design
+
+- **Action:** Ran comprehensive 9-method integration benchmark on ggo_human IMC data (~248K cells, 38 markers, 7 samples, 15 celltypes) on brb HPC. Documented integration selection workflow and added 4th QC report (post-celltyping).
+- **Methods benchmarked (3 normalization groups):**
+  - Group A (arcsinh): Unintegrated PCA, Harmony, CytoVI (arcsinh), ComBat
+  - Group B (raw counts): scVI, scANVI (semi-supervised)
+  - Group C (log1p z-score): IMC Phenotyping, IMC Pheno+Harmony, Z-score+Harmony
+- **Results (overall score = 0.6 * batch + 0.4 * bio):**
+  1. Z-score+Harmony: 0.634 (batch 0.967, bio 0.412)
+  2. IMC Pheno+Harmony: 0.633 (batch 0.968, bio 0.410)
+  3. IMC Phenotyping: 0.627 (batch 0.973, bio 0.397)
+  4. scANVI (raw): 0.621 (batch 0.975, bio 0.385)
+  5. ComBat: 0.568 | 6. PCA: 0.564 | 7. scVI: 0.555 | 8. Harmony: 0.553 | 9. CytoVI: 0.486
+- **Key findings:**
+  - Z-score (log1p → per-ROI truncated z-score at ±3SD) + Harmony matches the ElementoLab phenotyping pipeline performance while being simpler (no ComBat/BBKNN).
+  - scANVI with raw counts performs well (4th) despite IMC data being protein-level; its semi-supervised nature leverages celltype labels.
+  - CytoVI last because scvi-tools CytoVI was not available; fell back to scVI on arcsinh-transformed data (designed for raw counts). This is a real workflow people use; the benchmark reveals it is suboptimal for this dataset.
+  - Bio metrics (ARI, NMI, ASW celltype) used leiden res=1.0 labels, creating potential circularity. Batch score should be the primary selection criterion pre-celltyping.
+- **Harmony PyTorch fix:** `run_harmony()` rewritten to call `harmonypy.run_harmony()` directly (bypassing scanpy wrapper). Handles Z_corr as torch tensor (`.detach().cpu().numpy()`) with shape validation for both (n_obs, n_comps) and (n_comps, n_obs) orientations. Stores `np.float32` contiguous array.
+- **Report optimization:** Added `comparison_df` parameter to `generate_post_integration_report()` and `compute_integration_section()` to skip recomputation (~1.5h saved on 248K cells).
+- **Design decision — 4-report QC workflow:**
+  - Pre-filter (Phase 1) → Post-filter (Phase 1-2) → Post-integration (Phase 3, **batch-focused**) → Post-celltyping (Phase 4, **full bio metrics**)
+  - Batch score is primary metric for integration selection. Bio metrics become meaningful only after validated celltyping.
+  - Integration benchmark stores intermediates in `results/tmp/integration_test/{method}.h5ad` for re-annotation without re-running integration.
+  - Selected method recorded in `results/integration_method.txt`.
+- **Files changed:** `sc_tools/pp/integrate.py` (Harmony fix), `sc_tools/qc/report.py` (comparison_df), `sc_tools/qc/report_utils.py` (comparison_df, expanded _KNOWN_EMBEDDINGS), `Architecture.md` (Sections 2.3, 2.5, Phase 3, Phase 4), `Mission.md` (Phase 3 integration workflow, Phase 4 QC report).
+
+### [2026-03-06] - IMC Cell Segmentation Benchmark Pipeline Overhaul
+
+- **Action:** Implemented comprehensive IMC segmentation benchmark framework (`sc_tools.bm` + `sc_tools.data.imc.benchmark`). 21 new files, 8 modified files across all 7 planned phases (A through G).
+- **Data infrastructure (`sc_tools/data/imc/benchmark/`):**
+  - `catalog.py`: `ROIRecord`/`IMCDatasetEntry` dataclasses, `discover_rois()`, `discover_internal_datasets()`, `build_benchmark_catalog()` — scans HPC dirs for 8 internal datasets (ggo-imc, aapc, clonevo, etc.).
+  - `public.py`: 5 public dataset entries (steinbock_example, jackson_2020_breast, immuncan_2024, damond_2019_pancreas, rendeiro_2021_covid) with download and standardization to steinbock convention.
+  - `prepare.py`: `validate_roi_files()`, `normalize_imc_intensity()` (percentile/arcsinh/zscore/uint8), `extract_dna_channels()`, `extract_channel_by_name()`, `generate_probability_map()` (gaussian/otsu/multiscale).
+  - `config.py`: `BenchmarkConfig` dataclass with YAML I/O for all benchmark parameters.
+- **Four segmentation strategies:**
+  - Strategy 1: Full image + Ilastik prob map + DL (extended existing `segment.py` with `run_deepcell`, Cellpose variants, `run_all_strategy1`).
+  - Strategy 2: DNA-only + prob map + DL (`strategy_dna.py`).
+  - Strategy 3: HuggingFace pretrained models (`strategy_hf.py` — CellViT, SAM, HoVer-Net registry with IMC-to-uint8 normalization).
+  - Strategy 4: SegFormer trainable N-channel input (`strategy_vit.py` — `IMCSegmentationDataset`, `build_segformer_model`, `train_segformer`, `predict_segformer`).
+- **Runner and orchestration:**
+  - `runner.py`: `run_single_roi()`, `run_benchmark()` with resume support via progress.json, `aggregate_results()`.
+  - `slurm.py`: sbatch script generation (CPU for strategies 1-2, GPU for 3-4), job submission, result collection.
+  - `cli.py`: CLI via `python -m sc_tools.bm.cli` with 8 subcommands (catalog, download, prepare, run, run-chunk, train-vit, evaluate, slurm).
+- **Extended metrics (`segmentation.py`):** Added `compute_panoptic_quality()` (PQ = SQ x DQ), `compute_boundary_metrics()` (boundary F1 at multiple tolerances), `compute_cell_type_preservation()`.
+- **Cross-dataset analysis (`analysis.py`):** `compute_generalization_matrix()`, `rank_methods_per_tissue()`, `statistical_comparison()` (paired Wilcoxon + BH), `identify_failure_cases()`.
+- **Extended reporting:** HTML template with 9 sections (executive summary, strategy comparison, method ranking, per-dataset heatmap, tissue analysis, generalization, statistics, runtime, failure gallery).
+- **7 new plot functions (`pl/benchmarking.py`):** `plot_strategy_comparison`, `plot_dataset_heatmap`, `plot_tissue_boxplot`, `plot_generalization_radar`, `plot_runtime_comparison`, `plot_failure_gallery`, `plot_metric_correlation_scatter`.
+- **Shared post-processing (`postprocess.py`):** `semantic_to_instance()` (distance transform + watershed), `filter_masks_by_area()`, `fill_holes()`.
+- **Dependencies:** Added `benchmark-extended` group to `pyproject.toml` (deepcell, torch, transformers, segmentation-models-pytorch, albumentations). HPC conda env YAML.
+- **Tests:** 4 new test files (catalog, strategies, runner, analysis) + extended `test_segmentation_benchmark.py`. 66 new benchmark tests, 394 total pass, 0 failures.
+- **Lint:** All files pass ruff check and ruff format.
+
 ### [2026-03-04] - PyPI deployment (CI/CD step 4)
 
 - **Action:** Implemented PyPI deployment infrastructure for sc-tools v0.1.0.
@@ -219,3 +348,39 @@ This journal documents **repository-level** technical and structural decisions. 
 - **Output naming:** Both wrapper scripts and Snakefiles now use `adata.deconvolution.{method}.h5ad` (e.g. `adata.deconvolution.tangram.h5ad`). Snakefiles accept `--config deconv_method=tangram` to select method.
 - **Results:** ggo_visium Tangram: 29,952 spots x 31 cell types (valid, no NaN). Robin Tangram: 567,456 spots x 39 cell types (already worked). Both spatial proportion PDFs generated.
 - **Note:** Cell2location is user-preferred method but requires NVIDIA GPU (not available on macOS ARM). Tangram used as CPU fallback. Wrapper defaults set to cell2location for GPU environments.
+
+## 2026-03-06: Storage abstraction, registry DB, and MCP servers
+
+**Goal:** Add three interlocking layers to make sc_tools work across multiple storage
+platforms (HPC, S3, Box) and surface capabilities to Claude Code as callable tools.
+
+**Storage layer (`sc_tools/storage.py`):**
+- `resolve_fs(uri)`: returns `(AbstractFileSystem, path)` for any URI scheme using fsspec
+- `open_file(uri, mode)`: context manager for any URI
+- `with_local_copy(uri)`: downloads remote files to tmp, yields local Path (for scanpy/tifffile compat)
+- `smart_read_h5ad(uri)`: reads .h5ad from local or remote URI
+- `smart_write_checkpoint(adata, uri, fmt)`: writes h5ad or zarr to any URI
+- `smart_read_csv(uri)`: reads CSV/TSV from any URI
+- Soft deps: fsspec always available (via dask), s3fs/sshfs/gcsfs/adlfs/boxfs optional
+
+**Registry database (`sc_tools/registry.py`):**
+- SQLAlchemy ORM with 4 tables: projects, datasets, slurm_jobs, agent_tasks
+- SQLite default (`~/.sc_tools/registry.db`); PostgreSQL via `SC_TOOLS_REGISTRY_URL`
+- `Registry` class with full CRUD API for all tables
+- CLI: `python -m sc_tools registry status`
+- Migrations directory `sc_tools/migrations/` with Alembic env for future schema changes
+
+**MCP servers (`sc_tools/mcp/`):**
+- `tools_server.py`: FastMCP sc-tools server with 8 analysis tools
+- `registry_server.py`: FastMCP sc-registry server with 7 bookkeeping tools
+- `.mcp.json` at repo root configures both servers for Claude Code auto-discovery
+- Tools in tools_server generate commands for long-running tasks (avoids blocking)
+
+**Ingest updates:**
+- `load_imc_sample()` now accepts direct `cells.h5ad` URIs (local or remote)
+- `load_batch_manifest()` accepts remote URIs via `smart_read_csv()`
+- `collect_all_batches()` supports remote directory globbing via fsspec
+
+**pyproject.toml:** Added `[storage]`, `[storage-box]`, `[registry]`, `[mcp]` extras
+
+**Results:** 441 tests pass (47 new), lint clean.

@@ -435,3 +435,124 @@ class TestExpandedEmbeddings:
         assert "Scanorama" in _KNOWN_EMBEDDINGS
         assert "scANVI" in _KNOWN_EMBEDDINGS
         assert "DestVI" in _KNOWN_EMBEDDINGS
+
+
+# ---------------------------------------------------------------------------
+# run_full_integration_workflow tests
+# ---------------------------------------------------------------------------
+
+
+class TestStratifiedSubsample:
+    def test_subsample_preserves_batches(self):
+        """Stratified subsample should include cells from all batches."""
+        from sc_tools.bm.integration import _stratified_subsample
+
+        adata = _make_batched_adata(n_obs=200)
+        sub = _stratified_subsample(adata, "batch", n=50)
+        assert sub.n_obs <= 50
+        assert set(sub.obs["batch"].unique()) == set(adata.obs["batch"].unique())
+
+    def test_subsample_noop_when_small(self):
+        """Subsample returns copy when n >= n_obs."""
+        from sc_tools.bm.integration import _stratified_subsample
+
+        adata = _make_batched_adata(n_obs=40)
+        sub = _stratified_subsample(adata, "batch", n=100)
+        assert sub.n_obs == adata.n_obs
+
+
+class TestResolveBestMethod:
+    def test_uses_batch_score(self):
+        """Should pick method with highest batch_score."""
+        from sc_tools.bm.integration import _resolve_best_method
+
+        df = pd.DataFrame(
+            {
+                "method": ["A", "B", "C"],
+                "batch_score": [0.5, 0.8, 0.3],
+                "overall_score": [0.9, 0.4, 0.7],
+            }
+        )
+        assert _resolve_best_method(df) == "B"
+
+    def test_falls_back_to_overall(self):
+        """Falls back to overall_score when batch_score absent."""
+        from sc_tools.bm.integration import _resolve_best_method
+
+        df = pd.DataFrame(
+            {
+                "method": ["A", "B"],
+                "overall_score": [0.3, 0.8],
+            }
+        )
+        assert _resolve_best_method(df) == "B"
+
+
+class TestRunFullIntegrationWorkflow:
+    def test_basic_workflow(self, tmp_path):
+        """Full workflow returns adata, comparison_df, and method name."""
+        import scanpy as sc
+
+        from sc_tools.bm.integration import run_full_integration_workflow
+
+        rng = np.random.RandomState(42)
+        n_obs, n_vars = 100, 50
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X)
+        adata.obs["batch"] = [f"batch_{i % 3}" for i in range(n_obs)]
+        adata.obsm["X_pca"] = rng.randn(n_obs, 10).astype(np.float32)
+
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
+
+        result_adata, df, best = run_full_integration_workflow(
+            adata,
+            modality="visium",
+            batch_key="batch",
+            methods=["combat", "pca"],
+            output_dir=str(tmp_path),
+            use_scib="sklearn",
+            save_intermediates=True,
+        )
+
+        assert isinstance(df, pd.DataFrame)
+        assert len(df) >= 2
+        assert isinstance(best, str)
+
+        # Check intermediates saved
+        test_dir = tmp_path / "tmp" / "integration_test"
+        assert test_dir.exists()
+        assert len(list(test_dir.glob("*.h5ad"))) >= 1
+
+        # Check method recorded
+        method_file = tmp_path / "integration_method.txt"
+        assert method_file.exists()
+        assert method_file.read_text().strip() == best
+
+    def test_no_save_intermediates(self, tmp_path):
+        """save_intermediates=False skips file writes."""
+        import scanpy as sc
+
+        from sc_tools.bm.integration import run_full_integration_workflow
+
+        rng = np.random.RandomState(42)
+        n_obs, n_vars = 80, 40
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X)
+        adata.obs["batch"] = [f"batch_{i % 2}" for i in range(n_obs)]
+        adata.obsm["X_pca"] = rng.randn(n_obs, 10).astype(np.float32)
+
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
+
+        _, _, _ = run_full_integration_workflow(
+            adata,
+            batch_key="batch",
+            methods=["pca"],
+            output_dir=str(tmp_path),
+            use_scib="sklearn",
+            save_intermediates=False,
+        )
+
+        test_dir = tmp_path / "tmp" / "integration_test"
+        assert not test_dir.exists()

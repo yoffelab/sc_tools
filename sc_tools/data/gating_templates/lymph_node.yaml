@@ -1,0 +1,41 @@
+T cell:
+  CD3: [0.5, null]
+  CD19: [null, 0.2]
+  children:
+    CD4 T cell:
+      CD4: [0.5, null]
+      CD8a: [null, 0.2]
+      children:
+        Tfh:
+          CXCR5: [0.5, null]
+          BCL6: [0.3, null]
+        Treg:
+          FOXP3: [0.5, null]
+    CD8 T cell:
+      CD8a: [0.5, null]
+      CD4: [null, 0.2]
+B cell:
+  CD19: [0.5, null]
+  CD3: [null, 0.2]
+  children:
+    Germinal center B cell:
+      BCL6: [0.5, null]
+      CD38: [0.5, null]
+    Memory B cell:
+      CD27: [0.5, null]
+      BCL6: [null, 0.2]
+    Plasma cell:
+      CD138: [0.5, null]
+NK cell:
+  CD56: [0.5, null]
+  CD3: [null, 0.2]
+Macrophage:
+  CD68: [0.5, null]
+  CD3: [null, 0.2]
+  CD19: [null, 0.2]
+Epithelial:
+  PanCK: [0.5, null]
+  CD45: [null, 0.2]
+Endothelial:
+  CD31: [0.5, null]
+  PanCK: [null, 0.2]

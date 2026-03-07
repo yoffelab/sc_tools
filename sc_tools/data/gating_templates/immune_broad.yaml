@@ -1,0 +1,43 @@
+Immune:
+  CD45: [0.5, null]
+  children:
+    T cell:
+      CD3: [0.5, null]
+      CD19: [null, 0.2]
+      children:
+        CD4 T cell:
+          CD4: [0.5, null]
+          CD8a: [null, 0.2]
+        CD8 T cell:
+          CD8a: [0.5, null]
+          CD4: [null, 0.2]
+        Treg:
+          CD4: [0.3, null]
+          FOXP3: [0.5, null]
+    B cell:
+      CD19: [0.5, null]
+      CD3: [null, 0.2]
+    NK cell:
+      CD56: [0.5, null]
+      CD3: [null, 0.2]
+    Myeloid:
+      CD68: [0.5, null]
+      children:
+        Macrophage:
+          CD68: [0.5, null]
+          CD11c: [null, 0.5]
+        DC:
+          HLA-DR: [0.5, null]
+          CD11c: [0.3, null]
+Non-immune:
+  CD45: [null, 0.2]
+  children:
+    Epithelial:
+      PanCK: [0.5, null]
+    Endothelial:
+      CD31: [0.5, null]
+      PanCK: [null, 0.2]
+    Fibroblast:
+      FAP: [0.3, null]
+      CD31: [null, 0.2]
+      PanCK: [null, 0.2]

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import stat
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -1013,7 +1013,7 @@ def generate_phase0_inventory(
         if count > 0:
             summary_parts.append(f"{count} {s_name}")
 
-    today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
+    today = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")  # noqa: UP017
     lines: list[str] = []
 
     # Header

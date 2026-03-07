@@ -50,20 +50,24 @@ Plan mode (discussing only): updating Mission optional until execution begins.
 
 ## Pipeline Phases (non-linear)
 
-| Phase | Name | Checkpoint |
-|-------|------|------------|
-| 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` |
-| 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.p0.h5ad` |
-| 1 | QC and Concatenation | `adata.raw.p1.h5ad` |
-| 2 | Metadata Attachment (HIL) | `adata.annotated.p2.h5ad` |
-| 3 | Preprocessing | `adata.normalized.p3.h5ad` |
-| 3.5 | Demographics (parallel branch) | Figure 1 |
-| 3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | `adata.normalized.scored.p35.h5ad` |
-| 4 | Manual Cell Typing (HIL, skippable) | `adata.celltyped.p4.h5ad` |
-| 5 | Downstream Biology | `figures/manuscript/` |
-| 6–7 | Meta Analysis (optional) | `adata.{level}.{feature}.h5ad` |
+Phases are defined as semantic slugs in `sc_tools/pipeline.py`. Use `get_available_next(completed)` and `get_phase_checkpoint(slug)` to query the DAG programmatically.
 
-Entry points: Phase 3 (preprocessed), Phase 3.5b (clustered), or Phase 4 (phenotyped). Full details: @Architecture.md §2.
+| Slug | Old code | Name | Checkpoint |
+|------|----------|------|------------|
+| `ingest_raw` | 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` |
+| `ingest_load` | 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.h5ad` |
+| `qc_filter` | 1 | QC and Concatenation | `results/adata.raw.h5ad` |
+| `metadata_attach` | 2 | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` |
+| `preprocess` | 3 | Preprocessing (+ integration benchmark) | `results/adata.normalized.h5ad` |
+| `demographics` | 3.5 | Demographics (parallel branch, optional) | Figure 1 |
+| `scoring` | 3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | `results/adata.scored.h5ad` |
+| `celltype_manual` | 4 | Manual Cell Typing (HIL, optional, iterative) | `results/adata.celltyped.h5ad` |
+| `biology` | 5 | Downstream Biology | `figures/manuscript/` |
+| `meta_analysis` | 6/7 | Meta Analysis (optional) | `results/adata.{level}.{feature}.h5ad` |
+
+Legacy p1/p2/p3/p35/p4 filenames still accepted during transition.
+
+Entry points: `preprocess` (preprocessed), `scoring` (clustered), or `celltype_manual` (phenotyped). Full details: @Architecture.md §2.
 
 ---
 

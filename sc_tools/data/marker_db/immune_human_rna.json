@@ -1,0 +1,10 @@
+{
+  "T cell": {"positive": ["CD3E", "CD3D", "CD3G"], "negative": ["CD19"]},
+  "B cell": {"positive": ["CD19", "MS4A1", "CD79A"], "negative": ["CD3E"]},
+  "NK cell": {"positive": ["GNLY", "NKG7", "NCAM1"], "negative": ["CD3E", "CD19"]},
+  "Macrophage": {"positive": ["CD68", "CSF1R", "MRC1"], "negative": []},
+  "Dendritic cell": {"positive": ["ITGAX", "CLEC4C", "SIGLEC6"], "negative": []},
+  "Epithelial": {"positive": ["EPCAM", "KRT8", "KRT18"], "negative": []},
+  "Fibroblast": {"positive": ["COL1A1", "FAP", "PDGFRA"], "negative": ["EPCAM"]},
+  "Endothelial": {"positive": ["PECAM1", "VWF", "CDH5"], "negative": []}
+}

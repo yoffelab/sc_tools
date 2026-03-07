@@ -71,7 +71,11 @@ sc.settings.set_figure_params(dpi=300, dpi_save=400)
 # ============================================================================
 CONFIG = {
     "sc_data_file": "results/seurat_object.h5ad",
-    "spatial_data_file": "results/adata.normalized.scored.p35.h5ad",
+    "spatial_data_file": (
+        "results/adata.scored.h5ad"
+        if __import__("os").path.exists("results/adata.scored.h5ad")
+        else "results/adata.normalized.scored.p35.h5ad"
+    ),
     "celltype_key": "cell.type",
     "spatial_batch_key": "library_id",
     "sc_batch_key": "Batch",

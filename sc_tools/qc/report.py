@@ -26,6 +26,10 @@ import pandas as pd  # noqa: E402
 from anndata import AnnData  # noqa: E402
 
 from .report_utils import (  # noqa: E402
+    _extract_body_content,
+    _extract_head_css,
+    _find_latest_report,
+    _wrap_with_tabs,
     build_metrics_table_rows,
     compute_integration_section,
     compute_segmentation_section,
@@ -52,6 +56,7 @@ _TEMPLATE_PATH = _DATA_DIR / "qc_report_template.html"
 _PRE_FILTER_TEMPLATE = _DATA_DIR / "pre_filter_qc_template.html"
 _POST_FILTER_TEMPLATE = _DATA_DIR / "post_filter_qc_template.html"
 _POST_INTEGRATION_TEMPLATE = _DATA_DIR / "post_integration_qc_template.html"
+_POST_CELLTYPING_TEMPLATE = _DATA_DIR / "post_celltyping_qc_template.html"
 
 
 # Keep for backward compat — delegates to fig_to_base64 from report_utils
@@ -311,6 +316,23 @@ def generate_post_filter_report(
     }
 
     html = render_template(_POST_FILTER_TEMPLATE, context)
+
+    # Tab wrapping: embed pre_filter report as a tab when available
+    _prev_tabs: list[tuple[str, str, str]] = []
+    _pre_path = _find_latest_report(output_dir, "pre_filter")
+    if _pre_path is not None:
+        try:
+            _raw = _pre_path.read_text()
+            _prev_tabs.append(
+                ("Report 1: Pre-filter", _extract_body_content(_raw), _extract_head_css(_raw))
+            )
+        except Exception:
+            logger.debug("Failed to embed pre_filter tab in post_filter report", exc_info=True)
+    if _prev_tabs:
+        _cur_css = _extract_head_css(html)
+        _cur_body = _extract_body_content(html)
+        html = _wrap_with_tabs("Report 2: Post-filter", _cur_body, _prev_tabs, _cur_css)
+
     output_path = output_dir / f"post_filter_qc_{ds}.html"
     output_path.write_text(html)
     logger.info("Post-filter QC report written: %s", output_path)
@@ -416,6 +438,30 @@ def generate_post_integration_report(
             fig = qc_umap_grid(adata, color_keys=color_keys)
             plots["umap_grid"] = fig_to_base64(fig)
 
+    # Per-embedding UMAP grid (compute UMAP for each integration method)
+    if embedding_keys:
+        from ..pl.qc_plots import qc_embedding_umap_grid
+
+        color_by = sample_col if sample_col in adata.obs.columns else None
+        if color_by is None:
+            for cand in ["library_id", "sample", "batch"]:
+                if cand in adata.obs.columns:
+                    color_by = cand
+                    break
+        if color_by is not None:
+            try:
+                logger.info(
+                    "Computing per-embedding UMAPs for %d methods...",
+                    len(embedding_keys),
+                )
+                fig = qc_embedding_umap_grid(
+                    adata, embedding_keys, color_key=color_by
+                )
+                plots["embedding_umaps"] = fig_to_base64(fig)
+                logger.info("Per-embedding UMAP grid generated successfully")
+            except Exception:
+                logger.warning("Per-embedding UMAP grid failed", exc_info=True)
+
     # Cluster distribution
     if cluster_key in adata.obs.columns and sample_col in adata.obs.columns:
         from ..pl.qc_plots import qc_cluster_distribution
@@ -473,6 +519,31 @@ def generate_post_integration_report(
 
     terms = get_modality_terms(modality)
 
+    # Build ranking table rows for the static HTML table
+    ranking_rows: list[dict] = []
+    _rank_df = result["comparison_df"] if result is not None else None
+    if _rank_df is not None and len(_rank_df) > 0:
+        has_group = "group" in _rank_df.columns
+        for rank, (_, row) in enumerate(_rank_df.iterrows(), 1):
+            entry: dict = {
+                "rank": rank,
+                "method": str(row.get("method", "")),
+                "overall": float(row["overall_score"]) if "overall_score" in row.index else None,
+                "batch": float(row["batch_score"]) if "batch_score" in row.index else None,
+                "bio": float(row["bio_score"]) if "bio_score" in row.index else None,
+                "asw_batch": float(row["asw_batch"]) if "asw_batch" in row.index else None,
+                "pcr": float(row["pcr"]) if "pcr" in row.index else None,
+                "graph_conn": float(row["graph_connectivity"])
+                if "graph_connectivity" in row.index
+                else None,
+                "asw_celltype": float(row["asw_celltype"]) if "asw_celltype" in row.index else None,
+                "ari": float(row["ari"]) if "ari" in row.index else None,
+                "nmi": float(row["nmi"]) if "nmi" in row.index else None,
+            }
+            if has_group:
+                entry["group"] = str(row["group"])
+            ranking_rows.append(entry)
+
     context = {
         "title": title,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -487,11 +558,41 @@ def generate_post_integration_report(
         "has_celltype": has_celltype,
         "plots": plots,
         "integration_plots": integration_plots,
+        "ranking_rows": ranking_rows,
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
     }
 
     html = render_template(_POST_INTEGRATION_TEMPLATE, context)
+
+    # Tab wrapping: embed post_filter and pre_filter reports as tabs when available
+    _prev_tabs_integ: list[tuple[str, str, str]] = []
+    for _rt, _lbl in [
+        ("post_filter", "Report 2: Post-filter"),
+        ("pre_filter", "Report 1: Pre-filter"),
+    ]:
+        _p = _find_latest_report(output_dir, _rt)
+        if _p is not None:
+            try:
+                _raw = _p.read_text()
+                _prev_tabs_integ.append(
+                    (_lbl, _extract_body_content(_raw), _extract_head_css(_raw))
+                )
+            except Exception:
+                logger.debug(
+                    "Failed to embed %s tab in post_integration report", _rt, exc_info=True
+                )
+    if _prev_tabs_integ:
+        _cur_css_integ = _extract_head_css(html)
+        _cur_body_integ = _extract_body_content(html)
+        html = _wrap_with_tabs(
+            "Report 3: Post-integration",
+            _cur_body_integ,
+            _prev_tabs_integ,
+            _cur_css_integ,
+            current_head_extras='<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>',
+        )
+
     output_path = output_dir / f"post_integration_qc_{ds}.html"
     output_path.write_text(html)
     logger.info("Post-integration QC report written: %s", output_path)
@@ -517,7 +618,9 @@ def generate_post_celltyping_report(
     date_stamp: str | None = None,
     segmentation_masks_dir: str | Path | None = None,
     comparison_df: pd.DataFrame | None = None,
+    comparison_df_p3: pd.DataFrame | None = None,
     integration_test_dir: str | Path | None = None,
+    marker_genes: dict[str, list[str]] | None = None,
 ) -> Path:
     """Generate a post-celltyping QC HTML report (Phase 4 exit).
 
@@ -552,13 +655,20 @@ def generate_post_celltyping_report(
     segmentation_masks_dir
         Optional path to mask TIFFs for segmentation scoring.
     comparison_df
-        Pre-computed integration benchmark DataFrame. When provided, skips
-        recomputing ``compare_integrations()``.
+        Pre-computed integration benchmark DataFrame (Phase 4, validated
+        celltypes). When provided, skips recomputing ``compare_integrations()``.
+    comparison_df_p3
+        Pre-computed integration benchmark DataFrame from Phase 3 (using
+        preliminary Leiden labels). Shown alongside Phase 4 values for
+        comparison. Optional.
     integration_test_dir
         Path to ``results/tmp/integration_test/`` directory containing
         per-method ``{method}.h5ad`` files from Phase 3 benchmark. If
         provided, embeddings are loaded and re-scored with validated
         cell type labels.
+    marker_genes
+        Optional dict mapping cell type name to a list of marker genes.
+        When provided, a marker dotplot is included in the report.
 
     Returns
     -------
@@ -604,11 +714,9 @@ def generate_post_celltyping_report(
                 method_name = h5ad_file.stem
                 try:
                     test_adata = ad.read_h5ad(h5ad_file)
-                    # Find the embedding key in the test adata
                     for obsm_key in test_adata.obsm:
                         if obsm_key.startswith("X_") and obsm_key != "X_pca":
                             if obsm_key not in adata.obsm:
-                                # Transfer embedding to main adata (matching obs)
                                 common = adata.obs_names.intersection(test_adata.obs_names)
                                 if len(common) > 0:
                                     import numpy as np
@@ -644,19 +752,31 @@ def generate_post_celltyping_report(
             selected_method = method_file.read_text().strip()
             break
     if integration_test_dir is not None:
-        method_file = integration_test_dir.parent / "integration_method.txt"
+        method_file = Path(integration_test_dir).parent / "integration_method.txt"
         if method_file.exists():
             selected_method = method_file.read_text().strip()
 
     has_umap = "X_umap" in adata.obsm
     plots: dict[str, str] = {}
 
-    # UMAP grid (include celltype)
+    # Celltype abundance plot
+    if sample_col in adata.obs.columns:
+        try:
+            from ..pl.qc_plots import qc_celltype_abundance
+
+            fig_abund = qc_celltype_abundance(
+                adata, celltype_key=celltype_key, sample_col=sample_col
+            )
+            plots["celltype_abundance"] = fig_to_base64(fig_abund)
+        except Exception:
+            logger.debug("Celltype abundance plot failed", exc_info=True)
+
+    # UMAP grid (include celltype and celltype_broad if available)
     if has_umap:
         from ..pl.qc_plots import qc_umap_grid
 
         color_keys = []
-        for k in [sample_col, batch_key, cluster_key, celltype_key]:
+        for k in [celltype_key, "celltype_broad", cluster_key, batch_key, sample_col]:
             if k in adata.obs.columns and k not in color_keys:
                 color_keys.append(k)
 
@@ -664,17 +784,39 @@ def generate_post_celltyping_report(
             fig = qc_umap_grid(adata, color_keys=color_keys)
             plots["umap_grid"] = fig_to_base64(fig)
 
-    # Cluster distribution
+    # Cluster distribution (by celltype)
     if cluster_key in adata.obs.columns and sample_col in adata.obs.columns:
         from ..pl.qc_plots import qc_cluster_distribution
 
         fig = qc_cluster_distribution(adata, cluster_key=cluster_key, sample_col=sample_col)
         plots["cluster_dist"] = fig_to_base64(fig)
 
+    # Marker dotplot (optional)
+    if marker_genes:
+        try:
+            import scanpy as sc
+
+            all_genes = [g for genes in marker_genes.values() for g in genes]
+            valid_genes = [g for g in all_genes if g in adata.var_names]
+            if valid_genes and celltype_key in adata.obs.columns:
+                fig_dot, _ = sc.pl.dotplot(  # type: ignore[misc]
+                    adata,
+                    var_names=marker_genes,
+                    groupby=celltype_key,
+                    return_fig=True,
+                    show=False,
+                )
+                plots["marker_dotplot"] = fig_to_base64(fig_dot)
+        except Exception:
+            logger.debug("Marker dotplot failed", exc_info=True)
+
     # Integration metrics WITH validated celltypes (bio metrics now meaningful)
     integration_plots: dict[str, str] | None = None
     best_method: str | None = None
     best_score: float | None = None
+    best_bio_method: str | None = None
+    best_bio_score: float | None = None
+    result = None
 
     if embedding_keys and batch_key in adata.obs.columns:
         result = compute_integration_section(
@@ -690,6 +832,58 @@ def generate_post_celltyping_report(
             if len(comp_df) > 0:
                 best_method = str(comp_df.iloc[0]["method"])
                 best_score = float(comp_df.iloc[0]["overall_score"])
+                # Bio score is primary for Phase 4
+                if "bio_score" in comp_df.columns:
+                    bio_sorted = comp_df.sort_values("bio_score", ascending=False)
+                    best_bio_method = str(bio_sorted.iloc[0]["method"])
+                    best_bio_score = float(bio_sorted.iloc[0]["bio_score"])
+
+    # Build ranking_rows sorted by bio_score (primary for Phase 4)
+    ranking_rows: list[dict] = []
+    _rank_df = result["comparison_df"] if result is not None else None
+    if _rank_df is not None and len(_rank_df) > 0:
+        # Sort by bio_score descending; fallback to overall_score
+        sort_col = "bio_score" if "bio_score" in _rank_df.columns else "overall_score"
+        _rank_df_sorted = _rank_df.sort_values(sort_col, ascending=False)
+
+        # Build p3 bio lookup for comparison
+        _p3_bio_lookup: dict[str, str] = {}
+        if comparison_df_p3 is not None and "bio_score" in comparison_df_p3.columns:
+            for _, r3 in comparison_df_p3.iterrows():
+                m = str(r3.get("method", r3.name))
+                _p3_bio_lookup[m] = f"{r3['bio_score']:.3f}"
+
+        for rank, (_, row) in enumerate(_rank_df_sorted.iterrows(), 1):
+            method_name = str(row.get("method", row.name))
+            entry: dict = {
+                "rank": rank,
+                "method": method_name,
+                "bio": f"{row['bio_score']:.3f}" if "bio_score" in row.index else "-",
+                "bio_p3": _p3_bio_lookup.get(method_name),
+                "batch": f"{row['batch_score']:.3f}" if "batch_score" in row.index else "-",
+                "ari": f"{row['ari']:.3f}" if "ari" in row.index else "-",
+                "nmi": f"{row['nmi']:.3f}" if "nmi" in row.index else "-",
+                "asw_cell": f"{row['asw_celltype']:.3f}" if "asw_celltype" in row.index else "-",
+                "asw_batch": f"{row['asw_batch']:.3f}" if "asw_batch" in row.index else "-",
+                "pcr": f"{row['pcr']:.3f}" if "pcr" in row.index else "-",
+                "graph_conn": (
+                    f"{row['graph_connectivity']:.3f}" if "graph_connectivity" in row.index else "-"
+                ),
+                "is_selected": method_name == selected_method,
+            }
+            ranking_rows.append(entry)
+
+    # Celltype composition table
+    ct_counts = adata.obs[celltype_key].value_counts()
+    total_cells = int(adata.n_obs)
+    celltype_table = [
+        {
+            "celltype": str(ct),
+            "n_cells": int(n),
+            "pct": float(n) / total_cells * 100,
+        }
+        for ct, n in ct_counts.items()
+    ]
 
     # Cluster count
     n_clusters = 0
@@ -726,16 +920,47 @@ def generate_post_celltyping_report(
         "n_embeddings": len(embedding_keys) if embedding_keys else 0,
         "best_method": best_method,
         "best_score": best_score,
+        "best_bio_method": best_bio_method,
+        "best_bio_score": best_bio_score,
         "selected_method": selected_method,
         "has_celltype": True,
         "celltype_key": celltype_key,
+        "show_p3_bio": bool(_p3_bio_lookup) if "_p3_bio_lookup" in dir() else False,
+        "ranking_rows": ranking_rows,
+        "celltype_table": celltype_table,
         "plots": plots,
         "integration_plots": integration_plots,
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
     }
 
-    html = render_template(_POST_INTEGRATION_TEMPLATE, context)
+    html = render_template(_POST_CELLTYPING_TEMPLATE, context)
+
+    # Tab wrapping: embed post_integration, post_filter, pre_filter reports when available
+    _prev_tabs_ct: list[tuple[str, str, str]] = []
+    for _rt, _lbl in [
+        ("post_integration", "Report 3: Post-integration"),
+        ("post_filter", "Report 2: Post-filter"),
+        ("pre_filter", "Report 1: Pre-filter"),
+    ]:
+        _p = _find_latest_report(output_dir, _rt)
+        if _p is not None:
+            try:
+                _raw = _p.read_text()
+                _prev_tabs_ct.append((_lbl, _extract_body_content(_raw), _extract_head_css(_raw)))
+            except Exception:
+                logger.debug("Failed to embed %s tab in post_celltyping report", _rt, exc_info=True)
+    if _prev_tabs_ct:
+        _cur_css_ct = _extract_head_css(html)
+        _cur_body_ct = _extract_body_content(html)
+        html = _wrap_with_tabs(
+            "Report 4: Post-celltyping",
+            _cur_body_ct,
+            _prev_tabs_ct,
+            _cur_css_ct,
+            current_head_extras='<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>',
+        )
+
     output_path = output_dir / f"post_celltyping_qc_{ds}.html"
     output_path.write_text(html)
     logger.info("Post-celltyping QC report written: %s", output_path)

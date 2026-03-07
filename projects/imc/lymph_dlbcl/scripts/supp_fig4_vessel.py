@@ -2,22 +2,25 @@
 """Supp Fig 4: Vessel analysis — endothelial subsets, vessel density per LME."""
 
 import logging
+import sys
 from pathlib import Path
 
 import anndata as ad
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import seaborn as sns
-import yaml
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
+
 RESULTS_DIR = PROJECT_DIR / "results"
 SEURAT_DIR = RESULTS_DIR / "seurat_converted"
 FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "supp_fig4"
@@ -25,6 +28,7 @@ METADATA_DIR = PROJECT_DIR / "metadata"
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     # Load stromal panel (has endothelial markers: CD31, vWF)
@@ -64,7 +68,9 @@ def main():
         if len(endo_markers) == 1:
             axes = [axes]
 
-        X_dense = adata.X.toarray() if hasattr(adata.X, "toarray") else np.array(adata.X)
+        # Use layers['raw'] if X is empty (p4 may have zeroed X)
+        data_matrix = adata.layers.get("raw", adata.X) if adata.layers else adata.X
+        X_dense = data_matrix.toarray() if hasattr(data_matrix, "toarray") else np.array(data_matrix)
         for i, marker in enumerate(endo_markers):
             idx = list(adata.var_names).index(marker)
             plot_df = pd.DataFrame({
@@ -88,7 +94,7 @@ def main():
         if "LME_class" not in adata.obs.columns and lme_path.exists():
             lme = pd.read_csv(lme_path)
             if "sample" in adata.obs.columns:
-                lme_map = dict(zip(lme["sample"].astype(str), lme["LME_display"]))
+                lme_map = dict(zip(lme["sample"].astype(str), lme["LME_display"], strict=False))
                 adata.obs["LME_class"] = adata.obs["sample"].astype(str).map(lme_map)
 
         if "LME_class" in adata.obs.columns and ct_col:

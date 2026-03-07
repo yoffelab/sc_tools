@@ -1,0 +1,151 @@
+# ibd_spatial project configuration
+# Saha lab patient-matched cross-platform IBD spatial transcriptomics
+
+project:
+  name: ibd_spatial
+  platform: multiplatform
+  collaboration: Saha lab (Cornell/Weill Cornell)
+  data_sharing_agreement: confirm before publication
+
+# HPC paths (cayuga)
+hpc:
+  cluster: cayuga
+  scratch: /athena/elementolab/scratch/juk4007
+  workdir: ~/elementolab/projects/ibd_spatial
+  raw_data_dir: /athena/project-saha/data_IBD  # RDS files (CONFIRMED)
+  flat_data_dir: /athena/project-saha/data      # Xenium/CosMx flat outputs
+  reference_h5ad: /athena/project-saha/data_IBD/SAHA_IBD_RNA.h5ad
+  metadata_csv: /athena/project-saha/data_IBD/NC_compare_11122025_meta.csv
+
+# Panel definitions
+panels:
+  cosmx_1k:
+    n_samples: 16
+    rds_dir: /athena/project-saha/data_IBD/CosMx_1k_16
+    file_pattern: "{sample_num}_smi_so_qcnorm.RDS"
+    approx_genes: 1000
+    tissue: [Ileum, Rectum]
+    disease: [CD, UC]
+
+  cosmx_6k:
+    n_samples: 4
+    rds_dir: /athena/project-saha/data_IBD/CosMx_6k_4
+    file_pattern: "{sample_num}_smi_so_qcnorm.RDS"
+    approx_genes: 6000
+    tissue: [Rectum]
+    disease: [Healthy, UC]  # NO CD
+
+  xenium_mt:
+    n_samples: 16
+    rds_dir: /athena/project-saha/data_IBD/Xenium_MT_16
+    file_pattern: "{sample_num}_xen_so_qcnorm.RDS"
+    approx_genes: 377
+    tissue: [Ileum, Rectum]
+    disease: [CD, UC]
+    matched_to: cosmx_1k  # SAME 16 PATIENTS
+
+  xenium_5k:
+    n_samples: 4
+    rds_dir: /athena/project-saha/data_IBD/Xenium_5K_4
+    file_pattern: "{sample_num}_xen_so_qcnorm.RDS"
+    approx_genes: 5000
+    tissue: [Rectum]
+    disease: [Healthy, UC]  # NO CD
+    matched_to: cosmx_6k  # SAME 4 PATIENTS
+
+  xenium_mt_withseg:
+    n_samples: 4
+    rds_dir: /athena/project-saha/data_IBD/Xenium_MT_withseg_4
+    file_pattern: "{sample_num}_xen_377_with_seg_so_qcnorm.RDS"
+    approx_genes: 377
+    tissue: [Rectum]
+    disease: [Healthy, UC]
+    matched_to: [cosmx_6k, xenium_5k, xenium_mt_noseg, xenium_colon]  # SAME 4 PATIENTS
+
+  xenium_mt_noseg:
+    n_samples: 4
+    rds_dir: /athena/project-saha/data_IBD/Xenium_MT_noseg_4
+    file_pattern: "{sample_num}_xen_377_no_seg_so_qcnorm.RDS"
+    approx_genes: 377
+    tissue: [Rectum]
+    disease: [Healthy, UC]
+    note: no_segmentation_stain  # technically matched to xenium_mt_withseg; use for M0
+
+  xenium_colon:
+    n_samples: 4
+    rds_dir: /athena/project-saha/data_IBD/Xenium_colon_4
+    file_pattern: "{sample_num}_xen_colon_with_seg_so_qcnorm.RDS"
+    approx_genes: 400  # colon-specific panel
+    tissue: [Rectum]
+    disease: [Healthy, UC]
+
+# Matched patient groups
+patient_groups:
+  group_16:
+    description: 16 patients measured by CosMx_1k and Xenium_MT (matched)
+    patients: [I0262, I0275, I0276, I0277, I0278, I0284, I0286, I0294, I0303, I0310, I0321]
+    disease_breakdown: {CD: 5, UC: 6}
+    tissue: [Ileum, Rectum]
+
+  group_4:
+    description: 4 patients measured by CosMx_6k, Xenium_5K, Xenium_MT_withseg/noseg, Xenium_colon
+    patients: [I0355, I0380, I0387, I0400]
+    disease_breakdown: {UC: 3, Healthy: 1}
+    tissue: [Rectum]
+    note: NO CD patients in this group
+
+# Integration parameters
+integration:
+  # Milestone 0: same-plex technical validation (noseg vs withseg)
+  m0:
+    samples: [xenium_mt_noseg, xenium_mt_withseg]
+    batch_key: panel_variant
+    expected_shared_genes: 377
+    scvi_n_latent: 10
+    scvi_n_hidden: 64
+
+  # Milestone 1: cross-platform matched, low-plex (KEY)
+  m1:
+    samples: [cosmx_1k, xenium_mt]
+    batch_key: platform
+    patient_key: patient_id  # anchor (not batch)
+    tissue_stratify: true     # run Ileum-only first
+    expected_shared_genes: ~377
+    scvi_n_latent: 10
+    scvi_n_hidden: 64
+
+  # Milestone 2: cross-platform matched, high-plex
+  m2:
+    samples: [cosmx_6k, xenium_5k]
+    batch_key: platform
+    patient_key: patient_id
+    expected_shared_genes: ~1500
+    scvi_n_latent: 20
+    scvi_n_hidden: 128
+    hvg_svg_selection: true
+
+  # Milestone 3: full cross-platform
+  m3:
+    samples: [cosmx_1k, cosmx_6k, xenium_mt, xenium_5k, xenium_colon, xenium_mt_withseg]
+    batch_key: platform
+    patient_key: patient_id
+    expected_shared_genes: ~100-300
+    scvi_n_latent: 8
+    scvi_n_hidden: 32
+    use_gimvi: true  # imputation via SAHA_IBD_RNA.h5ad reference
+
+# Success thresholds
+success_criteria:
+  m0_asw_platform: 0.2   # should integrate nearly perfectly
+  m1_asw_platform: 0.35
+  m2_asw_platform: 0.5
+  patient_cross_platform_mixing: 0.6  # cells from same patient should mix
+  ibd_marker_genes_required: 5        # of 8 canonical: EPCAM,CD3E,CD68,MS4A1,MKI67,FOXP3,IFNG,TNF
+  diagnosis_fisher_p: 0.05
+
+# Reference cell type mapping
+reference:
+  broad_key: ct_major_new
+  granular_key: ct_minor_new
+  spatial_broad_key: cell_type          # in RDS meta.data (to confirm)
+  spatial_granular_key: cell_type_general  # in RDS meta.data (to confirm)

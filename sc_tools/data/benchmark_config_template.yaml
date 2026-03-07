@@ -1,0 +1,64 @@
+# IMC Segmentation Benchmark Configuration
+# Copy and modify for your benchmark run.
+
+# Which strategies to run (1-4)
+strategies:
+  - 1  # Full image -> Ilastik prob map -> DL
+  - 2  # DNA only -> prob map -> DL
+  - 3  # DNA -> HuggingFace pretrained models
+  - 4  # Full image -> SegFormer (trainable)
+
+# Methods per strategy
+methods:
+  "1":
+    - cellpose_cyto2
+    - cellpose_cyto3
+    - cellpose_nuclei
+    - stardist
+    - deepcell
+  "2":
+    - cellpose_cyto2
+    - cellpose_nuclei
+    - stardist
+    - deepcell
+  "3":
+    - cellvit_256
+    - sam_base
+    - hovernet
+    - cellpose_cyto3
+    - stardist
+  "4":
+    - segformer_b0
+
+# Data settings
+n_rois: 0  # 0 = all available ROIs
+
+# Compute settings
+gpu: true
+batch_size: 1
+
+# Strategy 2: probability map generation
+prob_map_method: gaussian  # gaussian, otsu, multiscale
+
+# Strategy 3: HuggingFace models
+hf_models:
+  - cellvit_256
+  - sam_base
+  - hovernet
+
+# Strategy 4: SegFormer training
+vit_model_size: b0
+vit_n_epochs: 50
+vit_train_split: 0.8
+
+# SLURM settings (for HPC)
+slurm_partition_cpu: scu-cpu
+slurm_partition_gpu: scu-gpu
+slurm_time_cpu: "04:00:00"
+slurm_time_gpu: "08:00:00"
+slurm_mem: 32G
+slurm_chunk_size: 20
+
+# Output
+output_dir: benchmark_results
+resume: true

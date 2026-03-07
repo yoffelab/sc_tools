@@ -7,11 +7,13 @@ Following scanpy's API pattern, this module provides analysis functions:
 - deconvolution: Cell-type deconvolution (cell2location, tangram, destvi)
 - gene_sets: Gene set loaders and curation utilities
 - gsea: Group-level enrichment testing (ORA, pseudobulk GSEA)
+- celltype: Automated cell-type annotation (sctype, celltypist, custom_gates, ensemble)
 """
 
 # Import tool functions
-from . import colocalization, gene_sets, testing
+from . import celltype, colocalization, gene_sets, testing
 from . import io as io_save
+from .celltype import annotate_celltypes, apply_celltype_map, list_celltype_methods
 from .deconvolution import (
     deconvolution,
     extract_reference_profiles,
@@ -49,4 +51,8 @@ __all__ = [
     "save_gene_signatures",
     "run_ora",
     "run_gsea_pseudobulk",
+    "celltype",
+    "annotate_celltypes",
+    "apply_celltype_map",
+    "list_celltype_methods",
 ]

@@ -9,6 +9,7 @@ directory and writes a per-sample AnnData with standardized obs/obsm keys
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import anndata as ad
@@ -16,6 +17,39 @@ import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Internal helper: remote URI -> local path
+# ---------------------------------------------------------------------------
+
+
+def _local_path(uri: str | os.PathLike) -> Path:
+    """Resolve *uri* to a local path (downloads remote files to tmp).
+
+    For local paths this is a no-op.  For remote URIs (s3://, sftp://,
+    etc.) the file is downloaded to a temporary location.  The caller is
+    responsible for using the path before the temporary file is cleaned up
+    (i.e. use only within a ``with_local_copy()`` context or read
+    immediately).
+
+    Note: directory-based loaders (Visium, Xenium) require local directories
+    and do not benefit from URI resolution here.  For those, pass a local
+    path.  Only IMC ``cells.h5ad`` files are fetched remotely.
+    """
+    try:
+        from sc_tools.storage import _is_local, resolve_fs
+
+        fs, path = resolve_fs(str(uri))
+        if _is_local(fs):
+            return Path(path)
+        # Remote: not supported for directory-based loaders
+        raise ValueError(
+            f"Remote URIs are not supported for directory-based loaders. "
+            f"Use sc_tools.storage.with_local_copy() to download first, "
+            f"then pass the local path. URI: {uri}"
+        )
+    except ImportError:
+        return Path(str(uri))
 
 
 def load_visium_sample(
@@ -94,15 +128,17 @@ def load_visium_hd_sample(
         raise ImportError("squidpy is required for Visium HD loading: pip install squidpy") from e
 
     spaceranger_dir = Path(spaceranger_dir)
-    bin_dir = spaceranger_dir / bin_size
 
-    if not bin_dir.exists():
-        # Try under outs/
-        bin_dir = spaceranger_dir / "outs" / bin_size
-    if not bin_dir.exists():
+    # Search common bin directory locations
+    bin_candidates = [
+        spaceranger_dir / bin_size,
+        spaceranger_dir / "outs" / bin_size,
+        spaceranger_dir / "outs" / "binned_outputs" / bin_size,
+    ]
+    bin_dir = next((p for p in bin_candidates if p.exists()), None)
+    if bin_dir is None:
         raise FileNotFoundError(
-            f"Bin directory not found: {spaceranger_dir / bin_size} "
-            f"or {spaceranger_dir / 'outs' / bin_size}"
+            f"Bin directory not found for {bin_size}. Tried: {[str(p) for p in bin_candidates]}"
         )
 
     adata = sq.read.visium(
@@ -140,6 +176,51 @@ def load_visium_hd_sample(
     return adata
 
 
+def _extract_centroids_from_geojson(
+    geojson_path: Path,
+    obs_names: pd.Index | None = None,
+) -> pd.DataFrame:
+    """Extract cell centroids from a SpaceRanger 4 cell_segmentations.geojson.
+
+    Each GeoJSON Feature has a Polygon geometry and a ``cell_id`` property
+    (integer). The centroid is computed as the mean of the polygon exterior
+    coordinates.
+
+    The index format is auto-detected to match ``obs_names``. SpaceRanger 4
+    uses ``cellid_XXXXXXXXX-1`` (zero-padded 9-digit cell_id with ``-1``
+    suffix). If ``obs_names`` is provided and its first element matches this
+    pattern, the index is formatted accordingly; otherwise plain string
+    cell_id is used.
+
+    Returns a DataFrame with columns ``x_centroid``, ``y_centroid``.
+    """
+    import json
+
+    with open(geojson_path) as fh:
+        data = json.load(fh)
+
+    # Detect index format from obs_names
+    use_cellid_format = False
+    if obs_names is not None and len(obs_names) > 0:
+        first = str(obs_names[0])
+        if first.startswith("cellid_"):
+            use_cellid_format = True
+
+    rows = []
+    for feat in data["features"]:
+        cell_id = feat["properties"]["cell_id"]
+        coords = np.array(feat["geometry"]["coordinates"][0])  # exterior ring
+        cx, cy = coords.mean(axis=0)
+        if use_cellid_format:
+            idx = f"cellid_{int(cell_id):09d}-1"
+        else:
+            idx = str(cell_id)
+        rows.append({"cell_id": idx, "x_centroid": cx, "y_centroid": cy})
+
+    df = pd.DataFrame(rows).set_index("cell_id")
+    return df
+
+
 def load_visium_hd_cell_sample(
     spaceranger_dir: str | Path,
     sample_id: str,
@@ -148,9 +229,12 @@ def load_visium_hd_cell_sample(
 ) -> ad.AnnData:
     """Load one Visium HD sample from SpaceRanger 4 cell segmentation output.
 
-    Reads the cell-level (not bin-level) data produced by SpaceRanger 4
-    under ``outs/cell_segmentation/``. This is single-cell resolution data,
-    fundamentally different from bin-based (8um) Visium HD.
+    Reads the cell-level (not bin-level) data produced by SpaceRanger 4.
+    Searches for the segmentation output under both ``outs/segmented_outputs/``
+    (SR4 default) and ``outs/cell_segmentation/`` (legacy). The expression
+    matrix is ``filtered_feature_cell_matrix.h5`` (SR4) or
+    ``filtered_feature_bc_matrix.h5`` (legacy). Cell spatial coordinates are
+    extracted from ``cell_segmentations.geojson`` polygon centroids.
 
     Parameters
     ----------
@@ -169,78 +253,117 @@ def load_visium_hd_cell_sample(
 
     spaceranger_dir = Path(spaceranger_dir)
 
-    # Locate cell_segmentation directory
-    cell_seg_dir = spaceranger_dir / "outs" / "cell_segmentation"
-    if not cell_seg_dir.exists():
-        cell_seg_dir = spaceranger_dir / "cell_segmentation"
-    if not cell_seg_dir.exists():
+    # Locate segmented output directory (SR4: segmented_outputs, legacy: cell_segmentation)
+    cell_seg_dir = None
+    for subdir in ["segmented_outputs", "cell_segmentation"]:
+        for parent in [spaceranger_dir / "outs", spaceranger_dir]:
+            candidate = parent / subdir
+            if candidate.exists():
+                cell_seg_dir = candidate
+                break
+        if cell_seg_dir is not None:
+            break
+
+    if cell_seg_dir is None:
         raise FileNotFoundError(
-            f"Cell segmentation directory not found: "
-            f"{spaceranger_dir / 'outs' / 'cell_segmentation'} "
-            f"or {spaceranger_dir / 'cell_segmentation'}"
+            f"Cell segmentation directory not found under {spaceranger_dir}. "
+            f"Tried: outs/segmented_outputs, outs/cell_segmentation, "
+            f"segmented_outputs, cell_segmentation"
         )
 
-    # Load the filtered feature-barcode matrix
-    h5_path = cell_seg_dir / "filtered_feature_bc_matrix.h5"
-    mtx_dir = cell_seg_dir / "filtered_feature_bc_matrix"
+    # Load the filtered expression matrix (SR4: cell_matrix, legacy: bc_matrix)
+    h5_candidates = [
+        cell_seg_dir / "filtered_feature_cell_matrix.h5",
+        cell_seg_dir / "filtered_feature_bc_matrix.h5",
+    ]
+    mtx_candidates = [
+        cell_seg_dir / "filtered_feature_cell_matrix",
+        cell_seg_dir / "filtered_feature_bc_matrix",
+    ]
 
-    if h5_path.exists():
+    h5_path = next((p for p in h5_candidates if p.exists()), None)
+    mtx_dir = next((p for p in mtx_candidates if p.exists()), None)
+
+    if h5_path is not None:
         adata = sc.read_10x_h5(str(h5_path))
-    elif mtx_dir.exists():
+    elif mtx_dir is not None:
         adata = sc.read_10x_mtx(str(mtx_dir))
     else:
         raise FileNotFoundError(
             f"No filtered matrix found in {cell_seg_dir}. "
-            f"Expected filtered_feature_bc_matrix.h5 or filtered_feature_bc_matrix/"
+            f"Expected filtered_feature_cell_matrix.h5 or filtered_feature_bc_matrix.h5"
         )
 
-    # Load cell coordinates from parquet or CSV
+    # Load cell coordinates — try geojson first (SR4), then parquet/CSV fallbacks
     coords_loaded = False
-    for coords_name in ["cells.parquet", "cells.csv.gz", "cells.csv"]:
-        coords_path = cell_seg_dir / coords_name
-        if coords_path.exists():
-            if coords_name.endswith(".parquet"):
-                coords = pd.read_parquet(coords_path)
-            else:
-                coords = pd.read_csv(coords_path)
 
-            # Try standard column names
-            x_col = next(
-                (
-                    c
-                    for c in ["x_centroid", "cell_centroid_x", "pxl_col_in_fullres"]
-                    if c in coords.columns
-                ),
-                None,
-            )
-            y_col = next(
-                (
-                    c
-                    for c in ["y_centroid", "cell_centroid_y", "pxl_row_in_fullres"]
-                    if c in coords.columns
-                ),
-                None,
+    # Strategy 1: GeoJSON cell segmentation polygons -> centroids
+    geojson_path = cell_seg_dir / "cell_segmentations.geojson"
+    if geojson_path.exists():
+        try:
+            centroids = _extract_centroids_from_geojson(geojson_path, obs_names=adata.obs_names)
+            common = adata.obs_names.intersection(centroids.index)
+            if len(common) > 0:
+                adata = adata[common].copy()
+                adata.obsm["spatial"] = np.array(
+                    centroids.loc[common, ["x_centroid", "y_centroid"]]
+                )
+                coords_loaded = True
+                logger.info(
+                    "Loaded %d cell centroids from geojson for %s",
+                    len(common),
+                    sample_id,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to extract centroids from geojson for %s: %s",
+                sample_id,
+                exc,
             )
 
-            if x_col and y_col:
-                # Match barcodes if barcode column exists
-                bc_col = next((c for c in ["barcode", "cell_id"] if c in coords.columns), None)
-                if bc_col:
-                    coords = coords.set_index(bc_col)
-                    common = adata.obs_names.intersection(coords.index)
-                    if len(common) > 0:
-                        adata = adata[common].copy()
-                        adata.obsm["spatial"] = np.array(coords.loc[common, [x_col, y_col]])
-                        coords_loaded = True
+    # Strategy 2: parquet / CSV coordinate files
+    if not coords_loaded:
+        for coords_name in ["cells.parquet", "cells.csv.gz", "cells.csv"]:
+            coords_path = cell_seg_dir / coords_name
+            if coords_path.exists():
+                if coords_name.endswith(".parquet"):
+                    coords = pd.read_parquet(coords_path)
                 else:
-                    # No barcode column; assume same order
-                    if len(coords) == adata.n_obs:
+                    coords = pd.read_csv(coords_path)
+
+                x_col = next(
+                    (
+                        c
+                        for c in ["x_centroid", "cell_centroid_x", "pxl_col_in_fullres"]
+                        if c in coords.columns
+                    ),
+                    None,
+                )
+                y_col = next(
+                    (
+                        c
+                        for c in ["y_centroid", "cell_centroid_y", "pxl_row_in_fullres"]
+                        if c in coords.columns
+                    ),
+                    None,
+                )
+
+                if x_col and y_col:
+                    bc_col = next((c for c in ["barcode", "cell_id"] if c in coords.columns), None)
+                    if bc_col:
+                        coords = coords.set_index(bc_col)
+                        common = adata.obs_names.intersection(coords.index)
+                        if len(common) > 0:
+                            adata = adata[common].copy()
+                            adata.obsm["spatial"] = np.array(coords.loc[common, [x_col, y_col]])
+                            coords_loaded = True
+                    elif len(coords) == adata.n_obs:
                         adata.obsm["spatial"] = np.array(coords[[x_col, y_col]])
                         coords_loaded = True
-            break
+                break
 
+    # Strategy 3: tissue_positions.parquet
     if not coords_loaded:
-        # Try tissue_positions.parquet (SR4 format)
         pos_file = cell_seg_dir / "spatial" / "tissue_positions.parquet"
         if pos_file.exists():
             df_pos = pd.read_parquet(pos_file).set_index("barcode")
@@ -403,20 +526,32 @@ def load_imc_sample(
     """
     from .imc import IMCPanelMapper, build_imc_composite
 
-    processed_dir = Path(processed_dir)
+    # Support remote URIs: use smart_read_h5ad when processed_dir looks like
+    # a direct h5ad URI, otherwise treat as a local directory path.
+    processed_dir_str = str(processed_dir)
+    if processed_dir_str.endswith(".h5ad") or "://" in processed_dir_str:
+        # Direct path to a cells.h5ad (local or remote URI)
+        try:
+            from sc_tools.storage import smart_read_h5ad
 
-    # Locate the cells h5ad — try common steinbock output locations
-    candidates = [
-        processed_dir / "cells.h5ad",
-        processed_dir / "cells" / "cells.h5ad",
-    ]
-    h5ad_path = next((p for p in candidates if p.exists()), None)
-    if h5ad_path is None:
-        raise FileNotFoundError(
-            f"Could not find cells.h5ad in {processed_dir}. Tried: {[str(p) for p in candidates]}"
-        )
-
-    adata = ad.read_h5ad(h5ad_path)
+            adata = smart_read_h5ad(processed_dir_str)
+        except ImportError:
+            adata = ad.read_h5ad(processed_dir_str)
+        processed_dir = Path(processed_dir_str).parent
+    else:
+        processed_dir = Path(processed_dir)
+        # Locate the cells h5ad — try common steinbock output locations
+        candidates = [
+            processed_dir / "cells.h5ad",
+            processed_dir / "cells" / "cells.h5ad",
+        ]
+        h5ad_path = next((p for p in candidates if p.exists()), None)
+        if h5ad_path is None:
+            raise FileNotFoundError(
+                f"Could not find cells.h5ad in {processed_dir}. "
+                f"Tried: {[str(p) for p in candidates]}"
+            )
+        adata = ad.read_h5ad(h5ad_path)
     adata.obs["sample"] = sample_id
     adata.obs["library_id"] = sample_id
     adata.obs["raw_data_dir"] = str(processed_dir)

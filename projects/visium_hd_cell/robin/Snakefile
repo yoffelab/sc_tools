@@ -1,0 +1,153 @@
+# robin (visium_hd_cell) Snakemake pipeline
+# Run from repo root: snakemake -d projects/visium_hd_cell/robin -s projects/visium_hd_cell/robin/Snakefile [target]
+# Or from project dir: snakemake -d . -s Snakefile [target]
+# Runtime: auto-detected via run_container.sh (Docker on macOS, Apptainer on Linux).
+# Local conda: conda activate robin && SC_TOOLS_RUNTIME=none snakemake -d . -s Snakefile <target>
+#
+# ── Phase naming convention ───────────────────────────────────────────────────
+# This Snakefile uses SEMANTIC SLUG names (new nomenclature) defined in
+# sc_tools.pipeline. Rule names and checkpoint filenames follow the slugs:
+#
+#   Slug              Old code (DEPRECATED)   Checkpoint file
+#   qc_filter         p1                      results/adata.raw.h5ad
+#   metadata_attach   p2                      results/adata.annotated.h5ad
+#   preprocess        p3                      results/adata.normalized.h5ad
+#   scoring           p35                     results/adata.scored.h5ad
+#   celltype_manual   p4                      results/adata.celltyped.h5ad
+#
+# The old p1/p2/p3/p35/p4 names and adata.*.p1.h5ad filenames are OLD
+# NOMENCLATURE. They are still accepted by sc_tools.validate for migration
+# purposes but will emit DeprecationWarning. New projects should use slugs.
+# ─────────────────────────────────────────────────────────────────────────────
+
+configfile: "config.yaml"
+
+import os
+import pandas as pd
+
+ROOT = config["repo_root"]
+PROJECT = config["project_rel"]
+
+def run_container(script, args=""):
+    cmd = f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
+    return cmd + (f' {args}' if args else '')
+
+# ---- ingest_raw / ingest_load: Upstream Raw Data Processing (Phase 0a/0b) ----
+PHASE0_DIR = "metadata/phase0"
+
+def load_phase0_manifest():
+    all_tsv = f"{PHASE0_DIR}/all_samples.tsv"
+    if os.path.exists(all_tsv):
+        return pd.read_csv(all_tsv, sep="\t")
+    return pd.DataFrame()
+
+PHASE0_MANIFEST = load_phase0_manifest()
+PHASE0_SAMPLES = list(PHASE0_MANIFEST["sample_id"]) if len(PHASE0_MANIFEST) > 0 else []
+
+rule ingest_raw:
+    input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
+
+# ---- qc_filter: QC + Concatenation ----
+rule adata_qc_filter:
+    output: "results/adata.raw.h5ad"
+    input: "scripts/ingest.py"
+    shell: run_container("scripts/ingest.py")
+
+rule validate_qc_filter:
+    input: "results/adata.raw.h5ad"
+    output: touch("results/.adata.raw.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.raw.h5ad --phase qc_filter --fix"
+
+rule qc_filter:
+    input: "results/adata.raw.h5ad", "results/.adata.raw.validated"
+
+# ---- metadata_attach: Metadata Attachment ----
+rule adata_metadata_attach:
+    output: "results/adata.annotated.h5ad"
+    input: "results/adata.raw.h5ad", "results/.adata.raw.validated", "metadata/sample_metadata.csv"
+    shell: run_container("scripts/attach_metadata.py")
+
+rule validate_metadata_attach:
+    input: "results/adata.annotated.h5ad"
+    output: touch("results/.adata.annotated.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.annotated.h5ad --phase metadata_attach --fix"
+
+rule metadata_attach:
+    input: "results/adata.annotated.h5ad", "results/.adata.annotated.validated"
+
+# ---- preprocess: Normalize + Integrate + Cluster ----
+rule adata_preprocess:
+    output: "results/adata.normalized.h5ad"
+    input: "results/adata.annotated.h5ad", "results/.adata.annotated.validated", "scripts/preprocess.py"
+    shell: run_container("scripts/preprocess.py")
+
+rule validate_preprocess:
+    input: "results/adata.normalized.h5ad"
+    output: touch("results/.adata.normalized.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.h5ad --phase preprocess --fix"
+
+rule preprocess:
+    input: "results/adata.normalized.h5ad", "results/.adata.normalized.validated"
+
+# ---- scoring: Gene Scoring + Auto Cell Typing ----
+rule adata_scoring:
+    output: "results/adata.scored.h5ad"
+    input: "results/adata.normalized.h5ad", "results/.adata.normalized.validated", "metadata/gene_signatures.json", "scripts/score_signatures.py"
+    shell: run_container("scripts/score_signatures.py")
+
+rule validate_scoring:
+    input: "results/adata.scored.h5ad"
+    output: touch("results/.adata.scored.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.scored.h5ad --phase scoring --fix"
+
+rule scoring:
+    input: "results/adata.scored.h5ad", "results/.adata.scored.validated"
+
+# ---- celltype_manual: Manual Cell Typing (iterative, optional) ----
+rule adata_celltype_manual:
+    output: "results/adata.celltyped.h5ad"
+    input: "results/adata.scored.h5ad", "results/.adata.scored.validated", "metadata/celltype_map.json", "scripts/apply_celltype.py"
+    shell: run_container("scripts/apply_celltype.py")
+
+rule validate_celltype_manual:
+    input: "results/adata.celltyped.h5ad"
+    output: touch("results/.adata.celltyped.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.celltyped.h5ad --phase celltype_manual --fix"
+
+rule celltype_manual:
+    input: "results/adata.celltyped.h5ad", "results/.adata.celltyped.validated"
+
+# ---- QC reports (date-versioned HTML) ----
+rule qc_pre_filter:
+    input: "results/adata.raw.h5ad"
+    output: touch("figures/QC/pre_filter_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report pre_filter --adata results/adata.raw.h5ad --figures-dir figures --modality visium_hd_cell"
+    )
+
+rule qc_post_filter:
+    input: "results/adata.raw.h5ad", "results/adata.annotated.h5ad"
+    output: touch("figures/QC/post_filter_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_filter --adata results/adata.raw.h5ad"
+        + " --adata-post results/adata.annotated.h5ad --figures-dir figures --modality visium_hd_cell"
+    )
+
+rule qc_post_integration:
+    input: "results/adata.normalized.h5ad"
+    output: touch("figures/QC/post_integration_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_integration --adata-integrated results/adata.normalized.h5ad"
+        + " --figures-dir figures --modality visium_hd_cell"
+    )
+
+rule qc_report:
+    input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output
+    output: touch("figures/QC/qc_report.done")
+
+# ---- Default ----
+rule all:
+    input: "results/adata.scored.h5ad"

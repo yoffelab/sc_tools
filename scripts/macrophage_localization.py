@@ -324,7 +324,9 @@ def main():
 
     # Load data
     print("\n1. Loading data...")
-    adata_path = Path("results/adata.normalized.scored.p35.h5ad")
+    _scored_new = Path("results/adata.scored.h5ad")
+    _scored_old = Path("results/adata.normalized.scored.p35.h5ad")
+    adata_path = _scored_new if _scored_new.exists() else _scored_old
     if not adata_path.exists():
         raise FileNotFoundError(f"AnnData file not found: {adata_path}")
 

@@ -2,9 +2,11 @@
 """Supp Fig 6: Mutation landscape — per-gene rates, co-occurrence, LME enrichment."""
 
 import logging
+import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,6 +20,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
+
 FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "supp_fig6"
 METADATA_DIR = PROJECT_DIR / "metadata"
 
@@ -28,6 +33,7 @@ def load_config():
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     config = load_config()
 
@@ -42,7 +48,7 @@ def main():
     # Identify sample and gene columns
     sample_col = mut.columns[0]
     gene_cols = [c for c in mut.columns[1:] if mut[c].dtype in [int, float, np.int64, np.float64, bool]
-                 or set(mut[c].dropna().unique()) <= {0, 1, 0.0, 1.0, "0", "1", True, False}]
+                 or set(mut[c].dropna().unique()) <= {0, 1, "0", "1"}]
 
     if not gene_cols:
         gene_cols = mut.columns[1:].tolist()
@@ -119,7 +125,7 @@ def main():
                 _, res_df["p_adj"], _, _ = multipletests(res_df["p_value"], method="fdr_bh")
                 sig = res_df[res_df["p_adj"] < 0.05]
                 if not sig.empty:
-                    logger.info(f"  Significant mutation-LME associations (BH<0.05):")
+                    logger.info("  Significant mutation-LME associations (BH<0.05):")
                     for _, row in sig.iterrows():
                         logger.info(f"    {row['gene']} ~ {row['LME']}: p_adj={row['p_adj']:.3e}")
                 res_df.to_csv(FIG_DIR / "supp6c_fisher_tests.csv", index=False)

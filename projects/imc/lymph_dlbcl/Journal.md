@@ -90,3 +90,32 @@ This journal documents **project-specific** technical and analytical decisions. 
   - Runtime: cayuga; data already present at `/home/fs01/juk4007/elementolab/sc_tools/projects/imc/lymph_dlbcl`
   - Stats: BH FDR, lifelines for survival, sklearn RF for ML (Fig 5)
 - **Next:** Run `download_clinical_metadata.sh` on cayuga, then `snakemake --cores 8 phase0 phase1`
+
+### [2026-03-06] - Pipeline v2: Data fixes + figure quality overhaul
+
+- **Action:** Major overhaul addressing missing data, incorrect figures, and codifying figure production principles.
+- **Problems identified from run8 (46 PDFs):**
+  - Fig 1 missing (no PDFs generated)
+  - Stromal panel had only 1 sample (orig.ident not mapped to DLC_code)
+  - No survival curves (column name mismatch)
+  - LME proportions wrong (missing Cold class; 4 classes instead of 5)
+  - Heatmaps not z-scored, inconsistent colors, no statistical annotations
+- **Changes:**
+  - **skills.md Section 12.8:** Added "Figure Intent, Insight, and Readability" — separates general figure principles (every figure needs a claim, direction-of-effect validation) from reproduction-specific rules (align with manuscript text, quantitative validation). Key principle: if a bar plot shows a statistical comparison, the direction must match the stated insight.
+  - **figure_config.py:** Shared infrastructure — LME_COLORS (5 classes), LME_ORDER (manuscript order), CELLTYPE_COLORS (12 types, Okabe-Ito), COO_COLORS (GCB/ABC), FIGURE_RC_PARAMS (Arial 7pt, 300 DPI, PDF type 42). All figure scripts import from here.
+  - **attach_clinical_metadata.py:** Rewrote to use metadata/DLC380_clinical.tsv directly (348 cases, tab-separated). No more download dependency. Standardized column names: OS_time, OS_event, PFS_time, PFS_event, COO, age, sex, IPI, stage. Filters FINAL_COHORT=YES (332 cases).
+  - **build_lme_classes.py:** Three-tier LME assignment: (1) patient_tme CSV with direct names, (2) TME cluster CSV with k=10 mapping, (3) k-means on abundance fallback. Validates proportions against manuscript (Cold 35.1%, Stromal 21.3%, Cytotoxic 20.7%, T cell Regulated 14.6%, CD206 Enriched 8.2%). Warns if any class off by >5%.
+  - **build_panel_adata.py:** Added barcode parsing fallback for stromal panel — regex extracts DLC_code from cell barcodes when orig.ident gives only 1 sample.
+  - **Fig 1:** Added panels c (non-B cell prevalence), d (B cell markers), e (COO distribution). Z-scored marker heatmap. CELLTYPE_COLORS palette.
+  - **Fig 2:** Heatmap z-scored per cell type across LME classes (not raw). LME_ORDER for consistent row ordering. BH-corrected 1-vs-rest Wilcoxon on violins.
+  - **Fig 3:** Reads DLC380_clinical.tsv directly. Multivariate log-rank test. Cox forest with HR/CI/p-values (CD206 Enriched as reference). COO_COLORS palette.
+  - **Fig 4:** Community heatmap z-scored per community. Shannon entropy bar chart for diversity. Community x LME enrichment bubble plot (orange=enriched, purple=depleted). Gradient boosted model (not RF) for prediction.
+  - **Fig 5:** Moved ML analysis to `figures/manuscript/extended/ml_classification/` (manuscript Fig 5 is CosMx, deferred until data available).
+  - **All supp figs:** Updated to import figure_config and apply_figure_style(). Removed duplicate LME_COLORS definitions.
+  - All scripts pass ruff lint.
+- **Key decisions:**
+  - DLC380_clinical.tsv is the canonical clinical metadata source (already in metadata/, no download needed)
+  - Fig 5 is CosMx (deferred) — ML analysis is extended data
+  - Gradient boosted model for LME prediction (matching manuscript, not RF)
+  - Direction-of-effect validation is now a codified principle in skills.md
+- **Next:** Upload to cayuga and run: Phase 0 (download metadata CSVs), Phase 1 (build panel adata), Phase 3 (LME assignment), Phase 4 (figures). Then rsync figures back for visual QA.

@@ -29,6 +29,10 @@ __all__ = [
     "auto_detect_embeddings",
     "compute_segmentation_section",
     "compute_integration_section",
+    "_find_latest_report",
+    "_extract_body_content",
+    "_extract_head_css",
+    "_wrap_with_tabs",
 ]
 
 logger = logging.getLogger(__name__)
@@ -320,16 +324,6 @@ def compute_integration_section(
         logger.info("No embeddings provided for integration comparison")
         return None
 
-    try:
-        from sc_tools.pl.benchmarking import (
-            plot_integration_comparison_table,
-            plot_integration_radar,
-            plot_integration_ranking_bar,
-        )
-    except ImportError:
-        logger.warning("Integration benchmarking modules not available")
-        return None
-
     if comparison_df is None:
         try:
             from sc_tools.bm.integration import compare_integrations
@@ -354,33 +348,225 @@ def compute_integration_section(
 
     plots: dict[str, str] = {}
 
-    # Plotly-based interactive plots
+    # Radar chart
     try:
-        fig_table = plot_integration_comparison_table(comparison_df)
-        plots["integration_table"] = plotly_to_html(fig_table)
-    except Exception:
-        logger.debug("Integration table plot failed", exc_info=True)
+        from sc_tools.pl.benchmarking import plot_integration_radar
 
-    try:
         fig_radar = plot_integration_radar(comparison_df)
         plots["integration_radar"] = plotly_to_html(fig_radar)
+    except ImportError:
+        logger.warning("Integration benchmarking plot modules not available")
     except Exception:
         logger.debug("Integration radar plot failed", exc_info=True)
 
-    try:
-        fig_rank = plot_integration_ranking_bar(comparison_df)
-        plots["integration_ranking"] = plotly_to_html(fig_rank)
-    except Exception:
-        logger.debug("Integration ranking plot failed", exc_info=True)
-
-    # Batch vs bio scatter (if both scores present)
+    # Batch vs bio scatter (supplementary)
     if "batch_score" in comparison_df.columns and "bio_score" in comparison_df.columns:
         try:
             from sc_tools.pl.benchmarking import plot_batch_vs_bio
 
             fig_bvb = plot_batch_vs_bio(comparison_df)
             plots["batch_vs_bio"] = plotly_to_html(fig_bvb)
+        except ImportError:
+            pass  # already warned above
         except Exception:
             logger.debug("Batch vs bio plot failed", exc_info=True)
 
     return {"comparison_df": comparison_df, "plots": plots}
+
+
+# ---------------------------------------------------------------------------
+# Tab-navigation helpers (Plan B)
+# ---------------------------------------------------------------------------
+
+
+def _find_latest_report(output_dir: Path, report_type: str) -> Path | None:
+    """Find the most recent ``{report_type}_qc_YYYYMMDD.html`` in *output_dir*.
+
+    Globs for ``{report_type}_qc_????????.html`` and returns the file with
+    the lexicographically largest 8-digit date suffix. Returns ``None`` when
+    no matching files exist.
+
+    Parameters
+    ----------
+    output_dir
+        Directory to search.
+    report_type
+        Report type prefix, e.g. ``"pre_filter"``, ``"post_filter"``.
+
+    Returns
+    -------
+    Path or None
+    """
+    candidates = sorted(output_dir.glob(f"{report_type}_qc_????????.html"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stem[-8:])
+
+
+def _extract_body_content(html_str: str) -> str:
+    """Extract inner content between ``<body>`` and ``</body>``.
+
+    Falls back to returning the full string when no ``<body>`` tag is found.
+
+    Parameters
+    ----------
+    html_str
+        Full HTML string.
+
+    Returns
+    -------
+    str
+        Content inside the ``<body>`` element.
+    """
+    import re
+
+    match = re.search(r"<body[^>]*>(.*)</body>", html_str, re.DOTALL | re.IGNORECASE)
+    return match.group(1) if match else html_str
+
+
+def _extract_head_css(html_str: str) -> str:
+    """Extract the CSS text from the first ``<style>`` block in ``<head>``.
+
+    Returns an empty string when no ``<style>`` element is found.
+
+    Parameters
+    ----------
+    html_str
+        Full HTML string.
+
+    Returns
+    -------
+    str
+        Raw CSS text, or ``""`` if absent.
+    """
+    import re
+
+    match = re.search(r"<style[^>]*>(.*?)</style>", html_str, re.DOTALL | re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _wrap_with_tabs(
+    current_label: str,
+    current_content: str,
+    previous_tabs: list[tuple[str, str, str]],
+    current_css: str,
+    current_head_extras: str = "",
+    title: str = "",
+) -> str:
+    """Assemble a complete tabbed HTML document.
+
+    The active tab is always the *current* report; previous reports are shown
+    in reverse chronological order (most recent first).
+
+    Parameters
+    ----------
+    current_label
+        Display label for the active tab, e.g. ``"Report 2: Post-filter"``.
+    current_content
+        Inner HTML body of the active report (between ``<body>`` tags).
+    previous_tabs
+        List of ``(label, body_html, head_css)`` tuples for older reports, in
+        the order they should appear (leftmost = first in list).
+    current_css
+        CSS text extracted from the current report's ``<style>`` block.
+    current_head_extras
+        Extra ``<head>`` content (e.g. CDN ``<script>`` tags) needed by the
+        current report. Plotly CDN is always included when this string contains
+        ``plotly`` or when any previous tab content references Plotly.
+    title
+        ``<title>`` tag text (defaults to *current_label*).
+
+    Returns
+    -------
+    str
+        A complete, self-contained HTML document with tab navigation.
+    """
+    if not title:
+        title = current_label
+
+    # Always include Plotly CDN (some reports embed it, unified wrapper needs it)
+    plotly_cdn = '<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>'
+
+    # Build list of all tabs: current first, then previous in order
+    all_tabs: list[tuple[str, str, str]] = [(current_label, current_content, current_css)]
+    all_tabs.extend(previous_tabs)
+
+    # Assign stable HTML IDs
+    def _tab_id(idx: int) -> str:
+        return "tab-current" if idx == 0 else f"tab-prev-{idx}"
+
+    btn_id = lambda idx: "btn-" + _tab_id(idx)  # noqa: E731
+
+    # --- Tab navigation bar ---
+    btn_html_parts: list[str] = []
+    for i, (label, _, _) in enumerate(all_tabs):
+        active_cls = " active" if i == 0 else ""
+        btn_html_parts.append(
+            f'<button class="tab-btn{active_cls}" id="{btn_id(i)}" '
+            f"onclick=\"showTab('{_tab_id(i)}')\">{label}</button>"
+        )
+    nav_html = "\n    ".join(btn_html_parts)
+
+    # --- Panel divs ---
+    panel_parts: list[str] = []
+    for i, (_, body_html, css_text) in enumerate(all_tabs):
+        display = "block" if i == 0 else "none"
+        style_block = f"<style>{css_text}</style>" if css_text.strip() else ""
+        panel_parts.append(
+            f'<div class="tab-panel" id="{_tab_id(i)}" style="display:{display};">\n'
+            f"{style_block}\n"
+            f"{body_html}\n"
+            f"</div>"
+        )
+    panels_html = "\n".join(panel_parts)
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title}</title>
+{plotly_cdn}
+{current_head_extras}
+<style>
+  *, *::before, *::after {{ box-sizing: border-box; }}
+  body {{ margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont,
+         "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
+  .tab-nav {{
+    position: sticky; top: 0; z-index: 1000;
+    background: #1a1a2e; padding: 0 8px;
+    display: flex; flex-wrap: wrap; gap: 2px;
+  }}
+  .tab-btn {{
+    background: transparent; border: none; border-bottom: 3px solid transparent;
+    color: #ccc; padding: 10px 18px; cursor: pointer; font-size: 0.9rem;
+    white-space: nowrap; transition: color 0.15s, border-color 0.15s;
+  }}
+  .tab-btn:hover {{ color: #fff; border-bottom-color: #7f8c8d; }}
+  .tab-btn.active {{ color: #fff; border-bottom-color: #3498db; font-weight: 600; }}
+  .tab-panel {{ min-height: 100vh; }}
+</style>
+<script>
+  function showTab(id) {{
+    document.querySelectorAll('.tab-panel').forEach(function(p) {{
+      p.style.display = 'none';
+    }});
+    document.querySelectorAll('.tab-btn').forEach(function(b) {{
+      b.classList.remove('active');
+    }});
+    document.getElementById(id).style.display = 'block';
+    document.getElementById('btn-' + id).classList.add('active');
+  }}
+  document.addEventListener('DOMContentLoaded', function() {{
+    showTab('tab-current');
+  }});
+</script>
+</head>
+<body>
+<div class="tab-nav">
+  {nav_html}
+</div>
+{panels_html}
+</body>
+</html>"""
+    return html

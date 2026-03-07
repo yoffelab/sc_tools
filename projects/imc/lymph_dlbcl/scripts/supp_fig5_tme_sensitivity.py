@@ -2,9 +2,11 @@
 """Supp Fig 5: TME clustering sensitivity analysis."""
 
 import logging
+import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +21,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
+
 FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "supp_fig5"
 
 
@@ -28,6 +33,7 @@ def load_config():
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     config = load_config()
 
@@ -121,6 +127,9 @@ def main():
 
         mean_by_cluster = abundance_norm.groupby("cluster").mean()
         z_scored = mean_by_cluster.apply(lambda x: (x - x.mean()) / (x.std() + 1e-10), axis=0)
+
+        # Remove NaN/Inf values for clustermap compatibility
+        z_scored = z_scored.dropna(how="all", axis=0).dropna(how="all", axis=1).fillna(0)
 
         g = sns.clustermap(z_scored, cmap="RdBu_r", center=0, vmin=-2, vmax=2,
                            figsize=(12, max(4, k * 0.5)),

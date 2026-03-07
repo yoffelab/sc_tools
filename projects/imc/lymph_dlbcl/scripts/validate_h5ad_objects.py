@@ -127,12 +127,25 @@ def validate_object(name: str, path: Path) -> dict:
         except Exception:
             pass
 
-    # Data quality
+    # Data quality — use layers['raw'] if X is empty (p4 may have zeroed X)
     try:
-        if hasattr(adata.X, "toarray"):
-            x_sample = adata.X[:100].toarray()
+        data_src = adata.X
+        # Check if X is all zeros (sample first 100 rows)
+        if hasattr(data_src, "toarray"):
+            x_sample = data_src[:100].toarray()
         else:
-            x_sample = np.array(adata.X[:100])
+            x_sample = np.array(data_src[:100])
+
+        if np.abs(x_sample).max() < 1e-10 and "raw" in (adata.layers or {}):
+            data_src = adata.layers["raw"]
+            result["x_source"] = "layers['raw'] (X is empty)"
+            if hasattr(data_src, "toarray"):
+                x_sample = data_src[:100].toarray()
+            else:
+                x_sample = np.array(data_src[:100])
+        else:
+            result["x_source"] = "X"
+
         result["x_min"] = float(np.nanmin(x_sample))
         result["x_max"] = float(np.nanmax(x_sample))
         result["x_mean"] = float(np.nanmean(x_sample))

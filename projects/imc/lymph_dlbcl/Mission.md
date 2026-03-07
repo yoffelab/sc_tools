@@ -1,9 +1,9 @@
 # Mission: Two-Panel IMC DLBCL (lymph_dlbcl)
 
 **Project:** `projects/imc/lymph_dlbcl`
-**Current Status:** Manuscript reproduction — building reproducible Snakemake pipeline
+**Current Status:** Manuscript reproduction — 64 PDFs generated, visual QA in progress
 **Author:** Junbum Kim
-**Last Updated:** 2026-03-04
+**Last Updated:** 2026-03-06
 
 This file holds **project-specific** goals. Repository-level pipeline and phase definitions are in the root `Mission.md` and `Architecture.md`.
 
@@ -36,7 +36,8 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 | **Fig 2** | 5 LME classes: complex heatmap, abundance, IMC images | TME cluster assignments, cell proportions |
 | **Fig 3** | Clinical: KM curves (OS/PFS), COO, mutations | Clinical CSV, mutation table, survival data |
 | **Fig 4** | Spatial: 20 communities, neighborhood enrichment | Spatial community h5ad (k=30 kNN) |
-| **Fig 5** | ML: ROC, feature importance, IHC validation | TME z-scores, IHC data, clinical |
+| **Fig 5** | CosMx spatial transcriptomics (deferred) | CosMx data TBD |
+| **Ext Data** | ML: ROC, feature importance, IHC validation | TME z-scores, IHC data, clinical |
 | **Supp 1** | Panel composition and QC metrics | Marker lists, intensity distributions |
 | **Supp 2** | B cell subcluster analysis | B cell subset, re-clustering, marker heatmap |
 | **Supp 3** | T cell/myeloid characterization | T cell + myeloid subsets, markers, proportions |
@@ -53,16 +54,18 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 ### Phase 0: Data Audit and Organization
 
 - [x] Step 1: Remote file inventory and h5ad conversion (47 files)
-- [ ] **0.1** Download missing clinical/metadata from cayuga (`scripts/download_clinical_metadata.sh`)
+- [x] **0.1** Clinical metadata: `metadata/DLC380_clinical.tsv` (348 cases, direct use — no download dependency)
 - [ ] **0.2** Validate key h5ad objects (`scripts/validate_h5ad_objects.py`)
 - [ ] **0.3** Map cell type labels to manuscript nomenclature (`metadata/celltype_map_immune.json`, `metadata/celltype_map_stromal.json`)
 
 ### Phase 1: AnnData Construction (Per Panel)
 
-- [ ] **1.1** Build panel checkpoints from T2/S2 preprocessing objects (`scripts/build_panel_adata.py`)
-- [ ] **1.2** Attach clinical metadata (`scripts/attach_clinical_metadata.py`)
-- [ ] **1.3** Build celltyped checkpoints (P4)
-- [ ] **1.4** Build spatial community object (`scripts/build_spatial_adata.py`)
+- [x] **1.1** Build panel checkpoints from T2/S2 preprocessing objects (`scripts/build_panel_adata.py`)
+  - Immune: 1,628,885 cells x 49 markers, 138 samples, 19 cell types
+  - Stromal: 1,552,303 cells x 50 markers — **BLOCKER: only 1 sample** (orig.ident=0; needs S2_seurat_cellid.csv)
+- [x] **1.2** Attach clinical metadata (`scripts/attach_clinical_metadata.py`) — 78/138 immune samples matched (638K cells)
+- [x] **1.3** Build celltyped checkpoints (P4) — immune panel complete with LME_class
+- [x] **1.4** Build spatial community object (`scripts/build_spatial_adata.py`)
 
 ### Phase 2: QC and Normalization Verification
 
@@ -72,32 +75,33 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 ### Phase 3: Cell Typing Validation and LME Construction
 
 - [ ] **3.1** Validate cell types (`scripts/validate_celltypes.py`)
-- [ ] **3.2** Assign LME classes (`scripts/build_lme_classes.py`)
+- [x] **3.2** Assign LME classes (`scripts/build_lme_classes.py`) — 5 classes via Hungarian optimal matching on TME h5ad
+  - Cold 31.0% (ms: 35.1%), Stromal 19.2% (21.3%), Cytotoxic 21.3% (20.7%), T cell Reg 15.3% (14.6%), CD206 13.2% (8.2%)
 
-### Phase 4: Figure Reproduction
+### Phase 4: Figure Reproduction (64 PDFs generated, all scripts pass on cayuga)
 
-- [ ] **4.1** Fig 1: Single-cell atlas (`scripts/fig1_single_cell_atlas.py`)
-- [ ] **4.2** Fig 2: LME classes (`scripts/fig2_lme_classes.py`)
-- [ ] **4.3** Fig 3: Clinical (`scripts/fig3_clinical.py`)
-- [ ] **4.4** Fig 4: Spatial (`scripts/fig4_spatial.py`)
-- [ ] **4.5** Fig 5: ML framework (`scripts/fig5_ml_framework.py`)
-- [ ] **4.6** Supp 1: QC panels (`scripts/supp_fig1_qc_panels.py`)
-- [ ] **4.7** Supp 2: B cell (`scripts/supp_fig2_bcell.py`)
-- [ ] **4.8** Supp 3: T cell/myeloid (`scripts/supp_fig3_tcell_myeloid.py`)
-- [ ] **4.9** Supp 4: Vessel (`scripts/supp_fig4_vessel.py`)
-- [ ] **4.10** Supp 5: TME sensitivity (`scripts/supp_fig5_tme_sensitivity.py`)
-- [ ] **4.11** Supp 6: Mutations (`scripts/supp_fig6_mutations.py`)
-- [ ] **4.12** Supp 7: RNA-protein (`scripts/supp_fig7_rna_protein.py`)
-- [ ] **4.13** Supp 8: Extended survival (`scripts/supp_fig8_extended_survival.py`)
+- [x] **4.1** Fig 1: Single-cell atlas — 4 panels (UMAP x2, heatmap, prevalence; fig1d B cell markers skipped)
+- [x] **4.2** Fig 2: LME classes — 6 panels (heatmap, stacked bar x2, violin, proportions x2)
+- [x] **4.3** Fig 3: Clinical — 5 panels (KM OS p=0.0147, KM PFS p=0.0024, Cox forest, COO x2)
+- [x] **4.4** Fig 4: Spatial — 5 panels (community composition, diversity, enrichment, ML, by LME)
+- [x] **4.5** Fig 5: ML framework — 5 panels (ROC, feature importance, confusion, IHC, metrics) → extended/
+- [x] **4.6** Supp 1: QC panels — 6 panels (markers, distributions, per-sample QC, both panels)
+- [x] **4.7** Supp 2: B cell — 8 panels (UMAP x4, heatmap x4)
+- [x] **4.8** Supp 3: T cell/myeloid — 12 panels (UMAP, heatmap, proportions, T2 + S1 + v2)
+- [x] **4.9** Supp 4: Vessel — 1 panel (endothelial markers)
+- [x] **4.10** Supp 5: TME sensitivity — 5 panels (cluster metrics, stability, k=5/8/10 heatmaps)
+- [ ] **4.11** Supp 6: Mutations — **BLOCKED** (needs CTMA121_mut_table.csv)
+- [x] **4.12** Supp 7: RNA-protein — placeholder
+- [x] **4.13** Supp 8: Extended survival — multivariate Cox, subgroup KM
 
 ### Phase 5: Snakemake Pipeline
 
-- [ ] **5.1** `config.yaml` with project parameters
-- [ ] **5.2** `Snakefile` with full DAG
+- [x] **5.1** `config.yaml` with project parameters
+- [x] **5.2** `Snakefile` with full DAG
 
 ### Phase 6: Verification
 
-- [ ] **6.1** Visual comparison with `manuscript/Figures_v7.1/` originals
+- [ ] **6.1** Visual comparison with `manuscript/Figures_v7.1/` originals — QA in progress
 - [ ] **6.2** Numerical validation (cell counts, LME sizes, KM p-values, AUC)
 - [ ] **6.3** End-to-end Snakemake run
 
@@ -108,6 +112,17 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 - [x] Create project layout: `data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`, and planning docs.
 - [x] Step 1: Remote file listing obtained; inventory script run; annotated inventory produced (`metadata/remote_file_inventory_annotated.csv`).
 - [x] RDS metadata extracted (47 files + notebook traceability); Seurat-to-h5ad conversion done (48 objects in `results/seurat_converted/`).
+- [x] **v2 overhaul (2026-03-06):** Figure quality + data pipeline fixes.
+  - Added `scripts/figure_config.py` — shared LME_COLORS, LME_ORDER, CELLTYPE_COLORS, COO_COLORS, apply_figure_style().
+  - Rewrote `attach_clinical_metadata.py` — uses `metadata/DLC380_clinical.tsv` directly (no download dependency); standardized column names (OS_time, PFS_time, COO, etc.).
+  - Rewrote `build_lme_classes.py` — tries patient_tme CSV, then cluster mapping, then k-means fallback; validates all 5 LME classes with manuscript proportions.
+  - Rewrote Fig 1-4 scripts with z-scored heatmaps, diverging colormaps, consistent LME/celltype colors, BH-corrected statistics, KM with log-rank p-values, Cox forest with HR/CI.
+  - Moved Fig 5 (ML) to `figures/manuscript/extended/ml_classification/` (manuscript Fig 5 is CosMx, deferred).
+  - Updated all supp fig scripts to use figure_config.
+  - Added `build_panel_adata.py` barcode parsing fallback for stromal panel (DLC_code from cell barcode regex).
+  - Updated `config.yaml` to point to `metadata/DLC380_clinical.tsv`.
+  - Added skills.md Section 12.8: Figure Intent, Insight, and Readability (general + reproduction-specific).
+  - All scripts lint clean (ruff).
 
 ---
 

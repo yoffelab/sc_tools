@@ -25,7 +25,6 @@ import logging
 from pathlib import Path
 
 import anndata as ad
-import numpy as np
 import pandas as pd
 import yaml
 
@@ -154,7 +153,7 @@ def build_stromal_panel(config: dict) -> ad.AnnData:
     # 2. DLC_code mapping for S2 (not present in S2 preprocessing objects)
     # Try cell ID CSVs first
     s2_cellid_path = PROJECT_DIR / config["metadata"].get("s2_cellid", "")
-    s1_cellid_path = PROJECT_DIR / config["metadata"].get("s1_cellid", "")
+    _ = PROJECT_DIR / config["metadata"].get("s1_cellid", "")  # S1 path reserved for future use
 
     if s2_cellid_path.exists():
         logger.info(f"  Loading S2 cell ID mapping: {s2_cellid_path}")
@@ -163,7 +162,7 @@ def build_stromal_panel(config: dict) -> ad.AnnData:
         # Map cell barcodes to DLC_code
         if "DLC_code" in cellid_df.columns:
             barcode_col = cellid_df.columns[0]  # First col is usually barcode/index
-            id_map = dict(zip(cellid_df[barcode_col], cellid_df["DLC_code"]))
+            id_map = dict(zip(cellid_df[barcode_col], cellid_df["DLC_code"], strict=False))
             adata.obs["sample"] = adata.obs.index.map(
                 lambda x: id_map.get(x, "Unknown")
             )
@@ -176,6 +175,21 @@ def build_stromal_panel(config: dict) -> ad.AnnData:
 
     n_samples = adata.obs["sample"].nunique()
     logger.info(f"  Samples: {n_samples} unique")
+
+    # If orig.ident produced only 1 sample (all identical), try extracting
+    # DLC_code from cell barcode format (e.g., "DLC_0001_ATCG...")
+    if n_samples <= 1 and "orig.ident" in adata.obs.columns:
+        logger.warning("  Only 1 unique sample from orig.ident; trying barcode parsing")
+        import re
+        dlc_pattern = re.compile(r"(DLC_\d{4})")
+        parsed = adata.obs.index.map(
+            lambda x: (m.group(1) if (m := dlc_pattern.search(str(x))) else "Unknown")
+        )
+        n_parsed = (parsed != "Unknown").sum()
+        if n_parsed > adata.n_obs * 0.5:
+            adata.obs["sample"] = parsed.values
+            n_samples = adata.obs["sample"].nunique()
+            logger.info(f"  Parsed DLC_code from barcodes: {n_samples} samples, {n_parsed:,} cells mapped")
 
     # 3. Transfer labels from merged/subset objects
     # S2 subsets have 'meta' and 'recluster' but not always 'labels'

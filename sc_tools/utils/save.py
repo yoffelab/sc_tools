@@ -4,6 +4,8 @@ Versioned save utilities: datetime-prefixed filenames for figures and h5ad.
 Format: YYDDMM.hh.mm.filename.extension (e.g. 250208.14.30.volcano_faceted.pdf)
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 

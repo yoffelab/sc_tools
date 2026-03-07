@@ -4,6 +4,8 @@ Volcano plot utilities.
 Provides functions for creating volcano plots with statistical annotations.
 """
 
+from __future__ import annotations
+
 import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np

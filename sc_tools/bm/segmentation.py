@@ -28,6 +28,9 @@ __all__ = [
     "compute_size_distribution",
     "compute_detection_metrics",
     "compute_segmentation_accuracy",
+    "compute_panoptic_quality",
+    "compute_boundary_metrics",
+    "compute_cell_type_preservation",
     "score_segmentation",
     "compare_segmentations",
 ]
@@ -418,6 +421,190 @@ def compute_segmentation_accuracy(
         "ap_50": ap_50,
         "ap_75": ap_75,
         "ap_50_95": ap_50_95,
+    }
+
+
+def compute_panoptic_quality(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    iou_threshold: float = 0.5,
+) -> dict[str, float]:
+    """Compute Panoptic Quality (PQ = SQ x DQ).
+
+    Standard instance segmentation metric from Kirillov et al. (2019).
+
+    Parameters
+    ----------
+    pred
+        Predicted instance segmentation mask.
+    gt
+        Ground truth instance segmentation mask.
+    iou_threshold
+        IoU threshold for matching.
+
+    Returns
+    -------
+    Dict with keys: ``pq``, ``sq`` (segmentation quality), ``dq`` (detection quality),
+    ``n_tp``, ``n_fp``, ``n_fn``.
+    """
+    iou_matrix, pred_labels, gt_labels = _compute_iou_matrix(pred, gt)
+    n_pred = len(pred_labels)
+    n_gt = len(gt_labels)
+
+    if n_pred == 0 and n_gt == 0:
+        return {"pq": 1.0, "sq": 1.0, "dq": 1.0, "n_tp": 0, "n_fp": 0, "n_fn": 0}
+    if n_pred == 0 or n_gt == 0:
+        return {"pq": 0.0, "sq": 0.0, "dq": 0.0, "n_tp": 0, "n_fp": n_pred, "n_fn": n_gt}
+
+    # Hungarian matching
+    cost = -iou_matrix
+    row_ind, col_ind = linear_sum_assignment(cost)
+
+    # Matched pairs above threshold
+    tp_ious = []
+    matched_pred = set()
+    matched_gt = set()
+    for r, c in zip(row_ind, col_ind, strict=False):
+        if iou_matrix[r, c] >= iou_threshold:
+            tp_ious.append(iou_matrix[r, c])
+            matched_pred.add(r)
+            matched_gt.add(c)
+
+    n_tp = len(tp_ious)
+    n_fp = n_pred - n_tp
+    n_fn = n_gt - n_tp
+
+    sq = float(np.mean(tp_ious)) if tp_ious else 0.0
+    dq = n_tp / (n_tp + 0.5 * n_fp + 0.5 * n_fn) if (n_tp + n_fp + n_fn) > 0 else 0.0
+    pq = sq * dq
+
+    return {
+        "pq": float(pq),
+        "sq": float(sq),
+        "dq": float(dq),
+        "n_tp": int(n_tp),
+        "n_fp": int(n_fp),
+        "n_fn": int(n_fn),
+    }
+
+
+def compute_boundary_metrics(
+    pred: np.ndarray,
+    gt: np.ndarray,
+    tolerances: tuple[int, ...] = (1, 2, 3, 5),
+) -> dict[str, float]:
+    """Compute boundary F1 at multiple pixel tolerances.
+
+    Parameters
+    ----------
+    pred
+        Predicted instance segmentation mask.
+    gt
+        Ground truth instance segmentation mask.
+    tolerances
+        Pixel tolerances for boundary matching.
+
+    Returns
+    -------
+    Dict with keys ``boundary_f1_{tol}px`` for each tolerance.
+    """
+    from skimage.segmentation import find_boundaries
+
+    pred_boundaries = find_boundaries(pred, mode="inner")
+    gt_boundaries = find_boundaries(gt, mode="inner")
+
+    results = {}
+    for tol in tolerances:
+        # Dilate boundaries by tolerance
+        from scipy.ndimage import binary_dilation
+
+        struct = np.ones((2 * tol + 1, 2 * tol + 1))
+        gt_dilated = binary_dilation(gt_boundaries, structure=struct)
+        pred_dilated = binary_dilation(pred_boundaries, structure=struct)
+
+        # Precision: pred boundary pixels within tolerance of gt
+        tp_pred = np.sum(pred_boundaries & gt_dilated)
+        n_pred = np.sum(pred_boundaries)
+        precision = tp_pred / n_pred if n_pred > 0 else 0.0
+
+        # Recall: gt boundary pixels within tolerance of pred
+        tp_gt = np.sum(gt_boundaries & pred_dilated)
+        n_gt = np.sum(gt_boundaries)
+        recall = tp_gt / n_gt if n_gt > 0 else 0.0
+
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        results[f"boundary_f1_{tol}px"] = float(f1)
+
+    return results
+
+
+def compute_cell_type_preservation(
+    pred_mask: np.ndarray,
+    gt_mask: np.ndarray,
+    gt_labels: np.ndarray | dict[int, str],
+    iou_threshold: float = 0.5,
+) -> dict[str, float]:
+    """Measure how well segmentation preserves cell type identity.
+
+    For annotated public datasets where GT cells have type labels.
+
+    Parameters
+    ----------
+    pred_mask
+        Predicted instance mask.
+    gt_mask
+        Ground truth instance mask.
+    gt_labels
+        Either a 2D array (same shape as gt_mask) with cell type IDs per pixel,
+        or a dict mapping GT cell label -> cell type string.
+    iou_threshold
+        IoU threshold for matching.
+
+    Returns
+    -------
+    Dict with ``type_preservation_rate``, ``n_matched``, ``n_types_preserved``.
+    """
+    iou_matrix, pred_labs, gt_labs = _compute_iou_matrix(pred_mask, gt_mask)
+
+    if len(pred_labs) == 0 or len(gt_labs) == 0:
+        return {"type_preservation_rate": 0.0, "n_matched": 0, "n_types_preserved": 0}
+
+    # Hungarian matching
+    cost = -iou_matrix
+    row_ind, col_ind = linear_sum_assignment(cost)
+
+    # Get cell type for each GT cell
+    if isinstance(gt_labels, dict):
+        gt_type_map = gt_labels
+    else:
+        # Extract per-cell majority type from label array
+        gt_type_map = {}
+        for gl in gt_labs:
+            cell_pixels = gt_labels[gt_mask == gl]
+            if len(cell_pixels) > 0:
+                values, counts = np.unique(cell_pixels, return_counts=True)
+                gt_type_map[int(gl)] = int(values[np.argmax(counts)])
+
+    # Count matched cells that map to the same type
+    matched = 0
+    type_correct = 0
+    types_seen = set()
+
+    for r, c in zip(row_ind, col_ind, strict=False):
+        if iou_matrix[r, c] >= iou_threshold:
+            matched += 1
+            gt_label = int(gt_labs[c])
+            if gt_label in gt_type_map:
+                types_seen.add(gt_type_map[gt_label])
+                # A matched cell preserves type by definition if IoU is high enough
+                type_correct += 1
+
+    preservation_rate = type_correct / matched if matched > 0 else 0.0
+
+    return {
+        "type_preservation_rate": float(preservation_rate),
+        "n_matched": int(matched),
+        "n_types_preserved": len(types_seen),
     }
 
 

@@ -1,0 +1,20 @@
+# robin Snakemake config
+repo_root: "../../.."
+project_rel: "projects/visium_hd_cell/robin"
+container_sif: "containers/sc_tools.sif"
+
+# Phase 0: upstream tool paths (adjust for your HPC)
+# spaceranger_path: "/path/to/spaceranger"
+# transcriptome: "/path/to/refdata-gex-GRCh38-2024-A"
+# probe_set: "/path/to/probe_sets/Visium_Human_Transcriptome_Probe_Set_v2.1.0_GRCh38-2024-A.csv"
+# output_dir: "spaceranger_outputs"
+# create_bam: false
+# localcores: 32
+# localmem: 220
+
+# SLURM resource defaults (used by generate_phase0_sbatch.py)
+# slurm:
+#   partition: "scu-cpu"
+#   cpus_per_task: 32
+#   mem: "240G"
+#   time: "2-00:00:00"

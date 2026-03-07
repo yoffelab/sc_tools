@@ -46,9 +46,9 @@ pytest projects/visium/ggo_visium/tests/ -v
 
 | Path | Description |
 |------|-------------|
-| `results/adata.annotated.p2.h5ad` | Phase 2 output: AnnData with clinical metadata |
-| `results/adata.normalized.scored.p35.h5ad` | **Primary Phase 5 input**: scores in `obsm['signature_score']` |
-| `results/adata.celltyped.p4.h5ad` | Manual cell type labels |
+| `results/adata.annotated.h5ad` | metadata_attach output: AnnData with clinical metadata |
+| `results/adata.scored.h5ad` | **Primary biology input**: scores in `obsm['signature_score']` |
+| `results/adata.celltyped.h5ad` | celltype_manual output: manual cell type labels |
 | `results/adata.deconvolution.h5ad` | Cell-type proportions (optional) |
 | `metadata/gene_signatures.json` | Gene signatures for scoring |
 | `metadata/celltype_map.json` | cluster_id → celltype mapping |

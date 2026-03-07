@@ -101,13 +101,17 @@ def run_ggo_visium_reports():
     output_dir = f"{base}/figures/QC"
     os.makedirs(output_dir, exist_ok=True)
 
-    # Use p2 as pre-filter (it's the earliest available checkpoint)
-    p2_path = f"{base}/results/adata.annotated.p2.h5ad"
-    p3_path = f"{base}/results/adata.normalized.p3.h5ad"
+    # Use annotated as pre-filter (it's the earliest available checkpoint)
+    _ann_new = f"{base}/results/adata.annotated.h5ad"
+    _ann_old = f"{base}/results/adata.annotated.p2.h5ad"
+    p2_path = _ann_new if os.path.exists(_ann_new) else _ann_old
+    _norm_new = f"{base}/results/adata.normalized.h5ad"
+    _norm_old = f"{base}/results/adata.normalized.p3.h5ad"
+    p3_path = _norm_new if os.path.exists(_norm_new) else _norm_old
 
-    # Pre-filter report using p2 (closest available)
+    # Pre-filter report using annotated (closest available)
     try:
-        print(f"  Loading p2: {p2_path}")
+        print(f"  Loading annotated: {p2_path}")
         adata_p2 = sc.read_h5ad(p2_path)
         adata_p2.obs_names_make_unique()
 
@@ -165,15 +169,21 @@ def run_robin_reports():
     output_dir = f"{base}/figures/QC"
     os.makedirs(output_dir, exist_ok=True)
 
-    p1_path = f"{base}/results/adata.raw.p1.h5ad"
-    p2_path = f"{base}/results/adata.annotated.p2.h5ad"
-    p3_path = f"{base}/results/adata.normalized.p3.h5ad"
+    _raw_new = f"{base}/results/adata.raw.h5ad"
+    _raw_old = f"{base}/results/adata.raw.p1.h5ad"
+    p1_path = _raw_new if os.path.exists(_raw_new) else _raw_old
+    _ann_new = f"{base}/results/adata.annotated.h5ad"
+    _ann_old = f"{base}/results/adata.annotated.p2.h5ad"
+    p2_path = _ann_new if os.path.exists(_ann_new) else _ann_old
+    _norm_new = f"{base}/results/adata.normalized.h5ad"
+    _norm_old = f"{base}/results/adata.normalized.p3.h5ad"
+    p3_path = _norm_new if os.path.exists(_norm_new) else _norm_old
 
     adata_p1 = None
 
     # Pre-filter report
     try:
-        print(f"  Loading p1: {p1_path}")
+        print(f"  Loading raw: {p1_path}")
         adata_p1 = sc.read_h5ad(p1_path)
         adata_p1.obs_names_make_unique()
 

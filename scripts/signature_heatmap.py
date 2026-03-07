@@ -34,7 +34,9 @@ sc.settings.set_figure_params(dpi=300, dpi_save=400)
 # ============================================================================
 
 # Input/Output paths
-ADATA_PATH = Path("results/adata.normalized.scored.p35.h5ad")
+_scored_new = Path("results/adata.scored.h5ad")
+_scored_old = Path("results/adata.normalized.scored.p35.h5ad")
+ADATA_PATH = _scored_new if _scored_new.exists() else _scored_old
 OUTPUT_DIR = Path("figures/manuscript/signature_heatmaps")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

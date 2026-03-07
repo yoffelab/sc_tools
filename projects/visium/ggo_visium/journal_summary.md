@@ -15,4 +15,4 @@ Condensed summary of `Journal.md` for this project. Full entries are in `Journal
 ## Key conventions
 
 - Comparisons: 1-vs-rest for tumor stages; significance text box format; dodged bars.
-- Checkpoint names aligned with root Architecture (e.g. adata.normalized.scored.p35.h5ad after checkpoint migration).
+- Checkpoint names: semantic slug names adopted (adata.annotated.h5ad, adata.scored.h5ad, adata.celltyped.h5ad). Backwards compat with old p-code names via `_old` fallback vars in all scripts.

@@ -2,7 +2,7 @@
 
 **Scope:** Repository-level and generalizable goals. Project-specific objectives (e.g. TLS, macrophage analysis) live in each project's `Mission.md` under `projects/<data_type>/<project_name>/Mission.md`.
 
-**Last Updated:** 2026-03-04
+**Last Updated:** 2026-03-06
 
 ---
 
@@ -20,10 +20,10 @@
 | **0** | Upstream Raw Data Processing | (0a) Space Ranger / Xenium Ranger / IMC pipeline on HPC → `data/{sample_id}/outs/`. (0b) Load per-sample into AnnData/SpatialData → `data/{sample_id}/adata.p0.h5ad`. |
 | **1** | QC and Concatenation | Load Phase 0 per-sample AnnData; per-sample QC; filter; concat via `concat_samples()`; QC reports. |
 | **2** | Metadata Attachment | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. |
-| **3** | Preprocessing | Backup `adata.raw`; filter; normalize; batch correct (e.g. scVI); cluster. No automated cell typing. |
+| **3** | Preprocessing | Backup `adata.raw`; filter; normalize; **integration benchmark** (subsample → test all methods → select best by batch score → integrate full dataset); cluster. No automated cell typing. |
 | **3.5** | Demographics | Branch from Phase 3 (parallel to 3.5b). Cohort stats, Figure 1. |
 | **3.5b** | Gene scoring, automated cell typing, deconvolution | Branch from Phase 3 (parallel to 3.5). Hallmark + project signatures (target: `adata.obsm['sig:...']`); automated cell typing; optional deconvolution. Connects to Phase 4. |
-| **4** | Manual Cell Typing | Human-in-loop, iterative. Skippable if automated typing (3.5b) is adequate. |
+| **4** | Manual Cell Typing | Human-in-loop, iterative. Skippable if automated typing (3.5b) is adequate. **Post-celltyping QC report** with full bio metrics. |
 | **5** | Downstream Biology | Uses 3.5b outputs. Spatial/process analysis, figures. |
 | **6–7** | Meta Analysis | Optional. Aggregate ROI/patient; downstream on aggregated. |
 
@@ -60,7 +60,8 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **IMC image loading (Phase 0b):** `load_imc_sample(load_images=True, panel_csv=...)` reads the per-ROI `{roi_id}_full.tiff` multi-channel stack (C, H, W) and companion `{roi_id}_full.csv` channel index file from `processed/{sample}/tiffs/`. Builds arcsinh-normalized full stack + RGB composite (PanCK=R, CD3=G, DNA1=B defaults). Stores in `adata.uns['spatial'][sample_id]` (squidpy/scanpy-compatible). `IMCPanelMapper` resolves names from `MarkerName(IsotopeTag)` format (exact, case-insensitive, isotope tag, partial); reads both `*_full.csv` (per-ROI channel index) and `channel_labels.csv` (project panel with full/ilastik flags). Optional mask loading (`load_mask=True`) for `*_full_mask.tiff`. 18 new unit tests; 74 total pass, lint clean.
 - [x] **H&E image loading (any modality):** `load_he_image(he_path, library_id, adata)` injects any TIFF (RGB, grayscale, or CHW format) into `adata.uns['spatial'][library_id]['images']`. Handles grayscale-to-RGB, uint16/float-to-uint8, channel-first-to-HWC, and downsample. 5 unit tests.
 - [x] **IMC spatial plotting:** `sc_tools.pl.plot_imc_composite()` — same API as `plot_spatial_plain_he`; renders `images['hires']` RGB composite with channel label title. `sc_tools.pl.plot_imc_channel()` — renders single channel from `images['full']` (C, H, W) stack with inferno colormap and percentile-based vmax. Both exported in `sc_tools.pl.__all__`.
-- [ ] **Phase 0b checkpoint script:** Per-sample `data/{sample_id}/adata.p0.h5ad` saved by `scripts/ingest.py` before concatenation. Snakemake rule `adata_p0` produces sentinel `data/{sample_id}/.adata.p0.done`. Depends on IMC ingestion pipeline being wired first.
+- [x] **Phase 0b checkpoint script (`scripts/ingest.py`):** Generic CLI reads batch manifest, dispatches to modality loaders (`_get_loader()`), saves per-sample `data/{sample_id}/adata.p0.h5ad` (`--save-per-sample`), concatenates, saves final output. 5 tests in `test_ingest_script.py`.
+- [ ] **Phase 0b Snakemake rule:** `adata_p0` rule with sentinel `data/{sample_id}/.adata.p0.done`. Wire `scripts/ingest.py` into project Snakefiles.
 - [ ] **SpatialData (optional):** `data/{sample_id}/spatialdata.zarr` for Visium HD and Xenium when full image pyramids / subcellular coords needed. Loader via `spatialdata-io`.
 
 ### Checkpoint Validation
@@ -110,15 +111,16 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] Integrated into `scripts/run_qc_report.py` with `--modality`, `--mad-multiplier`, `--thresholds`, `--apply-filter` CLI args.
 - [x] 15 new unit tests (28 total in test_qc.py); all pass, lint clean.
 
-#### Date-Versioned QC Reports (restructured)
+#### Date-Versioned QC Reports (restructured — now 4 reports)
 - [x] **`generate_pre_filter_report()`**: Phase 1 entry. Output: `figures/QC/pre_filter_qc_YYYYMMDD.html`.
 - [x] **`generate_post_filter_report()`**: Phase 1-2 exit. Pre-vs-post comparison, HVG/SVG. Output: `figures/QC/post_filter_qc_YYYYMMDD.html`.
-- [x] **`generate_post_integration_report()`**: Phase 3 exit. UMAP grid, cluster distribution, integration metrics. Output: `figures/QC/post_integration_qc_YYYYMMDD.html`.
+- [x] **`generate_post_integration_report()`**: Phase 3 exit. UMAP grid, cluster distribution, integration benchmark. **Batch score is the primary metric** (celltype labels are preliminary). Output: `figures/QC/post_integration_qc_YYYYMMDD.html`. Accepts `comparison_df` to skip recomputation.
+- [x] **`generate_post_celltyping_report()`**: Phase 4 exit. Full bio + batch metrics with validated celltypes. Re-scores `results/tmp/integration_test/{method}.h5ad` if available. Output: `figures/QC/post_celltyping_qc_YYYYMMDD.html`. 3 tests.
 - [x] **`generate_all_qc_reports()`**: Orchestrator. `report_utils.py` for shared helpers.
 - [x] **`sc_tools.pl.qc_plots`**: `qc_umap_grid()`, `qc_cluster_distribution()`.
-- [x] **`bm/integration.py`**: `celltype_key` now optional (None = batch-only metrics).
-- [x] **CLI**: `--report pre_filter|post_filter|post_integration|all`. New args: `--adata-integrated`, `--batch-key`, `--celltype-key`, `--embedding-keys`, `--segmentation-masks-dir`.
-- [x] **Snakemake**: Three QC rules replace one (ggo_visium + create_project.sh). Optional segmentation scoring.
+- [x] **`bm/integration.py`**: `celltype_key` now optional (None = batch-only metrics). `compare_integrations()` with `comparison_df` pass-through.
+- [x] **CLI**: `--report pre_filter|post_filter|post_integration|post_celltyping|all`. New args: `--adata-integrated`, `--batch-key`, `--celltype-key`, `--embedding-keys`, `--segmentation-masks-dir`.
+- [x] **Snakemake**: Three QC rules replace one (ggo_visium + create_project.sh). Optional segmentation scoring. Fourth rule for post-celltyping pending.
 - [x] 12 new tests; 58 total pass, lint clean.
 
 - [ ] **Future:** MA plots (per gene/protein across samples).
@@ -141,6 +143,11 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **Integration:** `run_scvi` (default for Visium), `run_harmony` (PCA-based), `run_cytovi` (IMC protein data). All soft dependencies with install hints.
 - [x] **Reduction/Clustering:** `pca`, `neighbors` (auto-detects use_rep), `umap`, `leiden`, `cluster` (convenience wrapper). `run_utag` for spatial-aware clustering (soft dep).
 - [x] **Recipes:** `preprocess(adata, modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc", integration=..., ...)` dispatches to modality-specific pipelines. 38 unit tests, lint clean.
+- [x] **Integration methods (sc_tools.pp.integrate):** `run_scvi`, `run_scanvi`, `run_harmony` (direct harmonypy call with PyTorch tensor fix), `run_cytovi`, `run_imc_phenotyping` (log1p → per-ROI z-score → ComBat → BBKNN). ComBat via `scanpy.pp.combat`. All soft deps.
+- [x] **Harmony PyTorch fix:** Direct `harmonypy.run_harmony()` call bypassing scanpy wrapper; handles `Z_corr` as torch tensor (`.detach().cpu().numpy()`) or numpy array; validates shape orientation; stores `np.float32` contiguous array.
+- [x] **Integration benchmark workflow (`sc_tools.bm.integration`):** `run_full_integration_workflow()` orchestrator: subsample → run all candidate methods → benchmark with batch score as primary metric → select best → apply to full dataset. Stores intermediates in `results/tmp/integration_test/{method}.h5ad`. Records selected method in `results/integration_method.txt`. Helpers: `_stratified_subsample()`, `_resolve_best_method()`, `_apply_integration_method()`. 6 tests.
+- [x] **4 QC HTML reports:** Pre-filter (Phase 1), post-filter (Phase 1-2), post-integration (Phase 3, batch-focused), **post-celltyping** (Phase 4, full bio metrics). All 4 implemented. See Architecture.md Section 2.5.
+- [x] **`generate_post_celltyping_report()`:** Re-evaluate integration with validated celltypes. Optionally re-score all `results/tmp/integration_test/{method}.h5ad` candidates. Output: `figures/QC/post_celltyping_qc_YYYYMMDD.html`. 3 tests.
 - [ ] Post-normalization QC report → `figures/QC/post/`.
 - [ ] **No automated cell typing here** (moved to Phase 3.5b).
 
@@ -160,7 +167,7 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [x] **Gene set loaders:** `sc_tools.tl.gene_sets` — `load_hallmark()` (50 bundled MSigDB Hallmark sets; stripped from robin metadata; offline), `load_msigdb_json()`, `load_gmt()`, `list_gene_sets()`. Curation: `validate_gene_signatures()`, `merge_gene_signatures()`, `update_gene_symbols()`, `save_gene_signatures()`.
 - [x] **Group-level enrichment testing:** `sc_tools.tl.run_ora()` (Fisher exact + BH FDR), `sc_tools.tl.run_gsea_pseudobulk()` (pseudobulk prerank via gseapy; soft dep). Plotting: `sc_tools.pl.plot_gsea_dotplot()`. Optional deps: `pip install sc-tools[geneset]`.
 - [x] **Always apply:** Use `merge_gene_signatures(project_sigs, load_hallmark())` before calling `score_signature`. Project JSON + bundled Hallmark combined in one pass.
-- [ ] Automated cell typing (cluster → celltype); non-transformer and transformer models.
+- [x] **Automated cell typing (cluster → celltype):** `sc_tools.tl.celltype` subpackage. `annotate_celltypes(adata, method=...)` dispatcher with Protocol-based backend registry. Backends: ScType (pure numpy, cluster or per-cell, min_score threshold), custom hierarchical gating (DFS traversal, zero deps), CellTypist (soft dep), ensemble majority/weighted vote. Stubs for scArches, Geneformer, scGPT, SingleR. `apply_celltype_map()` writes `obs[celltype]`, `obs[celltype_broad]`, `uns[celltype_colors]` from JSON map. Bundled marker DBs (`immune_human_rna.json`, `immune_human_protein.json`, `protein_aliases.json`) and gating templates (`immune_broad.yaml`, `lymph_node.yaml`). `pyproject.toml` extras: `[celltyping]`, `[foundation]`. 37 unit tests; 574 total pass.
 - [x] **Cell-type deconvolution module:** `sc_tools.tl.deconvolution()` with backend registry (cell2location, tangram, destvi). `extract_reference_profiles()` for memory-optimized Cell2location. Per-library backed loading. Output: `obsm['cell_type_proportions']`, `obs['{method}_argmax']`. Thin wrappers in ggo_visium and robin. 14 unit tests.
 - [ ] Phase 3.5b is a separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Phase 4 is skippable if automated cell typing is adequate.
 
@@ -174,6 +181,7 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 - [ ] **Two mappings:** `cluster_id → celltype` (full, e.g. `Epithelial (Ki67/MKI67+)`), `cluster_id → celltype_broad` (without parenthesis, e.g. `Epithelial`).
 - [ ] **Per iteration:** matrixplot, UMAP (celltype, celltype_broad, clusters), scatter plots (raw/normalized, gene), signature genes per celltype.
 - [ ] Repeat until satisfactory. Save `celltype_map.json` under `projects/<platform>/<project>/metadata/`.
+- [x] **Post-celltyping QC report:** `generate_post_celltyping_report()` → `figures/QC/post_celltyping_qc_YYYYMMDD.html`. Purple header distinguishes from other reports. New `post_celltyping_qc_template.html`: celltype composition section (stacked bar + table), Phase 3 vs Phase 4 benchmark table (bio column primary/bold), UMAP grid, celltype distribution per sample, optional marker dotplot. `ranking_rows` bug fixed (was missing). New params: `comparison_df_p3`, `marker_genes`. `qc_celltype_abundance()` added to `sc_tools.pl`. Tab navigation across all 4 reports (inline embed — self-contained HTML). Reports 2 and 3 also embed prior reports as tabs. `_find_latest_report`, `_extract_body_content`, `_extract_head_css`, `_wrap_with_tabs` added to `report_utils.py`. `qc_post_celltyping` Snakemake rule added to robin and ggo_visium. 17 new tests; 574 total pass.
 
 ---
 
@@ -245,32 +253,48 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - **Phase 3 preprocessing module (sc_tools.pp):** Modality-aware preprocessing with GPU auto-detection (rapids-singlecell/scanpy). Normalization (`normalize_total`, `log_transform`, `scale`, `arcsinh_transform`, `filter_genes_by_pattern`, `backup_raw`). Integration (`run_scvi`, `run_harmony`, `run_cytovi`; all soft deps). Reduction/clustering (`pca`, `neighbors` with auto use_rep detection, `umap`, `leiden`, `cluster`, `run_utag`). Recipes: `preprocess(modality="visium"|"visium_hd"|"xenium"|"cosmx"|"imc")`. 38 unit tests pass, lint clean. skills.md updated with modality-specific preprocessing standards.
 - **Phase 0 ingestion module (sc_tools.ingest):** Batch manifest system (`config.py`), Space Ranger / Xenium / IMC command builders (`spaceranger.py`, `xenium.py`, `imc.py`), modality-specific AnnData loaders (`loaders.py`). Snakemake Phase 0 rules and validation sentinels in robin, ggo_visium, and create_project.sh template. 26 unit tests pass, lint clean.
 - **Checkpoint validation (sc_tools.validate):** `validate_p1` through `validate_p4` with auto-fix support. CLI wrapper `scripts/validate_checkpoint.py` for Snakemake integration. Validation sentinels enforce Architecture.md Section 2.2 metadata contracts. 30 unit tests pass, lint clean.
+- **IMC segmentation benchmark pipeline (sc_tools.bm + sc_tools.data.imc.benchmark):** Comprehensive 4-strategy benchmark framework. Data: `sc_tools/data/imc/benchmark/` (catalog for 8 internal + 5 public datasets, BenchmarkConfig with YAML I/O, ROI validation, IMC intensity normalization, DNA channel extraction, probability map generation). Strategies: (1) Ilastik prob map + DL, (2) DNA-only + prob map + DL, (3) HuggingFace pretrained (CellViT/SAM/HoVer-Net), (4) SegFormer trainable N-channel. Infrastructure: runner with resume, SLURM job generation, CLI (`python -m sc_tools.bm.cli`, 8 subcommands), cross-dataset analysis (Wilcoxon + BH). Extended metrics: panoptic quality (PQ = SQ x DQ), boundary F1, cell type preservation. 7 new plot functions, HTML report template, shared post-processing (watershed, area filter, hole fill). `benchmark-extended` dep group in pyproject.toml. 21 new files, 8 modified, 66 new tests (394 total pass), lint clean.
 - **Publication figure guidelines (skills.md §12):** Journal-specific standards for Nature/Cell/Science families. Dimension/DPI/font tables, Okabe-Ito and Paul Tol color-blind safe palettes, statistical reporting requirements, line weights, scale bars, marsilea for composite figures, pre-submission checklist. `pyproject.toml [viz]` extra for marsilea.
 - **skills.md reorganization:** Restructured into 4 logical parts: (I) Analysis Pipeline §1-6, (II) Spatial and Integrative Analysis §7-9, (III) Statistical Analysis and Visualization §10-12, (IV) Engineering and CI §13-17. Colors (old §11.5) merged with palettes into §11. References consolidated into Appendix.
 
 ### In Progress — Priority order
 
-**1. IMC ingestion pipeline (next)**
+**1. Automated cell typing + post-celltyping QC report — DONE (2026-03-06)**
+- [x] `sc_tools.tl.celltype` subpackage (Plan A): ScType, gating, CellTypist, ensemble; 37 tests.
+- [x] `generate_post_celltyping_report()` overhaul + tabbed navigation (Plan B): dedicated template, `qc_celltype_abundance()`, tab wrapping reports 2-4; 17 tests.
+- [x] `apply_celltype_map()` consolidates project-local `apply_leiden_mapping()` into sc_tools.
+
+**2. IMC ingestion pipeline (next)**
 - [ ] Wire end-to-end IMC Snakemake workflow (Phase 0a → 0b) for lymph_dlbcl and ggo-imc.
-- [ ] Create IMC batch manifest templates under `metadata/phase0/`.
-- [ ] Validate against existing processed data on HPC.
+- [x] Create IMC batch manifest templates under `metadata/phase0/`. ggo_human: `batch1_samples.tsv` (8 samples). ggo-imc: `scripts/generate_manifests.py` for auto-generating panel manifests.
+- [ ] Validate against existing processed data on HPC. Both IMC projects have non-standard per-ROI h5ad layouts (not standard `cells.h5ad`).
 
 **2. PyPI deployment (CI/CD step 4) — DONE**
 - [x] Ensure `pyproject.toml` builds clean wheel/sdist.
 - [x] GitHub Action for publishing on release (trusted publishing).
 - [x] LICENSE file (MIT, Yoffe Lab). `requires-python >= 3.11`. Package-data for bundled JSON/HTML.
-- [ ] One-time PyPI setup: add trusted publisher for `yoffelab/sc_tools` repo on pypi.org.
+- [x] One-time PyPI setup: trusted publisher configured on pypi.org; v0.1.0 released.
 
-**3. Phase 0b checkpoint script**
-- [ ] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.p0.h5ad`.
+**3. Registry schema extension + Phase DAG — DONE**
+- [x] `sc_tools/pipeline.py`: 10-slug DAG (`PhaseSpec`, `STANDARD_PHASES`, `extend_dag`, `get_available_next`, `get_phase_checkpoint`, `validate_dag`).
+- [x] Registry: `domain`/`imaging_modality` on projects; `file_role`/`validated`/`n_obs`/`n_vars` on datasets; `project_phases` table with composite PK.
+- [x] Alembic migrations: `0001_initial_schema.py` (baseline), `0002_tech_taxonomy_and_phase_tracking.py`.
+- [x] MCP server: `get_phase_status`, `set_phase_status` tools added.
+- [x] README.md Mermaid diagram fixed (TD layout, no nested subgraphs, new phase slug names).
+- [x] Architecture.md and CLAUDE.md updated with slug-to-old-code mapping.
+- [x] 59 new tests (500 total pass, 12 skipped), lint clean.
+
+**4. Phase 0b checkpoint script — PARTIALLY DONE**
+- [x] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.h5ad`. 5 tests.
 - [ ] Snakemake rule `adata_p0` with sentinel `data/{sample_id}/.adata.p0.done`.
 
 **4. Testing**
 - [ ] ggo_visium project tests: `projects/visium/ggo_visium/tests/`. Integration/smoke tests.
 - [ ] sc_tools package tests: `sc_tools/tests/`. Expand unit tests for pl, tl, qc.
 
-**5. Makefile and scripts cleanup**
-- [ ] Align Makefile targets with Phases 0–7.
+**5. Scripts cleanup**
+- [x] Project Makefiles deleted (ggo_visium, robin) — fully superseded by per-project Snakefiles.
+- [x] Root Makefile retained for developer tooling only (lint, format, test, docs).
 - [ ] Update scripts to use `$(PROJECT)/metadata/` paths.
 - [ ] Modular scripts: config-driven; import from `sc_tools`; thin orchestration only.
 
@@ -285,6 +309,8 @@ Sequential; each step builds on the previous. See skills.md Sections 13 and 16.
 | 3 | **Sphinx docs** | Done | `docs/` with pydata-sphinx-theme + myst-nb; `make docs`; `.readthedocs.yaml`; zero warnings. |
 | 4 | **PyPI deployment** | Done | `pyproject.toml` wheel/sdist; `.github/workflows/publish.yml` (trusted publishing). LICENSE added. |
 | 5 | **GitHub Actions** | Done | `.github/workflows/ci.yml`: lint, test matrix (py3.10/3.11 x ubuntu/macos), docs, Snakemake dry-run, Docker build. `docs.yml` absorbed. |
+| 6 | **Storage + Registry + MCP** | Done | `sc_tools/storage.py` (fsspec URI abstraction), `sc_tools/registry.py` (SQLAlchemy SQLite/PG), `sc_tools/mcp/` (FastMCP servers), `.mcp.json`. 441 tests pass. |
+| 7 | **Registry schema extension + Phase DAG** | Done | `sc_tools/pipeline.py` (10-slug DAG, `extend_dag`, `get_available_next`, `get_phase_checkpoint`). Registry: `domain`/`imaging_modality` on projects; `file_role`/`validated`/`n_obs`/`n_vars` on datasets; `project_phases` table. Alembic migrations `0001`+`0002`. MCP: `get_phase_status`, `set_phase_status`. README Mermaid fixed. 500 tests pass. |
 
 ### To Do (later)
 

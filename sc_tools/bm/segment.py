@@ -16,7 +16,7 @@ import logging
 
 import numpy as np
 
-__all__ = ["run_cellpose", "run_stardist"]
+__all__ = ["run_cellpose", "run_stardist", "run_deepcell", "run_all_strategy1"]
 
 logger = logging.getLogger(__name__)
 
@@ -126,13 +126,15 @@ def run_cellpose(
     except AttributeError:
         model_cls = models.CellposeModel
     model = model_cls(model_type=model_type, gpu=gpu)
-    mask, _flows, _styles, _diams = model.eval(
+    result = model.eval(
         img,
         diameter=diameter,
         channels=channels,
         flow_threshold=flow_threshold,
         cellprob_threshold=cellprob_threshold,
     )
+    # Cellpose v3 returns 4 values, v4+ returns 3 (no diams)
+    mask = result[0]
 
     logger.info("Cellpose: detected %d cells", len(np.unique(mask)) - 1)
     return mask.astype(np.uint32)
@@ -210,3 +212,101 @@ def run_stardist(
 
     logger.info("StarDist: detected %d cells", len(np.unique(mask)) - 1)
     return mask.astype(np.uint32)
+
+
+def run_deepcell(
+    image: np.ndarray,
+    nuclear_channels: list[int] | None = None,
+    membrane_channels: list[int] | None = None,
+    nuclear_idx: int = 1,
+    cytoplasm_idx: int = 2,
+    compartment: str = "whole-cell",
+    image_mpp: float = 1.0,
+    postprocess_kwargs: dict | None = None,
+) -> np.ndarray:
+    """Run DeepCell Mesmer segmentation.
+
+    Thin re-export of ``sc_tools.bm.deepcell_runner.run_deepcell``.
+    See that module for full documentation.
+
+    Returns
+    -------
+    Labeled segmentation mask, shape ``(H, W)``, dtype uint32.
+    """
+    from sc_tools.bm.deepcell_runner import run_deepcell as _run_deepcell
+
+    return _run_deepcell(
+        image,
+        nuclear_channels=nuclear_channels,
+        membrane_channels=membrane_channels,
+        nuclear_idx=nuclear_idx,
+        cytoplasm_idx=cytoplasm_idx,
+        compartment=compartment,
+        image_mpp=image_mpp,
+        postprocess_kwargs=postprocess_kwargs,
+    )
+
+
+def run_all_strategy1(
+    image: np.ndarray,
+    methods: list[str] | None = None,
+    nuclear_channels: list[int] | None = None,
+    membrane_channels: list[int] | None = None,
+    nuclear_idx: int = 1,
+    cytoplasm_idx: int = 2,
+    gpu: bool = False,
+) -> dict[str, np.ndarray]:
+    """Run all Strategy 1 methods on a single image (Ilastik prob map or intensity TIFF).
+
+    Parameters
+    ----------
+    image
+        Probability map ``(H, W, C)`` or intensity TIFF ``(C, H, W)``.
+    methods
+        Method names to run. Default: all available.
+    nuclear_channels
+        Nuclear channel indices for ``(C, H, W)`` input.
+    membrane_channels
+        Membrane channel indices for ``(C, H, W)`` input.
+    nuclear_idx
+        Nuclear channel index for ``(H, W, C)`` input.
+    cytoplasm_idx
+        Cytoplasm channel index for ``(H, W, C)`` input.
+    gpu
+        Whether to use GPU.
+
+    Returns
+    -------
+    Dict mapping method name to labeled mask.
+    """
+    if methods is None:
+        methods = ["cellpose_cyto2", "cellpose_cyto3", "cellpose_nuclei", "stardist", "deepcell"]
+
+    results = {}
+    common = {
+        "nuclear_channels": nuclear_channels,
+        "membrane_channels": membrane_channels,
+        "nuclear_idx": nuclear_idx,
+        "cytoplasm_idx": cytoplasm_idx,
+    }
+
+    for method in methods:
+        try:
+            if method.startswith("cellpose"):
+                model_type = method.replace("cellpose_", "") if "_" in method else "cyto2"
+                mask = run_cellpose(image, model_type=model_type, gpu=gpu, **common)
+            elif method == "stardist":
+                mask = run_stardist(
+                    image, **{k: v for k, v in common.items() if "membrane" not in k}
+                )
+            elif method == "deepcell":
+                mask = run_deepcell(image, **common)
+            else:
+                logger.warning("Unknown Strategy 1 method: %s", method)
+                continue
+            results[f"s1_{method}"] = mask
+            logger.info("Strategy 1 / %s: %d cells", method, len(np.unique(mask)) - 1)
+        except Exception as e:
+            logger.error("Strategy 1 / %s failed: %s", method, e)
+
+    return results

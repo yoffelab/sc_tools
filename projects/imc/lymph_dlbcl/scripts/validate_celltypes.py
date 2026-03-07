@@ -67,13 +67,16 @@ def compute_mean_expression(adata: ad.AnnData, groupby: str) -> pd.DataFrame:
         logger.warning(f"Too many groups ({len(groups)}); skipping")
         return pd.DataFrame()
 
+    # Use layers['raw'] if X is empty (p4 may have zeroed X)
+    data_matrix = adata.layers.get("raw", adata.X) if adata.layers else adata.X
+
     mean_expr = pd.DataFrame(index=groups, columns=adata.var_names, dtype=float)
     for group in groups:
         mask = adata.obs[groupby] == group
-        if hasattr(adata.X, "toarray"):
-            mean_expr.loc[group] = np.array(adata.X[mask].toarray().mean(axis=0)).flatten()
+        if hasattr(data_matrix, "toarray"):
+            mean_expr.loc[group] = np.array(data_matrix[mask].toarray().mean(axis=0)).flatten()
         else:
-            mean_expr.loc[group] = np.array(adata.X[mask].mean(axis=0)).flatten()
+            mean_expr.loc[group] = np.array(data_matrix[mask].mean(axis=0)).flatten()
 
     return mean_expr
 

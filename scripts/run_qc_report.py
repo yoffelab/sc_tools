@@ -11,20 +11,20 @@ Supports three report types aligned with pipeline phases:
 Usage:
   # Pre-filter only
   python scripts/run_qc_report.py --report pre_filter \\
-    --adata results/adata.raw.p1.h5ad --figures-dir figures
+    --adata results/adata.raw.h5ad --figures-dir figures
 
   # Post-filter (pre + post)
   python scripts/run_qc_report.py --report post_filter \\
-    --adata results/adata.raw.p1.h5ad --adata-post results/adata.annotated.p2.h5ad \\
+    --adata results/adata.raw.h5ad --adata-post results/adata.annotated.h5ad \\
     --figures-dir figures
 
   # Post-integration
   python scripts/run_qc_report.py --report post_integration \\
-    --adata-integrated results/adata.normalized.p3.h5ad --figures-dir figures
+    --adata-integrated results/adata.normalized.h5ad --figures-dir figures
 
   # Legacy (backward compat)
-  python scripts/run_qc_report.py --raw results/adata.annotated.p2.h5ad \\
-    --post results/adata.normalized.scored.p35.h5ad --figures-dir figures
+  python scripts/run_qc_report.py --raw results/adata.annotated.h5ad \\
+    --post results/adata.scored.h5ad --figures-dir figures
 """
 
 from __future__ import annotations
@@ -43,6 +43,7 @@ from sc_tools.qc import (  # noqa: E402
     calculate_qc_metrics,
     classify_samples,
     compute_sample_metrics,
+    generate_post_celltyping_report,
     generate_post_filter_report,
     generate_post_integration_report,
     generate_pre_filter_report,
@@ -223,6 +224,56 @@ def run_post_integration(
         (qc_dir / "post_integration_qc.done").touch()
 
 
+def run_post_celltyping(
+    adata_path, figures_dir, sample_col, modality, batch_key, celltype_key,
+    embedding_keys, segmentation_masks_dir, integration_test_dir, touch_done,
+    marker_genes=None, comparison_df_p3=None,
+):
+    """Generate post-celltyping QC report."""
+    import json as _json
+
+    adata = sc.read_h5ad(adata_path).copy()
+    sample_col = _resolve_sample_col(adata, sample_col)
+
+    qc_dir = figures_dir / "QC"
+    qc_dir.mkdir(parents=True, exist_ok=True)
+
+    # Parse marker_genes from JSON string or file path
+    _marker_genes = None
+    if marker_genes is not None:
+        _p = Path(marker_genes)
+        if _p.exists():
+            _marker_genes = _json.loads(_p.read_text())
+        else:
+            try:
+                _marker_genes = _json.loads(marker_genes)
+            except Exception:
+                pass
+
+    # Load comparison_df_p3 from CSV if provided
+    _comparison_df_p3 = None
+    if comparison_df_p3 is not None and Path(comparison_df_p3).exists():
+        import pandas as _pd
+
+        _comparison_df_p3 = _pd.read_csv(comparison_df_p3, index_col=0)
+
+    generate_post_celltyping_report(
+        adata, qc_dir,
+        celltype_key=celltype_key or "celltype",
+        embedding_keys=embedding_keys,
+        batch_key=batch_key,
+        sample_col=sample_col,
+        modality=modality,
+        segmentation_masks_dir=segmentation_masks_dir,
+        integration_test_dir=integration_test_dir,
+        marker_genes=_marker_genes,
+        comparison_df_p3=_comparison_df_p3,
+    )
+
+    if touch_done:
+        (qc_dir / "post_celltyping_qc.done").touch()
+
+
 def run_segmentation(
     adata_path, masks_dir, figures_dir, sample_col, modality, touch_done,
 ):
@@ -341,8 +392,8 @@ def run_qc_report(
             classified,
             sample_col=sample_col,
             modality=modality,
-            output_path=results_dir / "adata.raw.p1.h5ad",
-            backup_path=results_dir / "adata.raw.p1.backup.qcfail_included.h5ad",
+            output_path=results_dir / "adata.raw.h5ad",
+            backup_path=results_dir / "adata.raw.backup.qcfail_included.h5ad",
         )
 
     # ---- Post plots ----
@@ -430,7 +481,7 @@ def main():
     # New --report mode
     parser.add_argument(
         "--report", type=str, default=None,
-        choices=["pre_filter", "post_filter", "post_integration", "segmentation", "all"],
+        choices=["pre_filter", "post_filter", "post_integration", "post_celltyping", "segmentation", "all"],
         help="Report type (default: legacy mode if --raw provided, else 'all').",
     )
 
@@ -441,6 +492,10 @@ def main():
                         help="Path to post-filter AnnData (for post_filter report).")
     parser.add_argument("--adata-integrated", type=Path, default=None,
                         help="Path to post-integration AnnData (for post_integration report).")
+    parser.add_argument("--adata-celltyped", type=Path, default=None,
+                        help="Path to cell-typed AnnData (for post_celltyping report).")
+    parser.add_argument("--integration-test-dir", type=Path, default=None,
+                        help="Dir with per-method h5ad files from integration benchmark.")
 
     # Legacy --raw/--post
     parser.add_argument("--raw", type=Path, default=None,
@@ -479,6 +534,12 @@ def main():
     # Integration benchmark
     parser.add_argument("--run-benchmark", action="store_true",
                         help="Run full integration benchmark (for post_integration report).")
+
+    # Post-celltyping specific
+    parser.add_argument("--marker-genes", type=str, default=None,
+                        help='JSON string or file path: {"T cell": ["CD3E", "CD8A"]}.')
+    parser.add_argument("--comparison-df-p3", type=Path, default=None,
+                        help="CSV with Phase 3 integration benchmark results (for bio comparison).")
 
     # Filter options (legacy)
     parser.add_argument("--apply-filter", action="store_true",
@@ -591,6 +652,25 @@ def main():
                 run_benchmark=args.run_benchmark,
             )
             print(f"Post-integration QC report written to {args.figures_dir / 'QC'}/")
+
+    if report_type in ("post_celltyping", "all"):
+        adata_ct_path = args.adata_celltyped or args.adata
+        if adata_ct_path is None:
+            if report_type == "post_celltyping":
+                print("Error: --adata-celltyped (or --adata) required", file=sys.stderr)
+                sys.exit(1)
+            else:
+                print("Skipping post_celltyping report (--adata-celltyped not provided)", file=sys.stderr)
+        elif adata_ct_path.exists():
+            run_post_celltyping(
+                adata_ct_path, args.figures_dir, args.library_id_col, args.modality,
+                args.batch_key, args.celltype_key, embedding_keys, seg_dir,
+                str(args.integration_test_dir) if args.integration_test_dir else None,
+                touch_done,
+                marker_genes=args.marker_genes,
+                comparison_df_p3=args.comparison_df_p3,
+            )
+            print(f"Post-celltyping QC report written to {args.figures_dir / 'QC'}/")
 
     if report_type in ("segmentation", "all"):
         adata_path = args.adata or args.raw

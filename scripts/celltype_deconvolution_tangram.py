@@ -10,7 +10,9 @@ import tangram as tg
 # Configuration
 # -------------------------------
 sc_data_file = "results/seurat_object.h5ad"
-visium_hd_data_file = "results/adata.annotated.p2.h5ad"
+_ann_new = "results/adata.annotated.h5ad"
+_ann_old = "results/adata.annotated.p2.h5ad"
+visium_hd_data_file = _ann_new if os.path.exists(_ann_new) else _ann_old
 celltype_key = "cell.type"
 visium_batch_key = "sample_id"
 sc_batch_key = "Batch"

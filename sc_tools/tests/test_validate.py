@@ -257,6 +257,58 @@ class TestValidateCheckpoint:
         issues = validate_checkpoint(adata_p1, phase="p1")
         assert issues == []
 
+    # ── New slug-name tests ───────────────────────────────────────────────────
+
+    def test_slug_qc_filter_accepted(self, adata_p1):
+        """Slug 'qc_filter' is the preferred replacement for 'p1'."""
+        issues = validate_checkpoint(adata_p1, phase="qc_filter")
+        assert issues == []
+
+    def test_slug_metadata_attach_accepted(self, adata_p2):
+        issues = validate_checkpoint(adata_p2, phase="metadata_attach")
+        assert issues == []
+
+    def test_slug_preprocess_accepted(self, adata_p3):
+        issues = validate_checkpoint(adata_p3, phase="preprocess")
+        assert issues == []
+
+    def test_slug_scoring_accepted(self, adata_p35):
+        issues = validate_checkpoint(adata_p35, phase="scoring")
+        assert issues == []
+
+    def test_slug_celltype_manual_accepted(self, adata_p4):
+        issues = validate_checkpoint(adata_p4, phase="celltype_manual")
+        assert issues == []
+
+    def test_legacy_p1_emits_deprecation_warning(self, adata_p1):
+        """Old p1 code still works but emits DeprecationWarning."""
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            issues = validate_checkpoint(adata_p1, phase="p1")
+            assert issues == []
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "p1" in str(w[0].message)
+            assert "qc_filter" in str(w[0].message)
+
+    def test_legacy_p35_emits_deprecation_warning(self, adata_p35):
+        """Old p35 code still works but emits DeprecationWarning."""
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            validate_checkpoint(adata_p35, phase="p35")
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "scoring" in str(w[0].message)
+
+    def test_unknown_slug_raises(self, adata_p1):
+        """Unknown phase identifier (neither slug nor legacy code) raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown phase"):
+            validate_checkpoint(adata_p1, phase="bogus_slug")
+
 
 # ---------------------------------------------------------------------------
 # validate_file
@@ -273,7 +325,7 @@ class TestValidateFile:
         assert any("File not found" in i for i in issues)
 
     def test_roundtrip(self, adata_p1, tmp_path):
-        path = tmp_path / "adata.raw.p1.h5ad"
+        path = tmp_path / "adata.raw.h5ad"
         adata_p1.write_h5ad(path)
         issues = validate_file(path, phase="p1")
         assert issues == []
@@ -281,7 +333,7 @@ class TestValidateFile:
     def test_fix_and_resave(self, adata_p1, tmp_path):
         del adata_p1.obs["raw_data_dir"]
         adata_p1.obs["batch"] = "batch_val"
-        path = tmp_path / "adata.raw.p1.h5ad"
+        path = tmp_path / "adata.raw.h5ad"
         adata_p1.write_h5ad(path)
 
         issues = validate_file(path, phase="p1", fix=True)

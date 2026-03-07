@@ -7,6 +7,8 @@ Provides functions for adding statistical annotations to plots:
 - P-value annotations
 """
 
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

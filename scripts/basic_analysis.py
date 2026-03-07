@@ -9,7 +9,9 @@ from matplotlib.patches import Wedge
 # -----------------------------
 # Config supplied by you
 # -----------------------------
-ADATA_PATH = Path("results/adata.annotated.p2.h5ad")
+_ann_new = Path("results/adata.annotated.h5ad")
+_ann_old = Path("results/adata.annotated.p2.h5ad")
+ADATA_PATH = _ann_new if _ann_new.exists() else _ann_old
 cluster_key: str = "cluster"
 library_id_key: str = "library_id"
 

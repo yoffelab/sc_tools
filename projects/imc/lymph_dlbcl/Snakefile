@@ -22,7 +22,29 @@ Usage:
 
 configfile: "config.yaml"
 
+import os
+
 PANELS = config["panels"]  # ["immune", "stromal"]
+
+# ── Backwards-compat checkpoint resolver (panel-aware) ───────────────────────
+# Returns old path when the old file exists and the new one does not.
+def _compat(new, old):
+    return old if os.path.exists(old) and not os.path.exists(new) else new
+
+# Panel-specific checkpoint paths (drop .p1/.p2/.p4 suffix from old names).
+# Usage: ADATA_RAW["immune"], ADATA_ANN["stromal"], etc.
+ADATA_RAW = {
+    p: _compat(f"results/adata.{p}.raw.h5ad", f"results/adata.{p}.raw.p1.h5ad")
+    for p in PANELS
+}
+ADATA_ANN = {
+    p: _compat(f"results/adata.{p}.annotated.h5ad", f"results/adata.{p}.annotated.p2.h5ad")
+    for p in PANELS
+}
+ADATA_CELLTYPED = {
+    p: _compat(f"results/adata.{p}.celltyped.h5ad", f"results/adata.{p}.celltyped.p4.h5ad")
+    for p in PANELS
+}
 
 # ============================================================
 # Target rules
@@ -33,12 +55,12 @@ rule all:
         # Phase 0
         "outputs/h5ad_validation_report.md",
         # Phase 1
-        expand("results/adata.{panel}.raw.p1.h5ad", panel=PANELS),
-        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        [ADATA_RAW[p] for p in PANELS],
+        [ADATA_ANN[p] for p in PANELS],
         "results/adata.stromal.spatial.communities.h5ad",
         # Phase 3
         "outputs/celltype_validation_report.md",
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
         "metadata/lme_class_assignments.csv",
         # Figures
         "figures/manuscript/fig1/.done",
@@ -55,8 +77,8 @@ rule phase0:
 
 rule phase1:
     input:
-        expand("results/adata.{panel}.raw.p1.h5ad", panel=PANELS),
-        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        [ADATA_RAW[p] for p in PANELS],
+        [ADATA_ANN[p] for p in PANELS],
         "results/adata.stromal.spatial.communities.h5ad",
 
 rule phase2:
@@ -65,7 +87,7 @@ rule phase2:
 
 rule phase3:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
         "metadata/lme_class_assignments.csv",
 
 rule figures:
@@ -111,8 +133,8 @@ rule build_panel_adata:
         # Stromal: S2 full
         stromal=config["objects"]["stromal_full"],
     output:
-        immune="results/adata.immune.raw.p1.h5ad",
-        stromal="results/adata.stromal.raw.p1.h5ad",
+        immune="results/adata.immune.raw.h5ad",
+        stromal="results/adata.stromal.raw.h5ad",
     shell:
         "python scripts/build_panel_adata.py --panel both"
 
@@ -120,12 +142,12 @@ rule build_panel_adata:
 rule attach_clinical:
     """Attach clinical metadata to panel AnnData."""
     input:
-        immune="results/adata.immune.raw.p1.h5ad",
-        stromal="results/adata.stromal.raw.p1.h5ad",
+        immune=ADATA_RAW["immune"],
+        stromal=ADATA_RAW["stromal"],
         manifest="metadata/download_manifest_phase0.csv",
     output:
-        immune="results/adata.immune.annotated.p2.h5ad",
-        stromal="results/adata.stromal.annotated.p2.h5ad",
+        immune="results/adata.immune.annotated.h5ad",
+        stromal="results/adata.stromal.annotated.h5ad",
     shell:
         "python scripts/attach_clinical_metadata.py --panel both"
 
@@ -147,7 +169,7 @@ rule build_spatial:
 rule validate_celltypes:
     """Validate cell types by marker expression."""
     input:
-        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        [ADATA_ANN[p] for p in PANELS],
     output:
         report="outputs/celltype_validation_report.md",
         immune_heatmap="figures/QC/celltype_marker_heatmap_immune.pdf",
@@ -157,12 +179,12 @@ rule validate_celltypes:
 
 
 rule build_lme_classes:
-    """Assign LME classes and create P4 checkpoints."""
+    """Assign LME classes and create celltype_manual checkpoints."""
     input:
-        expand("results/adata.{panel}.annotated.p2.h5ad", panel=PANELS),
+        [ADATA_ANN[p] for p in PANELS],
         manifest="metadata/download_manifest_phase0.csv",
     output:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        expand("results/adata.{panel}.celltyped.h5ad", panel=PANELS),
         lme="metadata/lme_class_assignments.csv",
     shell:
         "python scripts/build_lme_classes.py --panel both"
@@ -174,7 +196,7 @@ rule build_lme_classes:
 
 rule fig1:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
     output:
         touch("figures/manuscript/fig1/.done"),
     shell:
@@ -183,7 +205,7 @@ rule fig1:
 
 rule fig2:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
         lme="metadata/lme_class_assignments.csv",
     output:
         touch("figures/manuscript/fig2/.done"),
@@ -193,7 +215,7 @@ rule fig2:
 
 rule fig3:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
         lme="metadata/lme_class_assignments.csv",
         manifest="metadata/download_manifest_phase0.csv",
     output:
@@ -228,7 +250,7 @@ rule fig5:
 
 rule supp_fig1:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
     output:
         touch("figures/manuscript/supp_fig1/.done"),
     shell:
@@ -237,7 +259,7 @@ rule supp_fig1:
 
 rule supp_fig2:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
     output:
         touch("figures/manuscript/supp_fig2/.done"),
     shell:
@@ -246,7 +268,7 @@ rule supp_fig2:
 
 rule supp_fig3:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
     output:
         touch("figures/manuscript/supp_fig3/.done"),
     shell:
@@ -255,7 +277,7 @@ rule supp_fig3:
 
 rule supp_fig4:
     input:
-        expand("results/adata.{panel}.celltyped.p4.h5ad", panel=PANELS),
+        [ADATA_CELLTYPED[p] for p in PANELS],
         lme="metadata/lme_class_assignments.csv",
     output:
         touch("figures/manuscript/supp_fig4/.done"),

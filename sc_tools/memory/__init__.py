@@ -1,5 +1,6 @@
 """Memory management utilities."""
 
+from .env import get_environment_info
 from .gpu import check_gpu_available
 from .profiling import (
     aggressive_cleanup,
@@ -16,4 +17,5 @@ __all__ = [
     "estimate_adata_memory",
     "check_memory_threshold",
     "check_gpu_available",
+    "get_environment_info",
 ]

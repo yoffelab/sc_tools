@@ -2,25 +2,26 @@
 """Supp Fig 7: RNA-protein comparison (IMC vs CosMx)."""
 
 import logging
+import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import yaml
-from scipy import stats
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
+
 FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "supp_fig7"
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     # This figure requires CosMx RNA data which may need separate download

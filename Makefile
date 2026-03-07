@@ -1,16 +1,14 @@
 # ============================================================================
-# sc_tools repo-root Makefile — Lint, test, and other repo-wide targets
+# sc_tools repo-root Makefile — Developer tooling (lint, test, docs)
 # ============================================================================
-# DEPRECATED: Prefer Snakemake (Snakefile at repo root: snakemake lint, test, all).
-# Containerized runs use Apptainer; see project_setup.md.
-#
-# Pipeline Makefile lives in projects/visium/ggo_visium/Makefile (run with
-# make -f projects/visium/ggo_visium/Makefile or PROJECT=...).
+# Pipeline runs use Snakemake per-project (projects/<platform>/<project>/Snakefile).
+# Containerized runs use Apptainer/Docker via scripts/run_container.sh.
 #
 # Usage:
 #   make lint        - Run ruff check + format on sc_tools (required before commit)
 #   make format      - Apply ruff format to sc_tools
 #   make test        - Run pytest for sc_tools (sc_tools/tests/)
+#   make docs        - Build Sphinx HTML docs
 # ============================================================================
 
 .PHONY: lint format test docs docs-clean docs-open

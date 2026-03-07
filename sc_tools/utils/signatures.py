@@ -2,6 +2,8 @@
 Signature utility functions.
 """
 
+from __future__ import annotations
+
 import anndata as ad
 import pandas as pd
 

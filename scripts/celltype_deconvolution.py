@@ -26,7 +26,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     deconvolution(
-        spatial_adata="results/adata.normalized.scored.p35.h5ad",
+        spatial_adata=(
+            "results/adata.scored.h5ad"
+            if __import__("os").path.exists("results/adata.scored.h5ad")
+            else "results/adata.normalized.scored.p35.h5ad"
+        ),
         sc_adata="results/seurat_object.h5ad",
         method=args.method,
         celltype_key="cell.type",

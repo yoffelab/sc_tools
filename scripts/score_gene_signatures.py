@@ -1,6 +1,6 @@
 """
-Gene signature scoring for ggo_visium: load p2 adata and metadata/gene_signatures.json,
-call sc_tools.tl.score_signature, write results/adata.normalized.scored.p35.h5ad.
+Gene signature scoring for ggo_visium: load annotated adata and metadata/gene_signatures.json,
+call sc_tools.tl.score_signature, write results/adata.scored.h5ad.
 
 Scores are stored in obsm (signature_score, signature_score_z) for traceability.
 Run from project root: python scripts/score_gene_signatures.py
@@ -29,9 +29,11 @@ if str(REPO_ROOT) not in sys.path:
 import scanpy as sc
 
 from sc_tools.tl import score_signature
-ADATA_PATH = GGO_ROOT / "results" / "adata.annotated.p2.h5ad"
+_ann_new = GGO_ROOT / "results" / "adata.annotated.h5ad"
+_ann_old = GGO_ROOT / "results" / "adata.annotated.p2.h5ad"
+ADATA_PATH = _ann_new if _ann_new.exists() else _ann_old
 SIGNATURES_PATH = GGO_ROOT / "metadata" / "gene_signatures.json"
-P35_PATH = GGO_ROOT / "results" / "adata.normalized.scored.p35.h5ad"
+P35_PATH = GGO_ROOT / "results" / "adata.scored.h5ad"
 
 
 def main():

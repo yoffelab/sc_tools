@@ -19,9 +19,17 @@ from sc_tools.tl import score_signature
 # Repo root: assume tests run from repo root (e.g. pytest sc_tools/tests/)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROBIN_JSON = REPO_ROOT / "projects" / "visium_hd" / "robin" / "metadata" / "gene_signatures.json"
-ROBIN_P3 = REPO_ROOT / "projects" / "visium_hd" / "robin" / "results" / "adata.normalized.p3.h5ad"
+_robin_p3_new = REPO_ROOT / "projects" / "visium_hd" / "robin" / "results" / "adata.normalized.h5ad"
+_robin_p3_old = (
+    REPO_ROOT / "projects" / "visium_hd" / "robin" / "results" / "adata.normalized.p3.h5ad"
+)
+ROBIN_P3 = _robin_p3_new if _robin_p3_new.exists() else _robin_p3_old
 GGO_JSON = REPO_ROOT / "projects" / "visium" / "ggo_visium" / "metadata" / "gene_signatures.json"
-GGO_P2 = REPO_ROOT / "projects" / "visium" / "ggo_visium" / "results" / "adata.annotated.p2.h5ad"
+_ggo_p2_new = REPO_ROOT / "projects" / "visium" / "ggo_visium" / "results" / "adata.annotated.h5ad"
+_ggo_p2_old = (
+    REPO_ROOT / "projects" / "visium" / "ggo_visium" / "results" / "adata.annotated.p2.h5ad"
+)
+GGO_P2 = _ggo_p2_new if _ggo_p2_new.exists() else _ggo_p2_old
 
 # Cap obs for real-adata tests to keep test time reasonable
 MAX_OBS_REAL = 500
@@ -150,7 +158,7 @@ def _load_and_subset_adata(path: Path, max_obs: int = MAX_OBS_REAL):
 
 @pytest.mark.skipif(
     not (ROBIN_P3.exists() and ROBIN_JSON.exists()),
-    reason="Robin adata.normalized.p3.h5ad and/or gene_signatures.json not found",
+    reason="Robin adata.normalized.h5ad (or legacy .p3.h5ad) and/or gene_signatures.json not found",
 )
 def test_score_signature_robin_real():
     """Run score_signature on real robin p3 adata and metadata/gene_signatures.json."""
@@ -172,7 +180,7 @@ def test_score_signature_robin_real():
 
 @pytest.mark.skipif(
     not (GGO_P2.exists() and GGO_JSON.exists()),
-    reason="ggo_visium adata.annotated.p2.h5ad and/or gene_signatures.json not found",
+    reason="ggo_visium adata.annotated.h5ad (or legacy .p2.h5ad) and/or gene_signatures.json not found",
 )
 def test_score_signature_ggo_visium_real():
     """Run score_signature on real ggo_visium p2 adata and metadata/gene_signatures.json."""

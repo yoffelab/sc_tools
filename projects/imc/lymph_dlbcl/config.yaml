@@ -20,9 +20,10 @@ objects:
   spatial_communities: "results/seurat_converted/stroma_spatial/SO_k30_community_cluster.h5ad"
   tme: "results/seurat_converted/s_tme_seurat.h5ad"
 
-# --- Clinical files (must exist after Phase 0 download) ---
+# --- Clinical files ---
 clinical:
-  clinical_full: "data/downloaded/clinical/DLBCL_clinical_full.csv"
+  clinical_tsv: "metadata/DLC380_clinical.tsv"      # Primary: 348 cases, proper survival/COO/IPI
+  clinical_full: "data/downloaded/clinical/DLBCL_clinical_full.csv"  # Legacy (download-dependent)
   punch_notes: "data/downloaded/clinical/CTMA_121_punch_notes.csv"
   mutation_table: "data/downloaded/clinical/CTMA121_mut_table.csv"
 

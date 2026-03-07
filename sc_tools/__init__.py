@@ -15,6 +15,24 @@ All code in this package should be generic and not project-specific.
 __version__ = "0.1.0"
 
 # Import main modules following scanpy pattern
-from . import bm, ingest, memory, pl, pp, qc, tl, utils, validate
+from . import bm, ingest, memory, pl, pp, qc, storage, tl, utils, validate
 
-__all__ = ["pp", "pl", "tl", "qc", "utils", "memory", "bm", "ingest", "validate"]
+# Registry is optional (requires sqlalchemy)
+try:
+    from . import registry
+except ImportError:
+    pass
+
+__all__ = [
+    "pp",
+    "pl",
+    "tl",
+    "qc",
+    "utils",
+    "memory",
+    "bm",
+    "ingest",
+    "validate",
+    "storage",
+    "registry",
+]

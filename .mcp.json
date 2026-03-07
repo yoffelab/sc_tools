@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "sc-tools": {
+      "command": "python",
+      "args": ["-m", "sc_tools.mcp.tools_server"],
+      "env": {
+        "SC_TOOLS_REGISTRY_URL": "sqlite:////Users/junbumkim/.sc_tools/registry.db"
+      }
+    },
+    "sc-registry": {
+      "command": "python",
+      "args": ["-m", "sc_tools.mcp.registry_server"],
+      "env": {
+        "SC_TOOLS_REGISTRY_URL": "sqlite:////Users/junbumkim/.sc_tools/registry.db"
+      }
+    }
+  }
+}

@@ -2,6 +2,8 @@
 Versioned figure saving: PDF + PNG with datetime prefix, dpi=300, under pdf/ and png/.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 

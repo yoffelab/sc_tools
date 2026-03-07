@@ -300,7 +300,9 @@ def create_tls_anndata(
 # Example usage:
 if __name__ == "__main__":
     # Load data
-    adata = sc.read("results/adata.normalized.scored.p35.h5ad")
+    _scored_new = "results/adata.scored.h5ad"
+    _scored_old = "results/adata.normalized.scored.p35.h5ad"
+    adata = sc.read(_scored_new if os.path.exists(_scored_new) else _scored_old)
 
     # Create TLS anndata
     adata_tls = create_tls_anndata(

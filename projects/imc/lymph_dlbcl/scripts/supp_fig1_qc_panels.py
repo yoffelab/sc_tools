@@ -2,16 +2,19 @@
 """Supp Fig 1: Panel composition and QC metrics."""
 
 import logging
+import sys
 from pathlib import Path
 
 import anndata as ad
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,6 +30,7 @@ def load_config():
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     config = load_config()
 
@@ -41,10 +45,13 @@ def main():
             logger.warning(f"No checkpoint for {panel}")
             continue
 
+        # Use layers['raw'] if X is empty (p4 may have zeroed X)
+        data_matrix = adata.layers.get("raw", adata.X) if adata.layers else adata.X
+
         # a) Marker list
         fig, ax = plt.subplots(figsize=(8, max(4, adata.n_vars * 0.25)))
-        ax.barh(range(adata.n_vars), np.array(adata.X.mean(axis=0)).flatten()
-                if not hasattr(adata.X, "toarray") else np.array(adata.X.toarray().mean(axis=0)).flatten())
+        ax.barh(range(adata.n_vars), np.array(data_matrix.mean(axis=0)).flatten()
+                if not hasattr(data_matrix, "toarray") else np.array(data_matrix.toarray().mean(axis=0)).flatten())
         ax.set_yticks(range(adata.n_vars))
         ax.set_yticklabels(adata.var_names, fontsize=7)
         ax.set_xlabel("Mean Intensity")
@@ -60,7 +67,7 @@ def main():
         fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 3, nrows * 2.5))
         axes = axes.flatten()
 
-        X_dense = adata.X.toarray() if hasattr(adata.X, "toarray") else np.array(adata.X)
+        X_dense = data_matrix.toarray() if hasattr(data_matrix, "toarray") else np.array(data_matrix)
         for i in range(n_markers):
             ax = axes[i]
             ax.hist(X_dense[:, i], bins=50, density=True, alpha=0.7, color="#4575b4")

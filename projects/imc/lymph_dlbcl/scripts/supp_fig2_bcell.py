@@ -2,10 +2,12 @@
 """Supp Fig 2: B cell subcluster analysis."""
 
 import logging
+import sys
 from pathlib import Path
 
 import anndata as ad
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,6 +20,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import apply_figure_style
+
 RESULTS_DIR = PROJECT_DIR / "results"
 SEURAT_DIR = RESULTS_DIR / "seurat_converted"
 FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "supp_fig2"
@@ -29,6 +34,7 @@ def load_config():
 
 
 def main():
+    apply_figure_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     # Load B cell subsets from both panels
@@ -79,12 +85,18 @@ def main():
         groups = adata.obs[cluster_col].unique()
         if len(groups) <= 30:
             mean_expr = pd.DataFrame(index=groups, columns=adata.var_names, dtype=float)
-            X_dense = adata.X.toarray() if hasattr(adata.X, "toarray") else np.array(adata.X)
+            # Use layers['raw'] if X is empty (p4 may have zeroed X)
+            data_matrix = adata.layers.get("raw", adata.X) if adata.layers else adata.X
+            X_dense = data_matrix.toarray() if hasattr(data_matrix, "toarray") else np.array(data_matrix)
             for g in groups:
                 mask = adata.obs[cluster_col] == g
                 mean_expr.loc[g] = X_dense[mask].mean(axis=0)
 
             z_scored = mean_expr.apply(lambda x: (x - x.mean()) / (x.std() + 1e-10), axis=0)
+
+            # Remove NaN/Inf values for clustermap compatibility
+            z_scored = z_scored.dropna(how="all", axis=0).dropna(how="all", axis=1).fillna(0)
+
             g = sns.clustermap(z_scored, cmap="RdBu_r", center=0, vmin=-2, vmax=2,
                                figsize=(12, max(4, len(groups) * 0.35)),
                                xticklabels=True, yticklabels=True)

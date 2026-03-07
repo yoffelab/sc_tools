@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Figure 5: ML framework for TME classification and IHC validation.
+Extended Data: ML framework for TME classification and IHC validation.
+
+NOTE: Manuscript Fig 5 is CosMx spatial transcriptomics (deferred — data TBD).
+This ML analysis is moved to extended data figures.
 
 Panels:
   a) ROC curves for multiclass LME classification (one-vs-rest)
@@ -19,13 +22,15 @@ Input:
     metadata/lme_class_assignments.csv
 
 Output:
-    figures/manuscript/fig5/
+    figures/manuscript/extended/ml_classification/
 """
 
 import logging
+import sys
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,17 +50,12 @@ from sklearn.preprocessing import LabelBinarizer, StandardScaler
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "fig5"
-METADATA_DIR = PROJECT_DIR / "metadata"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from figure_config import LME_COLORS
 
-LME_COLORS = {
-    "Cold": "#4575b4",
-    "CD206 Enriched": "#d73027",
-    "Cytotoxic": "#fc8d59",
-    "Stromal": "#91bfdb",
-    "T cell Regulated": "#fee090",
-}
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+FIG_DIR = PROJECT_DIR / "figures" / "manuscript" / "extended" / "ml_classification"
+METADATA_DIR = PROJECT_DIR / "metadata"
 
 
 def load_config():
@@ -80,11 +80,13 @@ def load_data(config: dict) -> tuple[pd.DataFrame, pd.Series] | tuple[None, None
     lme["sample"] = lme["sample"].astype(str)
     zscore.index = zscore.index.astype(str)
 
-    merged = zscore.join(lme.set_index("sample")[["LME_display"]], how="inner")
-    merged = merged.dropna(subset=["LME_display"])
+    # Support both LME_display and LME_class column names
+    lme_col = "LME_display" if "LME_display" in lme.columns else "LME_class"
+    merged = zscore.join(lme.set_index("sample")[[lme_col]], how="inner")
+    merged = merged.dropna(subset=[lme_col])
 
-    X = merged.drop(columns=["LME_display"])
-    y = merged["LME_display"]
+    X = merged.drop(columns=[lme_col])
+    y = merged[lme_col]
 
     logger.info(f"ML data: {X.shape[0]} samples, {X.shape[1]} features, {y.nunique()} classes")
     return X, y

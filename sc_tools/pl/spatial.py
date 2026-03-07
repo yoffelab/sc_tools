@@ -5,6 +5,8 @@ Generic helpers for spatial visualization of omics data (H&E image,
 categorical and continuous overlays). Built on scanpy.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import matplotlib.pyplot as plt

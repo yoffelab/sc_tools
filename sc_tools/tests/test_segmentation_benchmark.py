@@ -8,9 +8,12 @@ import pytest
 
 from sc_tools.bm.segmentation import (
     compare_segmentations,
+    compute_boundary_metrics,
+    compute_cell_type_preservation,
     compute_detection_metrics,
     compute_marker_quality,
     compute_morphology_metrics,
+    compute_panoptic_quality,
     compute_segmentation_accuracy,
     compute_size_distribution,
     compute_spatial_coherence,
@@ -304,3 +307,71 @@ class TestCompareSegmentations:
         df = compare_segmentations({"only": mask})
         assert len(df) == 1
         assert df["composite_score"].iloc[0] == 50.0
+
+
+# ---------------------------------------------------------------------------
+# Panoptic quality
+# ---------------------------------------------------------------------------
+
+
+class TestPanopticQuality:
+    def test_perfect_pq(self):
+        mask = _make_circular_mask(5)
+        result = compute_panoptic_quality(mask, mask)
+        assert result["pq"] == pytest.approx(1.0, abs=0.01)
+        assert result["sq"] == pytest.approx(1.0, abs=0.01)
+        assert result["dq"] == pytest.approx(1.0, abs=0.01)
+
+    def test_no_predictions(self):
+        gt = _make_circular_mask(5)
+        pred = np.zeros_like(gt)
+        result = compute_panoptic_quality(pred, gt)
+        assert result["pq"] == 0.0
+
+    def test_empty_both(self):
+        empty = np.zeros((50, 50), dtype=np.int32)
+        result = compute_panoptic_quality(empty, empty)
+        assert result["pq"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Boundary metrics
+# ---------------------------------------------------------------------------
+
+
+class TestBoundaryMetrics:
+    def test_perfect_boundaries(self):
+        mask = _make_circular_mask(5)
+        result = compute_boundary_metrics(mask, mask)
+        assert "boundary_f1_1px" in result
+        assert result["boundary_f1_1px"] == pytest.approx(1.0, abs=0.01)
+
+    def test_no_match(self):
+        gt = _make_circular_mask(5, size=200)
+        pred = np.zeros_like(gt)
+        pred[0:5, 0:5] = 1  # no overlap with gt
+        result = compute_boundary_metrics(pred, gt)
+        # Should have low F1 at strict tolerance
+        assert result["boundary_f1_1px"] < 0.5
+
+
+# ---------------------------------------------------------------------------
+# Cell type preservation
+# ---------------------------------------------------------------------------
+
+
+class TestCellTypePreservation:
+    def test_with_dict_labels(self):
+        mask = _make_circular_mask(5)
+        labels = np.unique(mask)
+        labels = labels[labels > 0]
+        type_map = {int(l): f"type_{l % 3}" for l in labels}
+        result = compute_cell_type_preservation(mask, mask, type_map)
+        assert result["type_preservation_rate"] == pytest.approx(1.0, abs=0.01)
+        assert result["n_matched"] == len(labels)
+
+    def test_empty_pred(self):
+        gt = _make_circular_mask(5)
+        pred = np.zeros_like(gt)
+        result = compute_cell_type_preservation(pred, gt, {})
+        assert result["type_preservation_rate"] == 0.0

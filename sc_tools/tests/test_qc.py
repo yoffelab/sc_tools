@@ -909,3 +909,272 @@ class TestSegmentationQcReport:
             tmp_path / "out",
         )
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Post-celltyping QC report tests
+# ---------------------------------------------------------------------------
+
+
+def test_generate_post_celltyping_report_basic(tmp_path):
+    """Post-celltyping report generates with validated celltypes."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_celltyping_report
+
+    adata = _multi_sample_adata(n_samples=3, n_obs_per=30)
+    calculate_qc_metrics(adata, inplace=True, percent_top=None)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obsm["X_pca"] = rng.randn(adata.n_obs, 10).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 5) for i in range(adata.n_obs)])
+    adata.obs["celltype"] = pd.Categorical([f"type_{i % 3}" for i in range(adata.n_obs)])
+    adata.obs["batch"] = adata.obs["library_id"]
+
+    result = generate_post_celltyping_report(
+        adata,
+        tmp_path,
+        celltype_key="celltype",
+        batch_key="batch",
+        sample_col="library_id",
+        date_stamp="20260306",
+    )
+    assert result.exists()
+    assert "post_celltyping" in result.name
+    assert "20260306" in result.name
+    content = result.read_text()
+    assert "Post-celltyping" in content
+
+
+def test_generate_post_celltyping_report_missing_celltype(tmp_path):
+    """Post-celltyping report raises ValueError when celltype is missing."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_celltyping_report
+
+    adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+
+    with pytest.raises(ValueError, match="celltype_key"):
+        generate_post_celltyping_report(
+            adata,
+            tmp_path,
+            celltype_key="celltype",
+        )
+
+
+def test_generate_post_celltyping_report_with_integration_test_dir(tmp_path):
+    """Post-celltyping report loads integration test embeddings."""
+    pytest.importorskip("jinja2")
+    from sc_tools.qc import generate_post_celltyping_report
+
+    adata = _multi_sample_adata(n_samples=2, n_obs_per=30)
+    calculate_qc_metrics(adata, inplace=True, percent_top=None)
+    rng = np.random.RandomState(42)
+    adata.obsm["X_umap"] = rng.randn(adata.n_obs, 2).astype(np.float32)
+    adata.obsm["X_pca"] = rng.randn(adata.n_obs, 10).astype(np.float32)
+    adata.obs["leiden"] = pd.Categorical([str(i % 5) for i in range(adata.n_obs)])
+    adata.obs["celltype"] = pd.Categorical([f"type_{i % 3}" for i in range(adata.n_obs)])
+    adata.obs["batch"] = adata.obs["library_id"]
+
+    # Create a fake integration test dir with a method h5ad
+    test_dir = tmp_path / "tmp" / "integration_test"
+    test_dir.mkdir(parents=True)
+    test_adata = adata.copy()
+    test_adata.obsm["X_pca_harmony"] = rng.randn(test_adata.n_obs, 10).astype(np.float32)
+    test_adata.write_h5ad(test_dir / "Harmony.h5ad")
+
+    result = generate_post_celltyping_report(
+        adata,
+        tmp_path,
+        celltype_key="celltype",
+        batch_key="batch",
+        integration_test_dir=test_dir,
+        date_stamp="20260306",
+    )
+    assert result.exists()
+    content = result.read_text()
+    assert "Post-celltyping" in content
+
+
+# ---------------------------------------------------------------------------
+# Plan B: report_utils helper tests
+# ---------------------------------------------------------------------------
+
+
+from sc_tools.qc.report_utils import (  # noqa: E402
+    _extract_body_content,
+    _extract_head_css,
+    _find_latest_report,
+    _wrap_with_tabs,
+)
+
+
+class TestReportUtils:
+    def test_extract_body_content_normal(self):
+        html = "<html><head><style>body{}</style></head><body><p>hello</p></body></html>"
+        result = _extract_body_content(html)
+        assert "<p>hello</p>" in result
+        assert "<html>" not in result
+
+    def test_extract_body_content_no_body_fallback(self):
+        result = _extract_body_content("<p>bare</p>")
+        assert "bare" in result
+
+    def test_extract_head_css_normal(self):
+        html = "<html><head><style>.foo{color:red}</style></head><body></body></html>"
+        assert ".foo" in _extract_head_css(html)
+
+    def test_extract_head_css_missing(self):
+        assert _extract_head_css("<html><body></body></html>") == ""
+
+    def test_find_latest_report(self, tmp_path):
+        (tmp_path / "pre_filter_qc_20260301.html").write_text("old")
+        (tmp_path / "pre_filter_qc_20260304.html").write_text("new")
+        result = _find_latest_report(tmp_path, "pre_filter")
+        assert result is not None
+        assert "20260304" in result.name
+
+    def test_find_latest_report_none(self, tmp_path):
+        assert _find_latest_report(tmp_path, "pre_filter") is None
+
+    def test_wrap_with_tabs_produces_html(self):
+        result = _wrap_with_tabs(
+            "Report 2",
+            "<div>current</div>",
+            [("Report 1", "<div>prev</div>", "body{}")],
+            "body{color:blue}",
+        )
+        assert "tab-nav" in result
+        assert "Report 2" in result
+        assert "Report 1" in result
+        assert "current" in result
+        assert "prev" in result
+        assert "showTab" in result
+
+    def test_wrap_with_tabs_no_previous(self):
+        result = _wrap_with_tabs("Report 1", "<div>standalone</div>", [], "")
+        assert "standalone" in result
+
+
+# ---------------------------------------------------------------------------
+# Plan B: post-celltyping report (new template + tab wrapping)
+# ---------------------------------------------------------------------------
+
+
+class TestPostCelltypingReportPlanB:
+    def test_generate_post_celltyping_report_uses_new_template(self, tmp_path):
+        """Post-celltyping report should use purple header distinct from report 3."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc import generate_post_celltyping_report
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        adata.obs["celltype"] = pd.Categorical(["A"] * 20 + ["B"] * 20)
+        adata.obs["batch"] = adata.obs["library_id"]
+        result = generate_post_celltyping_report(
+            adata, tmp_path, celltype_key="celltype", date_stamp="20260304"
+        )
+        assert result.exists()
+        assert "20260304" in result.name
+        content = result.read_text()
+        # Purple header distinguishes report 4 from report 3 (dark blue)
+        assert "6c3483" in content or "Post-celltyping" in content
+
+    def test_post_celltyping_report_contains_celltypes(self, tmp_path):
+        pytest.importorskip("jinja2")
+        from sc_tools.qc import generate_post_celltyping_report
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        adata.obs["celltype"] = pd.Categorical(["Alpha"] * 20 + ["Beta"] * 20)
+        adata.obs["batch"] = adata.obs["library_id"]
+        result = generate_post_celltyping_report(
+            adata, tmp_path, celltype_key="celltype", date_stamp="20260304"
+        )
+        content = result.read_text()
+        assert "Alpha" in content or "Beta" in content
+
+    def test_post_celltyping_missing_celltype_raises(self, tmp_path):
+        pytest.importorskip("jinja2")
+        from sc_tools.qc import generate_post_celltyping_report
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        with pytest.raises(ValueError, match="celltype_key"):
+            generate_post_celltyping_report(adata, tmp_path, celltype_key="celltype")
+
+    def test_post_celltyping_report_embeds_pre_filter_tab(self, tmp_path):
+        pytest.importorskip("jinja2")
+        from sc_tools.qc import generate_post_celltyping_report
+
+        fake_pre = tmp_path / "pre_filter_qc_20260304.html"
+        fake_pre.write_text(
+            "<html><head><style>.x{}</style></head><body><p>pre filter content</p></body></html>"
+        )
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        adata.obs["celltype"] = pd.Categorical(["A"] * 20 + ["B"] * 20)
+        adata.obs["batch"] = adata.obs["library_id"]
+        result = generate_post_celltyping_report(
+            adata, tmp_path, celltype_key="celltype", date_stamp="20260304"
+        )
+        content = result.read_text()
+        assert "tab-nav" in content
+        assert "pre filter content" in content
+
+    def test_post_filter_report_embeds_pre_filter(self, tmp_path):
+        """generate_post_filter_report embeds pre_filter as a tab when available."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc import generate_post_filter_report
+
+        # Write a fake pre-filter report
+        fake_pre = tmp_path / "pre_filter_qc_20260304.html"
+        fake_pre.write_text(
+            "<html><head><style>.x{}</style></head><body><p>pre filter panel</p></body></html>"
+        )
+
+        adata_pre, metrics, classified = _qc_fixtures()
+        adata_post = adata_pre[10:].copy()
+        calculate_qc_metrics(adata_post, inplace=True, percent_top=None)
+
+        result = generate_post_filter_report(
+            adata_pre,
+            adata_post,
+            metrics,
+            classified,
+            tmp_path,
+            sample_col="library_id",
+            modality="visium",
+            date_stamp="20260304",
+        )
+        content = result.read_text()
+        assert "tab-nav" in content
+        assert "pre filter panel" in content
+
+
+# ---------------------------------------------------------------------------
+# Plan B: qc_celltype_abundance plot
+# ---------------------------------------------------------------------------
+
+
+class TestCelltypeAbundancePlot:
+    def test_qc_celltype_abundance_basic(self):
+        import matplotlib
+        import matplotlib.pyplot as plt
+
+        matplotlib.use("Agg")
+        from sc_tools.pl import qc_celltype_abundance
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        adata.obs["celltype"] = pd.Categorical(["TypeA"] * 20 + ["TypeB"] * 20)
+        fig = qc_celltype_abundance(adata, celltype_key="celltype")
+        assert fig is not None
+        plt.close("all")
+
+    def test_qc_celltype_abundance_with_uns_colors(self):
+        import matplotlib
+        import matplotlib.pyplot as plt
+
+        matplotlib.use("Agg")
+        from sc_tools.pl import qc_celltype_abundance
+
+        adata = _multi_sample_adata(n_samples=2, n_obs_per=20)
+        adata.obs["celltype"] = pd.Categorical(["TypeA"] * 20 + ["TypeB"] * 20)
+        adata.uns["celltype_colors"] = ["#E69F00", "#56B4E9"]
+        fig = qc_celltype_abundance(adata, celltype_key="celltype")
+        assert fig is not None
+        plt.close("all")

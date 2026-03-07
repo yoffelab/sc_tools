@@ -43,7 +43,7 @@ pytest projects/cosmx_1k/tests/ -v
 
 | Path | Description |
 |------|-------------|
-| `results/adata.raw.p1.h5ad` | Phase 1 output |
-| `results/adata.normalized.scored.p35.h5ad` | Phase 3.5b output (primary analysis input) |
+| `results/adata.raw.h5ad` | qc_filter output |
+| `results/adata.scored.h5ad` | scoring output (primary analysis input) |
 | `metadata/gene_signatures.json` | Gene signatures |
 | `figures/manuscript/` | Publication figures |

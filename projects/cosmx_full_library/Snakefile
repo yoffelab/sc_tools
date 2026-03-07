@@ -3,6 +3,9 @@
 # Or from project dir: snakemake -d . -s Snakefile [target]
 # Runtime: auto-detected via run_container.sh (Docker on macOS, Apptainer on Linux).
 # Local conda: conda activate cosmx_full_library && SC_TOOLS_RUNTIME=none snakemake -d . -s Snakefile <target>
+#
+# Phase slugs: qc_filter, metadata_attach, preprocess, scoring, celltype_manual, biology
+# Backwards compat: _compat() resolves legacy p-code filenames if they exist on disk.
 
 configfile: "config.yaml"
 
@@ -16,7 +19,17 @@ def run_container(script, args=""):
     cmd = f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
     return cmd + (f' {args}' if args else '')
 
-# ---- Phase 0: Upstream Raw Data Processing ----
+# ── Backwards-compat checkpoint resolver ─────────────────────────────────────
+def _compat(new, old):
+    return old if os.path.exists(old) and not os.path.exists(new) else new
+
+ADATA_RAW       = _compat("results/adata.raw.h5ad",        "results/adata.raw.p1.h5ad")
+ADATA_ANN       = _compat("results/adata.annotated.h5ad",  "results/adata.annotated.p2.h5ad")
+ADATA_NORM      = _compat("results/adata.normalized.h5ad", "results/adata.normalized.p3.h5ad")
+ADATA_SCORED    = _compat("results/adata.scored.h5ad",     "results/adata.normalized.scored.p35.h5ad")
+ADATA_CELLTYPED = _compat("results/adata.celltyped.h5ad",  "results/adata.celltyped.p4.h5ad")
+
+# ---- ingest_raw: Upstream Raw Data Processing ----
 PHASE0_DIR = "metadata/phase0"
 
 def load_phase0_manifest():
@@ -28,103 +41,103 @@ def load_phase0_manifest():
 PHASE0_MANIFEST = load_phase0_manifest()
 PHASE0_SAMPLES = list(PHASE0_MANIFEST["sample_id"]) if len(PHASE0_MANIFEST) > 0 else []
 
-rule phase0:
+rule ingest_raw:
     input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
 
-# ---- Phase 1: Data Ingestion & QC ----
-rule adata_raw_p1:
-    output: "results/adata.raw.p1.h5ad"
+# ---- qc_filter: QC + Concatenation ----
+rule adata_qc_filter:
+    output: "results/adata.raw.h5ad"
     input: "scripts/ingest.py"
     shell: run_container("scripts/ingest.py")
 
-rule validate_p1:
-    input: "results/adata.raw.p1.h5ad"
-    output: touch("results/.adata.raw.p1.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.raw.p1.h5ad --phase p1 --fix"
+rule validate_qc_filter:
+    input: ADATA_RAW
+    output: touch("results/.adata.raw.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_RAW} --phase qc_filter --fix"
 
-rule phase1:
-    input: "results/adata.raw.p1.h5ad", "results/.adata.raw.p1.validated"
+rule qc_filter:
+    input: ADATA_RAW, "results/.adata.raw.validated"
 
-# ---- Phase 2: Metadata Attachment ----
-rule adata_annotated_p2:
-    output: "results/adata.annotated.p2.h5ad"
-    input: "results/adata.raw.p1.h5ad", "results/.adata.raw.p1.validated", "metadata/sample_metadata.csv"
+# ---- metadata_attach: Metadata Attachment ----
+rule adata_metadata_attach:
+    output: "results/adata.annotated.h5ad"
+    input: ADATA_RAW, "results/.adata.raw.validated", "metadata/sample_metadata.csv"
     shell: run_container("scripts/attach_metadata.py")
 
-rule validate_p2:
-    input: "results/adata.annotated.p2.h5ad"
-    output: touch("results/.adata.annotated.p2.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.annotated.p2.h5ad --phase p2 --fix"
+rule validate_metadata_attach:
+    input: ADATA_ANN
+    output: touch("results/.adata.annotated.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_ANN} --phase metadata_attach --fix"
 
-rule phase2:
-    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated"
+rule metadata_attach:
+    input: ADATA_ANN, "results/.adata.annotated.validated"
 
-# ---- Phase 3: Preprocessing ----
-rule adata_normalized_p3:
-    output: "results/adata.normalized.p3.h5ad"
-    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated", "scripts/preprocess.py"
+# ---- preprocess: Normalize + Integrate + Cluster ----
+rule adata_preprocess:
+    output: "results/adata.normalized.h5ad"
+    input: ADATA_ANN, "results/.adata.annotated.validated", "scripts/preprocess.py"
     shell: run_container("scripts/preprocess.py")
 
-rule validate_p3:
-    input: "results/adata.normalized.p3.h5ad"
-    output: touch("results/.adata.normalized.p3.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.p3.h5ad --phase p3 --fix"
+rule validate_preprocess:
+    input: ADATA_NORM
+    output: touch("results/.adata.normalized.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_NORM} --phase preprocess --fix"
 
-rule phase3:
-    input: "results/adata.normalized.p3.h5ad", "results/.adata.normalized.p3.validated"
+rule preprocess:
+    input: ADATA_NORM, "results/.adata.normalized.validated"
 
-# ---- Phase 3.5b: Gene Scoring ----
-rule adata_p35:
-    output: "results/adata.normalized.scored.p35.h5ad"
-    input: "results/adata.normalized.p3.h5ad", "results/.adata.normalized.p3.validated", "metadata/gene_signatures.json", "scripts/score_signatures.py"
+# ---- scoring: Gene Scoring + Auto Cell Typing ----
+rule adata_scoring:
+    output: "results/adata.scored.h5ad"
+    input: ADATA_NORM, "results/.adata.normalized.validated", "metadata/gene_signatures.json", "scripts/score_signatures.py"
     shell: run_container("scripts/score_signatures.py")
 
-rule validate_p35:
-    input: "results/adata.normalized.scored.p35.h5ad"
-    output: touch("results/.adata.normalized.scored.p35.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.scored.p35.h5ad --phase p35 --fix"
+rule validate_scoring:
+    input: ADATA_SCORED
+    output: touch("results/.adata.scored.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_SCORED} --phase scoring --fix"
 
-rule phase35b:
-    input: "results/adata.normalized.scored.p35.h5ad", "results/.adata.normalized.scored.p35.validated"
+rule scoring:
+    input: ADATA_SCORED, "results/.adata.scored.validated"
 
-# ---- Phase 4: Cell Typing ----
-rule adata_celltyped_p4:
-    output: "results/adata.celltyped.p4.h5ad"
-    input: "results/adata.normalized.scored.p35.h5ad", "results/.adata.normalized.scored.p35.validated", "metadata/celltype_map.json", "scripts/apply_celltype.py"
+# ---- celltype_manual: Manual Cell Typing (iterative, optional) ----
+rule adata_celltype_manual:
+    output: "results/adata.celltyped.h5ad"
+    input: ADATA_SCORED, "results/.adata.scored.validated", "metadata/celltype_map.json", "scripts/apply_celltype.py"
     shell: run_container("scripts/apply_celltype.py")
 
-rule validate_p4:
-    input: "results/adata.celltyped.p4.h5ad"
-    output: touch("results/.adata.celltyped.p4.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.celltyped.p4.h5ad --phase p4 --fix"
+rule validate_celltype_manual:
+    input: ADATA_CELLTYPED
+    output: touch("results/.adata.celltyped.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_CELLTYPED} --phase celltype_manual --fix"
 
-rule phase4:
-    input: "results/adata.celltyped.p4.h5ad", "results/.adata.celltyped.p4.validated"
+rule celltype_manual:
+    input: ADATA_CELLTYPED, "results/.adata.celltyped.validated"
 
 # ---- QC reports (date-versioned HTML) ----
 rule qc_pre_filter:
-    input: "results/adata.raw.p1.h5ad"
+    input: ADATA_RAW
     output: touch("figures/QC/pre_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report pre_filter --adata results/adata.raw.p1.h5ad --figures-dir figures --modality cosmx"
+        + f" --report pre_filter --adata {ADATA_RAW} --figures-dir figures --modality cosmx"
     )
 
 rule qc_post_filter:
-    input: "results/adata.raw.p1.h5ad", "results/adata.annotated.p2.h5ad"
+    input: ADATA_RAW, ADATA_ANN
     output: touch("figures/QC/post_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report post_filter --adata results/adata.raw.p1.h5ad"
-        + " --adata-post results/adata.annotated.p2.h5ad --figures-dir figures --modality cosmx"
+        + f" --report post_filter --adata {ADATA_RAW}"
+        + f" --adata-post {ADATA_ANN} --figures-dir figures --modality cosmx"
     )
 
 rule qc_post_integration:
-    input: "results/adata.normalized.p3.h5ad"
+    input: ADATA_NORM
     output: touch("figures/QC/post_integration_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report post_integration --adata-integrated results/adata.normalized.p3.h5ad"
+        + f" --report post_integration --adata-integrated {ADATA_NORM}"
         + " --figures-dir figures --modality cosmx"
     )
 
@@ -134,4 +147,4 @@ rule qc_report:
 
 # ---- Default ----
 rule all:
-    input: "results/adata.normalized.scored.p35.h5ad"
+    input: ADATA_SCORED

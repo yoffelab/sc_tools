@@ -1,0 +1,11 @@
+{
+  "T cell": {"positive": ["CD3", "CD45"], "negative": ["CD19", "CD56"]},
+  "CD4 T cell": {"positive": ["CD3", "CD4"], "negative": ["CD8a", "CD8"]},
+  "CD8 T cell": {"positive": ["CD3", "CD8a"], "negative": ["CD4"]},
+  "Treg": {"positive": ["CD3", "CD4", "FOXP3"], "negative": []},
+  "B cell": {"positive": ["CD19", "CD20"], "negative": ["CD3"]},
+  "NK cell": {"positive": ["CD56"], "negative": ["CD3", "CD19"]},
+  "Macrophage": {"positive": ["CD68", "CD45"], "negative": ["CD3"]},
+  "Epithelial": {"positive": ["PanCK"], "negative": ["CD45"]},
+  "Endothelial": {"positive": ["CD31"], "negative": ["PanCK"]}
+}

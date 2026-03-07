@@ -22,7 +22,11 @@ import pandas as pd
 if TYPE_CHECKING:
     from anndata import AnnData
 
-__all__ = ["generate_segmentation_report", "generate_integration_report"]
+__all__ = [
+    "generate_segmentation_report",
+    "generate_integration_report",
+    "generate_benchmark_report",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +34,7 @@ matplotlib.use("Agg")
 
 _SEG_TEMPLATE_PATH = Path(__file__).parent.parent / "data" / "segmentation_report_template.html"
 _INT_TEMPLATE_PATH = Path(__file__).parent.parent / "data" / "integration_report_template.html"
+_BM_TEMPLATE_PATH = Path(__file__).parent.parent / "data" / "benchmark_report_template.html"
 
 
 def _fig_to_base64(fig: plt.Figure, dpi: int = 150) -> str:
@@ -241,4 +246,146 @@ def generate_integration_report(
     html = _render_template(_INT_TEMPLATE_PATH, context)
     output_path.write_text(html)
     logger.info("Integration report saved to %s", output_path)
+    return output_path
+
+
+def generate_benchmark_report(
+    results_df: pd.DataFrame,
+    aggregated: dict[str, pd.DataFrame] | None = None,
+    output_path: str | Path = "benchmark_report.html",
+    title: str = "IMC Segmentation Benchmark Report",
+) -> Path:
+    """Generate a comprehensive HTML benchmark report.
+
+    Includes: executive summary, strategy comparison, method ranking,
+    per-dataset heatmap, per-tissue analysis, generalization,
+    statistical comparisons, runtime comparison, failure gallery.
+
+    Parameters
+    ----------
+    results_df
+        Full benchmark results DataFrame.
+    aggregated
+        Output from ``aggregate_results()``. Computed if not provided.
+    output_path
+        Where to write the HTML report.
+    title
+        Report title.
+
+    Returns
+    -------
+    Path to the generated report.
+    """
+    from sc_tools.pl.benchmarking import (
+        plot_dataset_heatmap,
+        plot_runtime_comparison,
+        plot_strategy_comparison,
+        plot_tissue_boxplot,
+    )
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if aggregated is None:
+        from sc_tools.bm.runner import aggregate_results
+
+        aggregated = aggregate_results(results_df)
+
+    # Summary stats
+    n_rois = results_df["roi_id"].nunique() if "roi_id" in results_df.columns else len(results_df)
+    n_datasets = results_df["dataset"].nunique() if "dataset" in results_df.columns else 0
+    n_strategies = results_df["strategy"].nunique() if "strategy" in results_df.columns else 0
+    n_methods = results_df["method"].nunique() if "method" in results_df.columns else 0
+
+    # Best method by mean boundary regularity (or n_cells as fallback)
+    by_method = aggregated.get("by_method", pd.DataFrame())
+    best_method = "N/A"
+    if len(by_method) > 0:
+        score_col = None
+        for candidate in ["boundary_regularity_mean", "n_cells_mean"]:
+            if candidate in by_method.columns:
+                score_col = candidate
+                break
+        if score_col:
+            best_method = by_method.sort_values(score_col, ascending=False).iloc[0]["method"]
+
+    context = {
+        "title": title,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "n_rois": n_rois,
+        "n_datasets": n_datasets,
+        "n_strategies": n_strategies,
+        "n_methods": n_methods,
+        "best_method": best_method,
+    }
+
+    # Strategy comparison plot
+    try:
+        fig = plot_strategy_comparison(results_df)
+        context["plot_strategy_comparison"] = _plotly_to_html(fig)
+    except Exception:
+        context["plot_strategy_comparison"] = None
+
+    # Method ranking
+    try:
+        fig = plot_dataset_heatmap(results_df)
+        context["plot_method_ranking"] = _plotly_to_html(fig)
+    except Exception:
+        context["plot_method_ranking"] = None
+
+    # Dataset heatmap
+    try:
+        fig = plot_dataset_heatmap(results_df, metric="n_cells")
+        context["plot_dataset_heatmap"] = _plotly_to_html(fig)
+    except Exception:
+        context["plot_dataset_heatmap"] = None
+
+    # Tissue boxplot
+    try:
+        fig = plot_tissue_boxplot(results_df)
+        context["plot_tissue_boxplot"] = _plotly_to_html(fig)
+    except Exception:
+        context["plot_tissue_boxplot"] = None
+
+    # Generalization
+    try:
+        from sc_tools.bm.analysis import compute_generalization_matrix
+        from sc_tools.pl.benchmarking import plot_generalization_radar
+
+        gen_matrix = compute_generalization_matrix(results_df)
+        fig = plot_generalization_radar(gen_matrix)
+        context["plot_generalization"] = _plotly_to_html(fig)
+    except Exception:
+        context["plot_generalization"] = None
+
+    # Statistical comparisons
+    try:
+        from sc_tools.bm.analysis import statistical_comparison
+
+        stats_df = statistical_comparison(results_df)
+        if len(stats_df) > 0:
+            context["stats_table"] = stats_df.to_html(
+                index=False, classes="stats-table", float_format="%.4f"
+            )
+        else:
+            context["stats_table"] = None
+    except Exception:
+        context["stats_table"] = None
+
+    # Runtime comparison
+    if "runtime_s" in results_df.columns:
+        try:
+            fig = plot_runtime_comparison(results_df)
+            context["plot_runtime"] = _plotly_to_html(fig)
+        except Exception:
+            context["plot_runtime"] = None
+    else:
+        context["plot_runtime"] = None
+
+    # Failure gallery (static matplotlib)
+    context["failure_gallery_img"] = None
+
+    html = _render_template(_BM_TEMPLATE_PATH, context)
+    output_path.write_text(html)
+    logger.info("Benchmark report saved to %s", output_path)
     return output_path

@@ -68,102 +68,66 @@ pip install -e ".[deconvolution,gpu]"
 The pipeline is **non-linear** with human-in-loop phases. Branching points and explicit input files (e.g. clinical metadata) bypass manual steps.
 
 ```mermaid
-flowchart LR
-    subgraph P0["Phase 0: Upstream Data Processing"]
-        direction TB
-        Z1["(0a) HPC: Space Ranger / Xenium Ranger / IMC pipeline"] --> Z2["(0b) Load per sample → adata.p0.h5ad"]
+flowchart TD
+    subgraph ING["Ingestion"]
+        Z1["ingest_raw\nHPC: SpaceRanger / IMC"] --> Z2["ingest_load\nLoad per-sample → adata.h5ad"]
     end
 
-    subgraph P1["Phase 1: QC and Concatenation"]
-        direction TB
-        A1[Load Phase 0 AnnData] --> A2[Per-sample QC + filter]
-        A2 --> A3[concat_samples()]
-        A3 --> A4["QC report: figures/QC/raw/"]
+    subgraph QC["QC and Metadata"]
+        A1["qc_filter\nQC + Concatenation"] --> A2["metadata_attach\nAttach clinical metadata"]
     end
 
-    subgraph P2["Phase 2: Metadata Attachment"]
-        direction TB
-        B1{Clinical map provided?} --> |"No: HIL"| B2[Prepare CSV/xlsx]
-        B2 --> B1
-        B1 --> |"Yes"| B3[Join to adata.obs]
+    subgraph PRE["Preprocessing"]
+        C1["preprocess\nNormalize + Integrate + Cluster"]
     end
 
-    subgraph P3["Phase 3: Preprocessing"]
-        direction TB
-        C1[Backup adata.raw] --> C2[Filter QC failures]
-        C2 --> C3[Normalize, batch correct, cluster]
-        C3 --> C5["QC report: figures/QC/post/"]
+    subgraph DEM["Demographics (branch)"]
+        D1["demographics\nCohort stats, Figure 1"]
     end
 
-    subgraph P35["Phase 3.5: Demographics"]
-        direction TB
-        D1[Cohort stats]
-        D2[Figure 1]
+    subgraph SCO["Scoring (branch)"]
+        D3["scoring\nGene scoring + Auto cell typing"]
     end
 
-    subgraph P35b["Phase 3.5b: Gene Scoring, Cell Typing, Deconvolution"]
-        direction TB
-        D3[Hallmark + project sigs in obsm]
-        D4[Automated cell typing]
-        D5[Cell-type deconvolution optional]
+    subgraph CT["Cell Typing (optional, iterative)"]
+        E1["celltype_manual\nCluster to celltype JSON"] --> E2{Satisfactory?}
+        E2 -->|No| E1
+        E2 -->|Yes| E3[Apply celltype labels]
     end
 
-    subgraph P4["Phase 4: Manual Cell Typing"]
-        direction TB
-        E1[Extract cluster_id] --> E2[JSON: cluster_id→celltype]
-        E2 --> E3{Satisfactory?}
-        E3 --> |"No: HIL"| E2
-        E3 --> |"Yes"| E4[Apply celltype + celltype_broad]
+    subgraph BIO["Biology"]
+        F1["biology\nSpatial analysis, figures"]
     end
 
-    subgraph P5P67["Phase 5 & 6–7"]
-        direction TB
-        subgraph P5["Phase 5: Downstream Biology"]
-            direction TB
-            F1[Spatial/process analysis]
-            F2[Colocalization, Moran's I]
-            F3[Publication figures]
-        end
-        subgraph P67["Phase 6–7: Meta Analysis"]
-            direction TB
-            G1[Phase 6: Aggregate ROI/patient]
-            G2[Phase 7: Downstream on aggregated]
-        end
+    subgraph META["Meta Analysis (optional)"]
+        G1["meta_analysis\nROI / patient aggregation"]
     end
 
-    P0 --> P1 --> P2 --> P3
-    P3 --> P35
-    P3 --> P35b
-    P35b --> P4 --> P5P67
-    P35b -.-> |"Skip Phase 4 if automated typing adequate"| P5P67
-    P1 -.-> |"START HERE: processed outs available"| P2
-    P2 -.-> |"START HERE: preprocessed AnnData available"| P3
-    P3 -.-> |"START HERE: clustered AnnData available"| P35b
-    P35b -.-> |"START HERE: phenotyped AnnData available"| P4
+    ING --> QC --> PRE
+    PRE --> DEM
+    PRE --> SCO
+    SCO --> CT
+    SCO -.->|skip manual CT| BIO
+    CT --> BIO
+    BIO --> META
 
-    style P0 fill:#f0f4ff
-    style P1 fill:#e3f2fd
-    style P2 fill:#fff3e0
-    style P3 fill:#e8f5e9
-    style P35 fill:#e1f5fe
-    style P35b fill:#e8eaf6
-    style P4 fill:#fff3e0
-    style P5 fill:#f3e5f5
-    style P67 fill:#fafafa
+    START_P3(["Entry: preprocessed AnnData"]) -.-> PRE
+    START_P35(["Entry: scored AnnData"]) -.-> SCO
+    START_P4(["Entry: celltyped AnnData"]) -.-> CT
 ```
 
-| Phase | Name | Human-in-Loop? | Checkpoint |
-|-------|------|----------------|------------|
-| **0a** | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` or `processed/{sample}/` |
-| **0b** | Load per-sample into AnnData | No | `data/{sample_id}/adata.p0.h5ad` |
-| **1** | QC and Concatenation | No | `results/adata.raw.p1.h5ad` |
-| **2** | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.p2.h5ad` |
-| **3** | Preprocessing | No | `results/adata.normalized.p3.h5ad` |
-| **3.5** | Demographics (branch) | Project-specific | Figure 1 |
-| **3.5b** | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.normalized.scored.p35.h5ad` |
-| **4** | Manual Cell Typing (skippable) | Yes (iterative) | `results/adata.celltyped.p4.h5ad` |
-| **5** | Downstream Biology | No | `figures/manuscript/` |
-| **6–7** | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` |
+| Slug | Old code | Name | Human-in-Loop? | Checkpoint |
+|------|----------|------|----------------|------------|
+| `ingest_raw` | p0a | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` |
+| `ingest_load` | p0b | Load per-sample into AnnData | No | `data/{sample_id}/adata.h5ad` |
+| `qc_filter` | p1 | QC and Concatenation | No | `results/adata.raw.h5ad` |
+| `metadata_attach` | p2 | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.h5ad` |
+| `preprocess` | p3 | Preprocessing | No | `results/adata.normalized.h5ad` |
+| `demographics` | p3.5 | Demographics (branch, optional) | Project-specific | Figure 1 |
+| `scoring` | p3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.scored.h5ad` |
+| `celltype_manual` | p4 | Manual Cell Typing (optional, iterative) | Yes | `results/adata.celltyped.h5ad` |
+| `biology` | p5 | Downstream Biology | No | `figures/manuscript/` |
+| `meta_analysis` | p6/p7 | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` |
 
 ---
 

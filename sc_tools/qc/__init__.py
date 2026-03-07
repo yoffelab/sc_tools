@@ -30,6 +30,7 @@ from .plots import (
 )
 from .report import (
     generate_all_qc_reports,
+    generate_post_celltyping_report,
     generate_post_filter_report,
     generate_post_integration_report,
     generate_pre_filter_report,
@@ -77,6 +78,7 @@ __all__ = [
     "generate_pre_filter_report",
     "generate_post_filter_report",
     "generate_post_integration_report",
+    "generate_post_celltyping_report",
     "generate_segmentation_qc_report",
     "generate_all_qc_reports",
 ]

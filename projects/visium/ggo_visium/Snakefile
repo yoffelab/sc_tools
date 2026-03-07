@@ -3,6 +3,20 @@
 # Or from project dir: snakemake -d . -s Snakefile [target]
 # Uses run_container.sh (OS-aware: Docker on macOS, Apptainer on Linux).
 # Override runtime: SC_TOOLS_RUNTIME=docker|apptainer; SIF: SC_TOOLS_SIF; Image: SC_TOOLS_IMAGE.
+#
+# ── Phase naming convention ───────────────────────────────────────────────────
+# Uses SEMANTIC SLUG names (new nomenclature). Legacy p-code filenames are
+# supported via _compat(): if an old-named file exists on disk and the new
+# name does not, the old path is used so existing runs are not re-triggered.
+#
+#   Slug              Checkpoint file
+#   metadata_attach   results/adata.annotated.h5ad
+#   scoring           results/adata.scored.h5ad
+#   celltype_manual   results/adata.celltyped.h5ad
+#
+# Note: ggo_visium uses project-specific names for Phase 1/3 checkpoints
+# (adata.annotation.h5ad, scvi.leiden.h5ad) that predate the standard scheme.
+# ─────────────────────────────────────────────────────────────────────────────
 
 configfile: "config.yaml"
 
@@ -13,6 +27,16 @@ PROJECT = config["project_rel"]
 
 def run_container(script):
     return f'cd {ROOT} && ./scripts/run_container.sh {PROJECT} python {script}'
+
+# ── Backwards-compat checkpoint resolver ─────────────────────────────────────
+def _compat(new, old):
+    return old if os.path.exists(old) and not os.path.exists(new) else new
+
+ADATA_RAW       = _compat("results/adata.raw.h5ad",        "results/adata.raw.p1.h5ad")
+ADATA_ANN       = _compat("results/adata.annotated.h5ad",  "results/adata.annotated.p2.h5ad")
+ADATA_NORM      = _compat("results/adata.normalized.h5ad", "results/adata.normalized.p3.h5ad")
+ADATA_SCORED    = _compat("results/adata.scored.h5ad",     "results/adata.normalized.scored.p35.h5ad")
+ADATA_CELLTYPED = _compat("results/adata.celltyped.h5ad",  "results/adata.celltyped.p4.h5ad")
 
 # ---- Phase 0: Upstream Raw Data Processing ----
 import pandas as pd
@@ -47,27 +71,27 @@ rule spaceranger_count:
             --output-dir=data/{wildcards.sample_id}
         """
 
-rule phase0:
+rule ingest_raw:
     input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
 
-# ---- Phase 1: Data Ingestion & QC ----
+# ---- qc_filter / Phase 1: Data Ingestion & QC ----
 rule adata_annotation:
     output: "results/adata.annotation.h5ad"
     input: "scripts/loupe2adata.py"
     shell: run_container("scripts/loupe2adata.py")
 
-rule adata_annotated_p2:
-    output: "results/adata.annotated.p2.h5ad"
+rule adata_metadata_attach:
+    output: "results/adata.annotated.h5ad"
     input: "results/adata.annotation.h5ad", "scripts/annotation2mask_img.py"
     shell: run_container("scripts/annotation2mask_img.py")
 
-rule validate_p2:
-    input: "results/adata.annotated.p2.h5ad"
-    output: touch("results/.adata.annotated.p2.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.annotated.p2.h5ad --phase p2 --fix"
+rule validate_metadata_attach:
+    input: ADATA_ANN
+    output: touch("results/.adata.annotated.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_ANN} --phase metadata_attach --fix"
 
-rule phase1:
-    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated"
+rule metadata_attach:
+    input: ADATA_ANN, "results/.adata.annotated.validated"
 
 # ---- Phase 2: Metadata Attachment ----
 # (metadata already joined in Phase 1 for this project)
@@ -75,7 +99,7 @@ rule phase1:
 # ---- Phase 3: Preprocessing ----
 rule scvi_h5ad:
     output: "results/scvi.h5ad"
-    input: "results/adata.annotated.p2.h5ad", "scripts/preprocessing.py"
+    input: ADATA_ANN, "scripts/preprocessing.py"
     shell: run_container("scripts/preprocessing.py")
 
 rule scvi_leiden:
@@ -83,30 +107,30 @@ rule scvi_leiden:
     input: "results/scvi.h5ad", "scripts/clustering.py"
     shell: run_container("scripts/clustering.py")
 
-rule phase3:
+rule preprocess:
     input: "results/scvi.leiden.h5ad"
 
-# ---- Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution ----
+# ---- scoring: Gene Scoring, Automated Cell Typing, Deconvolution ----
 rule scvi_leiden_phenotyped:
     output: "results/scvi.leiden.phenotyped.h5ad"
     input: "results/scvi.leiden.h5ad", "scripts/celltyping.py"
     shell: run_container("scripts/celltyping.py")
 
-rule adata_p35:
-    output: "results/adata.normalized.scored.p35.h5ad"
-    input: "results/adata.annotated.p2.h5ad", "results/.adata.annotated.p2.validated", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
+rule adata_scoring:
+    output: "results/adata.scored.h5ad"
+    input: ADATA_ANN, "results/.adata.annotated.validated", "metadata/gene_signatures.json", "scripts/score_gene_signatures.py"
     shell: run_container("scripts/score_gene_signatures.py")
 
-rule validate_p35:
-    input: "results/adata.normalized.scored.p35.h5ad"
-    output: touch("results/.adata.normalized.scored.p35.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.normalized.scored.p35.h5ad --phase p35 --fix"
+rule validate_scoring:
+    input: ADATA_SCORED
+    output: touch("results/.adata.scored.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/{ADATA_SCORED} --phase scoring --fix"
 
 DECONV_METHOD = config.get("deconv_method", "cell2location")
 
 rule adata_deconvolution:
     output: f"results/adata.deconvolution.{DECONV_METHOD}.h5ad"
-    input: "results/adata.normalized.scored.p35.h5ad", "results/seurat_object.h5ad", "scripts/celltype_deconvolution.py"
+    input: ADATA_SCORED, "results/seurat_object.h5ad", "scripts/celltype_deconvolution.py"
     shell: run_container("scripts/celltype_deconvolution.py") + f" --method {DECONV_METHOD}"
 
 rule deconvolution_spatial_plot:
@@ -127,81 +151,92 @@ rule deconvolution:
         f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
         f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
 
-rule phase35b:
+rule scoring:
     input:
         "results/scvi.leiden.phenotyped.h5ad",
-        "results/adata.normalized.scored.p35.h5ad",
+        ADATA_SCORED,
         f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
         f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
 
-# ---- QC reports (date-versioned HTML: pre-filter, post-filter, post-integration) ----
+# ---- QC reports (date-versioned HTML) ----
 rule qc_pre_filter:
-    input: "results/adata.raw.p1.h5ad"
+    input: ADATA_RAW
     output: touch("figures/QC/pre_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report pre_filter --adata results/adata.raw.p1.h5ad --figures-dir figures --modality visium"
+        + f" --report pre_filter --adata {ADATA_RAW} --figures-dir figures --modality visium"
     )
 
 rule qc_post_filter:
-    input: "results/adata.raw.p1.h5ad", "results/adata.annotated.p2.h5ad"
+    input: ADATA_RAW, ADATA_ANN
     output: touch("figures/QC/post_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report post_filter --adata results/adata.raw.p1.h5ad"
-        + " --adata-post results/adata.annotated.p2.h5ad --figures-dir figures --modality visium"
+        + f" --report post_filter --adata {ADATA_RAW}"
+        + f" --adata-post {ADATA_ANN} --figures-dir figures --modality visium"
     )
 
 rule qc_post_integration:
-    input: "results/adata.normalized.p3.h5ad"
+    input: ADATA_NORM
     output: touch("figures/QC/post_integration_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report post_integration --adata-integrated results/adata.normalized.p3.h5ad"
+        + f" --report post_integration --adata-integrated {ADATA_NORM}"
+        + " --figures-dir figures --modality visium"
+    )
+
+rule qc_post_celltyping:
+    input: ADATA_CELLTYPED
+    output: touch("figures/QC/post_celltyping_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + f" --report post_celltyping --adata-integrated {ADATA_CELLTYPED}"
+        + " --celltype-key celltype"
+        + " --integration-test-dir results/tmp/integration_test"
         + " --figures-dir figures --modality visium"
     )
 
 rule qc_report:
-    input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output
+    input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output, rules.qc_post_celltyping.output
     output: touch("figures/QC/qc_report.done")
 
-# ---- Phase 4: Manual Cell Typing (skippable) ----
+# ---- Phase 5: Downstream Biology ----
 rule tls_clustered:
     output: "results/tls_clustered.h5ad"
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/create_tls_anndata.py"
+    input: ADATA_SCORED, "scripts/create_tls_anndata.py"
     shell: run_container("scripts/create_tls_anndata.py")
 
 rule tls_analysis:
     output: touch("figures/manuscript/tls_analysis/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "results/tls_clustered.h5ad", "scripts/tls_analysis.py"
+    input: ADATA_SCORED, "results/tls_clustered.h5ad", "scripts/tls_analysis.py"
     shell: run_container("scripts/tls_analysis.py") + " && mkdir -p figures/manuscript/tls_analysis && touch figures/manuscript/tls_analysis/.done"
 
 rule spatial_analysis:
     output: touch("figures/manuscript/spatial_analysis/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/spatial_analysis.py"
+    input: ADATA_SCORED, "scripts/spatial_analysis.py"
     shell: run_container("scripts/spatial_analysis.py") + " && mkdir -p figures/manuscript/spatial_analysis && touch figures/manuscript/spatial_analysis/.done"
 
 rule tumor_differences:
     output: touch("figures/manuscript/tumor_differences/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/tumor_differences.py"
+    input: ADATA_SCORED, "scripts/tumor_differences.py"
     shell: run_container("scripts/tumor_differences.py") + " && mkdir -p figures/manuscript/tumor_differences && touch figures/manuscript/tumor_differences/.done"
 
 rule macrophage_localization:
     output: touch("figures/manuscript/macrophage_localization/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/macrophage_localization.py"
+    input: ADATA_SCORED, "scripts/macrophage_localization.py"
     shell: run_container("scripts/macrophage_localization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/stats && touch figures/manuscript/macrophage_localization/.done"
 
 rule neutrophil_cytotoxic_tcell_localization:
     output: touch("figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/neutrophil_cytotoxic_tcell_localization.py"
+    input: ADATA_SCORED, "scripts/neutrophil_cytotoxic_tcell_localization.py"
     shell: run_container("scripts/neutrophil_cytotoxic_tcell_localization.py") + " && mkdir -p figures/manuscript/neutrophil_cytotoxic_tcell_localization figures/stats && touch figures/manuscript/neutrophil_cytotoxic_tcell_localization/.done"
 
 rule process_colocalization:
     output: touch("figures/process_colocalization/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/process_colocalization.py"
+    input: ADATA_SCORED, "scripts/process_colocalization.py"
     shell: run_container("scripts/process_colocalization.py") + " && mkdir -p figures/process_colocalization results/process_colocalization && touch figures/process_colocalization/.done"
 
-rule phase4:
+rule biology:
     input:
         "figures/manuscript/tumor_differences/.done",
         "figures/manuscript/macrophage_localization/.done",
@@ -217,35 +252,31 @@ rule localization_only_direct:
 
 rule spatial_multipage_colocalization:
     output: touch("figures/manuscript/spatial_multipage_colocalization.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/spatial_multipage_colocalization.py"
+    input: ADATA_SCORED, "scripts/spatial_multipage_colocalization.py"
     shell: run_container("scripts/spatial_multipage_colocalization.py") + " && mkdir -p figures/manuscript/macrophage_localization figures/manuscript/neutrophil_cytotoxic_tcell_localization && touch figures/manuscript/spatial_multipage_colocalization.done"
 
-# ---- Phase 5: Downstream Biology ----
 rule spatial_plots:
     output: touch("figures/manuscript/spatial_plots/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/manuscript_spatial_plots.py"
+    input: ADATA_SCORED, "scripts/manuscript_spatial_plots.py"
     shell: run_container("scripts/manuscript_spatial_plots.py") + " && mkdir -p figures/manuscript/spatial_plots && touch figures/manuscript/spatial_plots/.done"
 
 rule signature_heatmaps:
     output: touch("figures/manuscript/signature_heatmaps/.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/signature_heatmap.py"
+    input: ADATA_SCORED, "scripts/signature_heatmap.py"
     shell: run_container("scripts/signature_heatmap.py") + " && mkdir -p figures/manuscript/signature_heatmaps && touch figures/manuscript/signature_heatmaps/.done"
 
 rule signature_heatmaps_versioned:
     output: touch("figures/manuscript/signature_heatmaps_versioned.done")
-    input: "results/adata.normalized.scored.p35.h5ad", "scripts/signature_heatmap_versioned.py"
+    input: ADATA_SCORED, "scripts/signature_heatmap_versioned.py"
     shell: run_container("scripts/signature_heatmap_versioned.py") + " && touch figures/manuscript/signature_heatmaps_versioned.done"
-
-rule phase5:
-    input: "figures/manuscript/spatial_plots/.done", "figures/manuscript/signature_heatmaps/.done"
 
 # ---- Default: full pipeline ----
 rule all:
     input:
-        "results/adata.annotated.p2.h5ad",
+        ADATA_ANN,
         "results/scvi.leiden.h5ad",
         "results/scvi.leiden.phenotyped.h5ad",
-        "results/adata.normalized.scored.p35.h5ad",
+        ADATA_SCORED,
         f"results/adata.deconvolution.{DECONV_METHOD}.h5ad",
         f"figures/deconvolution/{DECONV_METHOD}/spatial_proportions.{DECONV_METHOD}.pdf",
         "figures/manuscript/tumor_differences/.done",

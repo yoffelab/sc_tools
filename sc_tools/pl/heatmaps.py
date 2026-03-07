@@ -9,6 +9,8 @@ is a list of hex strings (one per category in order). If missing, we create
 and store it so all plotting stays consistent.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import matplotlib.colors as mcolors

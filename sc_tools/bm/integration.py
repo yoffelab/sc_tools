@@ -9,6 +9,7 @@ sklearn for core metrics (ASW, ARI, NMI, PCR).
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ __all__ = [
     "compute_composite_score",
     "compare_integrations",
     "run_integration_benchmark",
+    "run_full_integration_workflow",
 ]
 
 logger = logging.getLogger(__name__)
@@ -653,3 +655,241 @@ def _try_scib_benchmarker(
     except Exception:
         logger.debug("scib-metrics Benchmarker failed; falling back", exc_info=True)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Full Integration Workflow
+# ---------------------------------------------------------------------------
+
+# Maps method short name -> (integration function name, obsm key)
+_METHOD_APPLY: dict[str, tuple[str | None, str]] = {
+    "harmony": ("run_harmony", "X_pca_harmony"),
+    "bbknn": ("run_bbknn", "X_umap_bbknn"),
+    "combat": ("run_combat", "X_pca_combat"),
+    "scanorama": ("run_scanorama", "X_scanorama"),
+    "scvi": ("run_scvi", "X_scVI"),
+    "scanvi": ("run_scanvi", "X_scANVI"),
+    "cytovi": ("run_cytovi", "X_cytovi"),
+    "pca": (None, "X_pca"),
+}
+
+# Maps display names (from benchmark results) back to method short names
+_DISPLAY_TO_METHOD: dict[str, str] = {
+    "Harmony": "harmony",
+    "BBKNN": "bbknn",
+    "ComBat": "combat",
+    "Scanorama": "scanorama",
+    "scVI": "scvi",
+    "scANVI": "scanvi",
+    "CytoVI": "cytovi",
+    "Unintegrated (PCA)": "pca",
+    "Unintegrated": "pca",
+}
+
+
+def _stratified_subsample(
+    adata: AnnData,
+    key: str,
+    n: int | None = None,
+    fraction: float | None = None,
+    seed: int = 42,
+) -> AnnData:
+    """Subsample adata stratified by key, preserving proportions."""
+    rng = np.random.RandomState(seed)
+
+    if n is None and fraction is None:
+        n = min(50_000, adata.n_obs)
+    if fraction is not None:
+        n = max(1, int(adata.n_obs * fraction))
+    assert n is not None
+
+    if n >= adata.n_obs:
+        return adata.copy()
+
+    groups = adata.obs[key]
+    indices: list[int] = []
+    for val in groups.unique():
+        group_idx = np.where(groups == val)[0]
+        group_n = max(1, int(len(group_idx) * n / adata.n_obs))
+        group_n = min(group_n, len(group_idx))
+        chosen = rng.choice(group_idx, size=group_n, replace=False)
+        indices.extend(chosen.tolist())
+
+    indices = sorted(indices)[:n]
+    logger.info("Subsampled %d -> %d cells (stratified by %s)", adata.n_obs, len(indices), key)
+    return adata[indices].copy()
+
+
+def _resolve_best_method(comparison_df: pd.DataFrame) -> str:
+    """Pick the best method from comparison results.
+
+    Uses batch_score as primary metric (per Architecture.md Phase 3).
+    Falls back to overall_score if batch_score not available.
+    """
+    if "batch_score" in comparison_df.columns:
+        best_idx = comparison_df["batch_score"].idxmax()
+    else:
+        best_idx = comparison_df["overall_score"].idxmax()
+    return str(comparison_df.loc[best_idx, "method"])
+
+
+def _apply_integration_method(
+    adata: AnnData,
+    method: str,
+    batch_key: str,
+    celltype_key: str | None = None,
+    use_gpu: str | bool = "auto",
+    max_epochs: int = 200,
+) -> str:
+    """Apply a single integration method to adata. Returns obsm key."""
+    # Resolve display name to short name
+    short = _DISPLAY_TO_METHOD.get(method, method.lower())
+    if short not in _METHOD_APPLY:
+        raise ValueError(f"Unknown method: {method}. Valid: {list(_METHOD_APPLY)}")
+
+    func_name, obsm_key = _METHOD_APPLY[short]
+    if func_name is None:
+        # PCA baseline -- nothing to do
+        return obsm_key
+
+    import importlib
+
+    integrate_mod = importlib.import_module("sc_tools.pp.integrate")
+    func = getattr(integrate_mod, func_name)
+
+    kwargs: dict = {"batch_key": batch_key}
+    if short in ("scvi", "scanvi", "cytovi"):
+        kwargs["max_epochs"] = max_epochs
+        kwargs["use_gpu"] = use_gpu
+    if short == "scanvi" and celltype_key:
+        kwargs["labels_key"] = celltype_key
+
+    func(adata, **kwargs)
+    return obsm_key
+
+
+def run_full_integration_workflow(
+    adata: AnnData,
+    modality: str = "visium",
+    batch_key: str = "library_id",
+    celltype_key: str | None = None,
+    methods: list[str] | None = None,
+    output_dir: str | Path = "results",
+    *,
+    subsample_n: int | None = None,
+    subsample_fraction: float | None = None,
+    use_gpu: str | bool = "auto",
+    max_epochs: int = 200,
+    use_scib: str = "auto",
+    save_intermediates: bool = True,
+) -> tuple[AnnData, pd.DataFrame, str]:
+    """Run the full integration benchmark workflow.
+
+    Orchestrates: subsample -> benchmark all methods -> save intermediates
+    -> select best (by batch score) -> apply to full dataset.
+
+    Parameters
+    ----------
+    adata
+        AnnData with raw or normalized data. Modified in place with the
+        winning integration embedding.
+    modality
+        Data modality (determines default method set).
+    batch_key
+        Batch column in ``obs``.
+    celltype_key
+        Cell type column (optional; improves scoring but not required).
+    methods
+        Integration methods to benchmark. If ``None``, uses modality defaults.
+    output_dir
+        Directory for intermediate outputs.
+    subsample_n
+        Number of cells to subsample for benchmarking. Default: auto
+        (all if <50k cells, else 50k stratified by batch).
+    subsample_fraction
+        Fraction of cells to subsample (overrides subsample_n).
+    use_gpu
+        GPU setting for VAE methods.
+    max_epochs
+        Max training epochs for VAE methods.
+    use_scib
+        Metric computation backend.
+    save_intermediates
+        If True, save per-method embeddings to
+        ``output_dir/tmp/integration_test/{method}.h5ad``.
+
+    Returns
+    -------
+    tuple[AnnData, pd.DataFrame, str]
+        The AnnData with the best integration applied, the comparison
+        DataFrame, and the name of the selected method.
+    """
+    output_dir = Path(output_dir)
+
+    # Step 1: Subsample for benchmark
+    if subsample_n is not None or subsample_fraction is not None or adata.n_obs > 50_000:
+        subsample = _stratified_subsample(
+            adata, batch_key, n=subsample_n, fraction=subsample_fraction
+        )
+    else:
+        subsample = adata.copy()
+
+    # Step 2: Run benchmark on subsample
+    subsample, comparison_df = run_integration_benchmark(
+        subsample,
+        modality=modality,
+        batch_key=batch_key,
+        celltype_key=celltype_key,
+        methods=methods,
+        use_gpu=use_gpu,
+        max_epochs=max_epochs,
+        use_scib=use_scib,
+    )
+
+    if comparison_df.empty:
+        raise RuntimeError("Integration benchmark produced no results")
+
+    # Step 3: Save intermediates
+    if save_intermediates:
+        test_dir = output_dir / "tmp" / "integration_test"
+        test_dir.mkdir(parents=True, exist_ok=True)
+
+        for _, row in comparison_df.iterrows():
+            method_name = str(row["method"])
+            emb_key = str(row.get("embedding_key", ""))
+            if emb_key and emb_key in subsample.obsm:
+                try:
+                    method_adata = subsample.copy()
+                    method_adata.write_h5ad(test_dir / f"{method_name}.h5ad")
+                    logger.info("Saved intermediate: %s", test_dir / f"{method_name}.h5ad")
+                except Exception:
+                    logger.warning("Failed to save intermediate for %s", method_name, exc_info=True)
+
+    # Step 4: Select best method (batch score primary)
+    best_method = _resolve_best_method(comparison_df)
+    logger.info("Selected best integration method: %s", best_method)
+
+    # Step 5: Record selection
+    method_file = output_dir / "integration_method.txt"
+    method_file.parent.mkdir(parents=True, exist_ok=True)
+    method_file.write_text(best_method)
+
+    # Step 6: Apply best method to full dataset
+    try:
+        obsm_key = _apply_integration_method(
+            adata,
+            best_method,
+            batch_key=batch_key,
+            celltype_key=celltype_key,
+            use_gpu=use_gpu,
+            max_epochs=max_epochs,
+        )
+        logger.info("Applied %s to full dataset -> %s", best_method, obsm_key)
+    except Exception:
+        logger.warning(
+            "Failed to apply %s to full dataset; subsample results available",
+            best_method,
+            exc_info=True,
+        )
+
+    return adata, comparison_df, best_method

@@ -41,7 +41,7 @@ from .benchmarking import (
     plot_segmentation_overlay,
 )
 from .gsea import plot_gsea_dotplot
-from .qc_plots import qc_cluster_distribution, qc_umap_grid
+from .qc_plots import qc_celltype_abundance, qc_cluster_distribution, qc_umap_grid
 from .save import save_figure
 
 __all__ = [
@@ -79,5 +79,6 @@ __all__ = [
     # QC plots (post-integration)
     "qc_umap_grid",
     "qc_cluster_distribution",
+    "qc_celltype_abundance",
     "qc_plots",
 ]

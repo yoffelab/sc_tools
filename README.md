@@ -72,7 +72,7 @@ flowchart TD
     subgraph ING["Ingestion"]
         Z1["ingest_raw<br/>HPC: SpaceRanger / IMC"] --> CP0a[("data/{id}/outs/")]
         CP0a --> Z2["ingest_load<br/>Load per-sample → adata.h5ad"]
-        Z2 --> CP0b[("adata.h5ad<br/>obs: sample, library_id,<br/>raw_data_dir<br/>obsm: spatial<br/>X: raw counts")]
+        Z2 --> CP0b[("adata.p0.h5ad<br/>obs: sample, library_id,<br/>raw_data_dir<br/>obsm: spatial<br/>X: raw counts")]
     end
 
     subgraph QC["QC and Metadata"]
@@ -143,7 +143,7 @@ flowchart TD
 | Slug | Name | Checkpoint | Required Data | QC Report |
 |------|------|------------|---------------|-----------|
 | `ingest_raw` | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
-| `ingest_load` | Load per-sample into AnnData | `data/{sample_id}/adata.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
+| `ingest_load` | Load per-sample into AnnData | `data/{sample_id}/adata.p0.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
 | `qc_filter` | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw counts, all samples concatenated | `pre_filter_qc.html` |
 | `metadata_attach` | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` | All of `qc_filter` + clinical columns in `obs` | `post_filter_qc.html` |
 | `preprocess` | Preprocessing + Integration | `results/adata.normalized.h5ad` | `obsm[X_scvi]` (or embedding), `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |

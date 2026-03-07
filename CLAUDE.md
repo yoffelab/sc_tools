@@ -55,7 +55,7 @@ Phases are defined as semantic slugs in `sc_tools/pipeline.py`. Use `get_availab
 | Slug | Old code | Name | Checkpoint | Required Data | QC Report |
 |------|----------|------|------------|---------------|-----------|
 | `ingest_raw` | 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
-| `ingest_load` | 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
+| `ingest_load` | 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.p0.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
 | `qc_filter` | 1 | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw, concatenated | `pre_filter_qc.html` |
 | `metadata_attach` | 2 | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` | + clinical columns in `obs` | `post_filter_qc.html` |
 | `preprocess` | 3 | Preprocessing (+ integration benchmark) | `results/adata.normalized.h5ad` | `obsm[X_scvi or embedding]`, `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |

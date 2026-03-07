@@ -33,11 +33,22 @@ if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
 fi
 
 PROJECT_ROOT="${REPO_ROOT}/projects/${DATA_TYPE}/${PROJECT_NAME}"
-SUBDIRS=(data figures metadata scripts results outputs tests)
+SUBDIRS=(data metadata scripts results outputs tests)
 
 mkdir -p "$PROJECT_ROOT"
 for d in "${SUBDIRS[@]}"; do
   mkdir -p "${PROJECT_ROOT}/${d}"
+done
+
+# figures/ subdirectory layout
+# scratch/       — throwaway exploratory plots; never evaluated by the hook
+# QC/            — auto-generated pipeline QC reports; technical checks only
+# exploratory/   — analysis in progress; full eval, standard bar
+# insightful/    — clear biological findings, pre-manuscript; full eval, high bar
+# manuscript/    — final publication figures; full eval, strictest bar
+# supplementary/ — supplementary material; same bar as manuscript
+for fig_subdir in scratch QC exploratory insightful manuscript supplementary; do
+  mkdir -p "${PROJECT_ROOT}/figures/${fig_subdir}"
 done
 
 # ---- Phase 0 status template ----
@@ -174,7 +185,12 @@ pytest projects/${DATA_TYPE}/${PROJECT_NAME}/tests/ -v
 | \`results/adata.scored.h5ad\` | scoring phase output (primary analysis input) |
 | \`results/adata.celltyped.h5ad\` | celltype_manual phase output |
 | \`metadata/gene_signatures.json\` | Gene signatures |
-| \`figures/manuscript/\` | Publication figures |
+| \`figures/scratch/\` | Throwaway exploratory plots (hook skips) |
+| \`figures/QC/\` | Auto-generated pipeline QC reports |
+| \`figures/exploratory/\` | Analysis in progress |
+| \`figures/insightful/\` | Clear findings, pre-manuscript |
+| \`figures/manuscript/\` | Final publication figures |
+| \`figures/supplementary/\` | Supplementary material |
 CLAUDE_EOF
 
 # ---- config.yaml ----
@@ -398,5 +414,5 @@ echo "  3. Create conda env:"
 echo "       conda create -n ${PROJECT_NAME} python=3.11 -y"
 echo "       conda activate ${PROJECT_NAME}"
 echo "       uv pip install -e '.[deconvolution]'   # from repo root"
-echo "  4. Run (container): snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile phase1"
-echo "  5. Run (local):     conda activate ${PROJECT_NAME} && SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile phase1"
+echo "  4. Run (container): snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile qc_filter"
+echo "  5. Run (local):     conda activate ${PROJECT_NAME} && SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile qc_filter"

@@ -18,7 +18,7 @@
 | Phase | Name | Checkpoint | Required Data | QC Report |
 |-------|------|------------|---------------|-----------|
 | **0a** | Platform tools (HPC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
-| **0b** | Load per-sample AnnData | `data/{sample_id}/adata.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
+| **0b** | Load per-sample AnnData | `data/{sample_id}/adata.p0.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
 | **1** | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw, concatenated | `pre_filter_qc.html` |
 | **2** | Metadata Attachment | `results/adata.annotated.h5ad` | + clinical columns in `obs` | `post_filter_qc.html` |
 | **3** | Preprocessing | `results/adata.normalized.h5ad` | `obsm[X_scvi or embedding]`, `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |
@@ -32,7 +32,7 @@ All QC reports are date-versioned (`YYYYMMDD`) and saved to `figures/QC/`. Full 
 
 **Entry points:** Start at Phase 3 (preprocessed AnnData), Phase 3.5b (clustered AnnData), or Phase 4 (phenotyped AnnData). See README diagram for START HERE conditions.
 
-**Checkpoint nomenclature:** Standard result filenames and required metadata are defined and checked in **Architecture.md** (Section 2). Use `results/adata.raw.p1.h5ad`, `adata.annotated.p2.h5ad`, `adata.normalized.p3.h5ad`, `adata.normalized.scored.p35.h5ad`, `adata.celltyped.p4.h5ad`, and `adata.{level}.{feature}.h5ad` for aggregated (level ∈ roi|patient, feature ∈ mean_expression|celltype_frequency).
+**Checkpoint nomenclature:** Standard filenames are defined in **Architecture.md** (Section 2.1): `adata.raw.h5ad`, `adata.annotated.h5ad`, `adata.normalized.h5ad`, `adata.scored.h5ad`, `adata.celltyped.h5ad`, and `adata.{level}.{feature}.h5ad` for aggregated. Legacy p-code names (`adata.raw.p1.h5ad`, etc.) are accepted during transition but deprecated.
 
 ---
 
@@ -77,10 +77,10 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 **Input:** Per-sample `data/{sample_id}/adata.p0.h5ad` produced in Phase 0b.
 
-- [ ] **Load Phase 0 checkpoints:** Read all per-sample `adata.p0.h5ad` files listed in `metadata/phase0/all_samples.tsv`.
-- [ ] **Per-sample QC:** `sc_tools.qc.filter_spots()` (modality-aware thresholds); `compute_sample_metrics()`; `classify_samples()` (absolute + MAD outlier thresholds).
-- [ ] **Concatenation:** `concat_samples()` across all passing samples → `results/adata.raw.p1.h5ad`.
-- [ ] **Required annotations:** `obs['sample']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; no normalization.
+- [x] **Load Phase 0 checkpoints:** Read all per-sample `adata.p0.h5ad` files listed in `metadata/phase0/all_samples.tsv`. Implemented in `scripts/ingest.py`.
+- [x] **Per-sample QC:** `sc_tools.qc.filter_spots()` (modality-aware thresholds); `compute_sample_metrics()`; `classify_samples()` (absolute + MAD outlier thresholds).
+- [x] **Concatenation:** `concat_samples()` across all passing samples → `results/adata.raw.h5ad`. Implemented in `sc_tools.ingest`.
+- [x] **Required annotations:** `obs['sample']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; no normalization.
 
 #### QC Metrics (sc_tools.qc)
 - [x] Implement `calculate_qc_metrics` (wrap scanpy `pp.calculate_qc_metrics`; optional mt/hb patterns).

@@ -70,17 +70,22 @@ The pipeline is **non-linear** with human-in-loop phases. Branching points and e
 ```mermaid
 flowchart TD
     subgraph ING["Ingestion"]
-        Z1["ingest_raw<br/>HPC: SpaceRanger / IMC"] --> Z2["ingest_load<br/>Load per-sample → adata.h5ad"]
+        Z1["ingest_raw<br/>HPC: SpaceRanger / IMC"] --> CP0a[("data/{id}/outs/")]
+        CP0a --> Z2["ingest_load<br/>Load per-sample → adata.h5ad"]
+        Z2 --> CP0b[("adata.h5ad<br/>obs: sample, library_id,<br/>raw_data_dir<br/>obsm: spatial<br/>X: raw counts")]
     end
 
     subgraph QC["QC and Metadata"]
-        A1["qc_filter<br/>QC + Concatenation"] --> QR1[/"pre_filter_qc.html"/]
-        A1 --> A2["metadata_attach<br/>Attach clinical metadata"]
-        A2 --> QR2[/"post_filter_qc.html"/]
+        A1["qc_filter<br/>QC + Concatenation"] --> CP1[("adata.raw.h5ad<br/>obs: sample, raw_data_dir<br/>obsm: spatial<br/>X: raw counts, concatenated")]
+        CP1 --> QR1[/"pre_filter_qc.html"/]
+        CP1 --> A2["metadata_attach<br/>Attach clinical metadata"]
+        A2 --> CP2[("adata.annotated.h5ad<br/>+ clinical metadata in obs")]
+        CP2 --> QR2[/"post_filter_qc.html"/]
     end
 
     subgraph PRE["Preprocessing"]
-        C1["preprocess<br/>Normalize + Integrate + Cluster"] --> QR3[/"post_integration_qc.html<br/>Batch score = primary"/]
+        C1["preprocess<br/>Normalize + Integrate + Cluster"] --> CP3[("adata.normalized.h5ad<br/>obsm: X_scvi or embedding<br/>obs: leiden<br/>adata.raw: backed up")]
+        CP3 --> QR3[/"post_integration_qc.html<br/>Batch score = primary"/]
     end
 
     subgraph DEM["Demographics (branch)"]
@@ -88,14 +93,15 @@ flowchart TD
     end
 
     subgraph SCO["Scoring (branch)"]
-        D3["scoring<br/>Gene scoring + Auto cell typing"]
+        D3["scoring<br/>Gene scoring + Auto cell typing"] --> CP35[("adata.scored.h5ad<br/>obsm: signature_score,<br/>signature_score_z<br/>uns: signature_score_report")]
     end
 
     subgraph CT["Cell Typing (optional, iterative)"]
         E1["celltype_manual<br/>Cluster to celltype JSON"] --> E2{Satisfactory?}
         E2 -->|No| E1
         E2 -->|Yes| E3[Apply celltype labels]
-        E3 --> QR4[/"post_celltyping_qc.html<br/>Full bio + batch scores"/]
+        E3 --> CP4[("adata.celltyped.h5ad<br/>obs: celltype, celltype_broad")]
+        CP4 --> QR4[/"post_celltyping_qc.html<br/>Full bio + batch scores"/]
     end
 
     subgraph BIO["Biology"]
@@ -103,7 +109,7 @@ flowchart TD
     end
 
     subgraph META["Meta Analysis (optional)"]
-        G1["meta_analysis<br/>ROI / patient aggregation"]
+        G1["meta_analysis<br/>ROI / patient aggregation"] --> CP67[("adata.{level}.{feature}.h5ad<br/>obs indexed by roi or patient")]
     end
 
     ING --> QC --> PRE
@@ -118,24 +124,36 @@ flowchart TD
     START_P35(["Entry: scored AnnData"]) -.-> SCO
     START_P4(["Entry: celltyped AnnData"]) -.-> CT
 
+    style CP0a fill:#fff3e0,stroke:#ff9800
+    style CP0b fill:#fff3e0,stroke:#ff9800
+    style CP1 fill:#fff3e0,stroke:#ff9800
+    style CP2 fill:#fff3e0,stroke:#ff9800
+    style CP3 fill:#fff3e0,stroke:#ff9800
+    style CP35 fill:#fff3e0,stroke:#ff9800
+    style CP4 fill:#fff3e0,stroke:#ff9800
+    style CP67 fill:#fff3e0,stroke:#ff9800
     style QR1 fill:#e8f4e8,stroke:#4caf50
     style QR2 fill:#e8f4e8,stroke:#4caf50
     style QR3 fill:#e8f4e8,stroke:#4caf50
     style QR4 fill:#e8f4e8,stroke:#4caf50
 ```
 
-| Slug | Old code | Name | Human-in-Loop? | Checkpoint | QC Report |
-|------|----------|------|----------------|------------|-----------|
-| `ingest_raw` | p0a | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` | |
-| `ingest_load` | p0b | Load per-sample into AnnData | No | `data/{sample_id}/adata.h5ad` | |
-| `qc_filter` | p1 | QC and Concatenation | No | `results/adata.raw.h5ad` | `pre_filter_qc_YYYYMMDD.html` |
-| `metadata_attach` | p2 | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.h5ad` | `post_filter_qc_YYYYMMDD.html` |
-| `preprocess` | p3 | Preprocessing | No | `results/adata.normalized.h5ad` | `post_integration_qc_YYYYMMDD.html` |
-| `demographics` | p3.5 | Demographics (branch, optional) | Project-specific | Figure 1 | |
-| `scoring` | p3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.scored.h5ad` | |
-| `celltype_manual` | p4 | Manual Cell Typing (optional, iterative) | Yes | `results/adata.celltyped.h5ad` | `post_celltyping_qc_YYYYMMDD.html` |
-| `biology` | p5 | Downstream Biology | No | `figures/manuscript/` | |
-| `meta_analysis` | p6/p7 | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` | |
+### Phase summary
+
+| Slug | Name | Checkpoint | Required Data | QC Report |
+|------|------|------------|---------------|-----------|
+| `ingest_raw` | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
+| `ingest_load` | Load per-sample into AnnData | `data/{sample_id}/adata.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
+| `qc_filter` | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw counts, all samples concatenated | `pre_filter_qc.html` |
+| `metadata_attach` | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` | All of `qc_filter` + clinical columns in `obs` | `post_filter_qc.html` |
+| `preprocess` | Preprocessing + Integration | `results/adata.normalized.h5ad` | `obsm[X_scvi]` (or embedding), `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |
+| `demographics` | Demographics (branch, optional) | Figure 1 | Cohort metadata from `preprocess` | |
+| `scoring` | Gene Scoring / Auto Cell Typing | `results/adata.scored.h5ad` | `obsm[signature_score, signature_score_z]`, `uns[signature_score_report]` | |
+| `celltype_manual` | Manual Cell Typing (optional) | `results/adata.celltyped.h5ad` | All of `scoring` + `obs[celltype, celltype_broad]` | `post_celltyping_qc.html` |
+| `biology` | Downstream Biology | `figures/manuscript/` | Reads from `scoring` or `celltype_manual` checkpoint | |
+| `meta_analysis` | Meta Analysis (optional) | `results/adata.{level}.{feature}.h5ad` | `obs` indexed by roi/patient; `X` = aggregated feature | |
+
+> Checkpoints are orange circles in the diagram; QC reports are green parallelograms. All QC reports are date-versioned (`YYYYMMDD`) under `figures/QC/`. See [Architecture.md Section 2.2](Architecture.md) for full validation contracts.
 
 ---
 

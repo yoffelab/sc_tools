@@ -70,37 +70,37 @@ The pipeline is **non-linear** with human-in-loop phases. Branching points and e
 ```mermaid
 flowchart TD
     subgraph ING["Ingestion"]
-        Z1["ingest_raw\nHPC: SpaceRanger / IMC"] --> Z2["ingest_load\nLoad per-sample → adata.h5ad"]
+        Z1["ingest_raw<br/>HPC: SpaceRanger / IMC"] --> Z2["ingest_load<br/>Load per-sample → adata.h5ad"]
     end
 
     subgraph QC["QC and Metadata"]
-        A1["qc_filter\nQC + Concatenation"] --> A2["metadata_attach\nAttach clinical metadata"]
+        A1["qc_filter<br/>QC + Concatenation"] --> A2["metadata_attach<br/>Attach clinical metadata"]
     end
 
     subgraph PRE["Preprocessing"]
-        C1["preprocess\nNormalize + Integrate + Cluster"]
+        C1["preprocess<br/>Normalize + Integrate + Cluster"]
     end
 
     subgraph DEM["Demographics (branch)"]
-        D1["demographics\nCohort stats, Figure 1"]
+        D1["demographics<br/>Cohort stats, Figure 1"]
     end
 
     subgraph SCO["Scoring (branch)"]
-        D3["scoring\nGene scoring + Auto cell typing"]
+        D3["scoring<br/>Gene scoring + Auto cell typing"]
     end
 
     subgraph CT["Cell Typing (optional, iterative)"]
-        E1["celltype_manual\nCluster to celltype JSON"] --> E2{Satisfactory?}
+        E1["celltype_manual<br/>Cluster to celltype JSON"] --> E2{Satisfactory?}
         E2 -->|No| E1
         E2 -->|Yes| E3[Apply celltype labels]
     end
 
     subgraph BIO["Biology"]
-        F1["biology\nSpatial analysis, figures"]
+        F1["biology<br/>Spatial analysis, figures"]
     end
 
     subgraph META["Meta Analysis (optional)"]
-        G1["meta_analysis\nROI / patient aggregation"]
+        G1["meta_analysis<br/>ROI / patient aggregation"]
     end
 
     ING --> QC --> PRE

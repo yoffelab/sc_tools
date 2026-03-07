@@ -52,18 +52,20 @@ Plan mode (discussing only): updating Mission optional until execution begins.
 
 Phases are defined as semantic slugs in `sc_tools/pipeline.py`. Use `get_available_next(completed)` and `get_phase_checkpoint(slug)` to query the DAG programmatically.
 
-| Slug | Old code | Name | Checkpoint |
-|------|----------|------|------------|
-| `ingest_raw` | 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` |
-| `ingest_load` | 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.h5ad` |
-| `qc_filter` | 1 | QC and Concatenation | `results/adata.raw.h5ad` |
-| `metadata_attach` | 2 | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` |
-| `preprocess` | 3 | Preprocessing (+ integration benchmark) | `results/adata.normalized.h5ad` |
-| `demographics` | 3.5 | Demographics (parallel branch, optional) | Figure 1 |
-| `scoring` | 3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | `results/adata.scored.h5ad` |
-| `celltype_manual` | 4 | Manual Cell Typing (HIL, optional, iterative) | `results/adata.celltyped.h5ad` |
-| `biology` | 5 | Downstream Biology | `figures/manuscript/` |
-| `meta_analysis` | 6/7 | Meta Analysis (optional) | `results/adata.{level}.{feature}.h5ad` |
+| Slug | Old code | Name | Checkpoint | QC Report |
+|------|----------|------|------------|-----------|
+| `ingest_raw` | 0a | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` | |
+| `ingest_load` | 0b | Load per-sample into AnnData / SpatialData | `data/{sample_id}/adata.h5ad` | |
+| `qc_filter` | 1 | QC and Concatenation | `results/adata.raw.h5ad` | `pre_filter_qc.html` |
+| `metadata_attach` | 2 | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` | `post_filter_qc.html` |
+| `preprocess` | 3 | Preprocessing (+ integration benchmark) | `results/adata.normalized.h5ad` | `post_integration_qc.html` |
+| `demographics` | 3.5 | Demographics (parallel branch, optional) | Figure 1 | |
+| `scoring` | 3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | `results/adata.scored.h5ad` | |
+| `celltype_manual` | 4 | Manual Cell Typing (HIL, optional, iterative) | `results/adata.celltyped.h5ad` | `post_celltyping_qc.html` |
+| `biology` | 5 | Downstream Biology | `figures/manuscript/` | |
+| `meta_analysis` | 6/7 | Meta Analysis (optional) | `results/adata.{level}.{feature}.h5ad` | |
+
+All QC reports are date-versioned (`YYYYMMDD`) and saved to `figures/QC/`. See Architecture.md Section 2.5 for details.
 
 Legacy p1/p2/p3/p35/p4 filenames still accepted during transition.
 

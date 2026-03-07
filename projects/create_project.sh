@@ -349,6 +349,15 @@ rule qc_post_integration:
         + " --figures-dir figures --modality ${DATA_TYPE}"
     )
 
+rule qc_post_celltyping:
+    input: "results/adata.celltyped.h5ad", "results/.adata.celltyped.validated"
+    output: touch("figures/QC/post_celltyping_qc.done")
+    shell: (
+        run_container(ROOT + "/scripts/run_qc_report.py")
+        + " --report post_celltyping --adata-integrated results/adata.celltyped.h5ad"
+        + " --figures-dir figures --modality ${DATA_TYPE}"
+    )
+
 rule qc_report:
     input: rules.qc_pre_filter.output, rules.qc_post_filter.output, rules.qc_post_integration.output
     output: touch("figures/QC/qc_report.done")

@@ -15,17 +15,19 @@
 
 ### Phasing scheme (sc_tools)
 
-| Phase | Name | Notes |
-|-------|------|--------|
-| **0** | Upstream Raw Data Processing | (0a) Space Ranger / Xenium Ranger / IMC pipeline on HPC → `data/{sample_id}/outs/`. (0b) Load per-sample into AnnData/SpatialData → `data/{sample_id}/adata.p0.h5ad`. |
-| **1** | QC and Concatenation | Load Phase 0 per-sample AnnData; per-sample QC; filter; concat via `concat_samples()`; QC reports. |
-| **2** | Metadata Attachment | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. |
-| **3** | Preprocessing | Backup `adata.raw`; filter; normalize; **integration benchmark** (subsample → test all methods → select best by batch score → integrate full dataset); cluster. No automated cell typing. |
-| **3.5** | Demographics | Branch from Phase 3 (parallel to 3.5b). Cohort stats, Figure 1. |
-| **3.5b** | Gene scoring, automated cell typing, deconvolution | Branch from Phase 3 (parallel to 3.5). Hallmark + project signatures (target: `adata.obsm['sig:...']`); automated cell typing; optional deconvolution. Connects to Phase 4. |
-| **4** | Manual Cell Typing | Human-in-loop, iterative. Skippable if automated typing (3.5b) is adequate. **Post-celltyping QC report** with full bio metrics. |
-| **5** | Downstream Biology | Uses 3.5b outputs. Spatial/process analysis, figures. |
-| **6–7** | Meta Analysis | Optional. Aggregate ROI/patient; downstream on aggregated. |
+| Phase | Name | QC Report | Notes |
+|-------|------|-----------|--------|
+| **0** | Upstream Raw Data Processing | | (0a) Space Ranger / Xenium Ranger / IMC pipeline on HPC → `data/{sample_id}/outs/`. (0b) Load per-sample into AnnData/SpatialData → `data/{sample_id}/adata.p0.h5ad`. |
+| **1** | QC and Concatenation | `pre_filter_qc.html` | Load Phase 0 per-sample AnnData; per-sample QC; filter; concat via `concat_samples()`. |
+| **2** | Metadata Attachment | `post_filter_qc.html` | Human-in-loop unless `sample_metadata.csv`/`.xlsx` provided. Pre-vs-post comparison, HVG/SVG. |
+| **3** | Preprocessing | `post_integration_qc.html` | Backup `adata.raw`; filter; normalize; **integration benchmark** (batch score = primary metric); cluster. No automated cell typing. |
+| **3.5** | Demographics | | Branch from Phase 3 (parallel to 3.5b). Cohort stats, Figure 1. |
+| **3.5b** | Gene scoring, automated cell typing, deconvolution | | Branch from Phase 3 (parallel to 3.5). Hallmark + project signatures; automated cell typing; optional deconvolution. Connects to Phase 4. |
+| **4** | Manual Cell Typing | `post_celltyping_qc.html` | Human-in-loop, iterative. Skippable if automated typing (3.5b) is adequate. Full bio + batch scores with validated celltypes. |
+| **5** | Downstream Biology | | Uses 3.5b outputs. Spatial/process analysis, figures. |
+| **6–7** | Meta Analysis | | Optional. Aggregate ROI/patient; downstream on aggregated. |
+
+All QC reports are date-versioned (`YYYYMMDD`) and saved to `figures/QC/`. See Architecture.md Section 2.5.
 
 **Entry points:** Start at Phase 3 (preprocessed AnnData), Phase 3.5b (clustered AnnData), or Phase 4 (phenotyped AnnData). See README diagram for START HERE conditions.
 

@@ -74,11 +74,13 @@ flowchart TD
     end
 
     subgraph QC["QC and Metadata"]
-        A1["qc_filter<br/>QC + Concatenation"] --> A2["metadata_attach<br/>Attach clinical metadata"]
+        A1["qc_filter<br/>QC + Concatenation"] --> QR1[/"pre_filter_qc.html"/]
+        A1 --> A2["metadata_attach<br/>Attach clinical metadata"]
+        A2 --> QR2[/"post_filter_qc.html"/]
     end
 
     subgraph PRE["Preprocessing"]
-        C1["preprocess<br/>Normalize + Integrate + Cluster"]
+        C1["preprocess<br/>Normalize + Integrate + Cluster"] --> QR3[/"post_integration_qc.html<br/>Batch score = primary"/]
     end
 
     subgraph DEM["Demographics (branch)"]
@@ -93,6 +95,7 @@ flowchart TD
         E1["celltype_manual<br/>Cluster to celltype JSON"] --> E2{Satisfactory?}
         E2 -->|No| E1
         E2 -->|Yes| E3[Apply celltype labels]
+        E3 --> QR4[/"post_celltyping_qc.html<br/>Full bio + batch scores"/]
     end
 
     subgraph BIO["Biology"]
@@ -114,20 +117,25 @@ flowchart TD
     START_P3(["Entry: preprocessed AnnData"]) -.-> PRE
     START_P35(["Entry: scored AnnData"]) -.-> SCO
     START_P4(["Entry: celltyped AnnData"]) -.-> CT
+
+    style QR1 fill:#e8f4e8,stroke:#4caf50
+    style QR2 fill:#e8f4e8,stroke:#4caf50
+    style QR3 fill:#e8f4e8,stroke:#4caf50
+    style QR4 fill:#e8f4e8,stroke:#4caf50
 ```
 
-| Slug | Old code | Name | Human-in-Loop? | Checkpoint |
-|------|----------|------|----------------|------------|
-| `ingest_raw` | p0a | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` |
-| `ingest_load` | p0b | Load per-sample into AnnData | No | `data/{sample_id}/adata.h5ad` |
-| `qc_filter` | p1 | QC and Concatenation | No | `results/adata.raw.h5ad` |
-| `metadata_attach` | p2 | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.h5ad` |
-| `preprocess` | p3 | Preprocessing | No | `results/adata.normalized.h5ad` |
-| `demographics` | p3.5 | Demographics (branch, optional) | Project-specific | Figure 1 |
-| `scoring` | p3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.scored.h5ad` |
-| `celltype_manual` | p4 | Manual Cell Typing (optional, iterative) | Yes | `results/adata.celltyped.h5ad` |
-| `biology` | p5 | Downstream Biology | No | `figures/manuscript/` |
-| `meta_analysis` | p6/p7 | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` |
+| Slug | Old code | Name | Human-in-Loop? | Checkpoint | QC Report |
+|------|----------|------|----------------|------------|-----------|
+| `ingest_raw` | p0a | Platform tools (Space Ranger / Xenium / IMC) | No | `data/{sample_id}/outs/` | |
+| `ingest_load` | p0b | Load per-sample into AnnData | No | `data/{sample_id}/adata.h5ad` | |
+| `qc_filter` | p1 | QC and Concatenation | No | `results/adata.raw.h5ad` | `pre_filter_qc_YYYYMMDD.html` |
+| `metadata_attach` | p2 | Metadata Attachment | Yes (unless map provided) | `results/adata.annotated.h5ad` | `post_filter_qc_YYYYMMDD.html` |
+| `preprocess` | p3 | Preprocessing | No | `results/adata.normalized.h5ad` | `post_integration_qc_YYYYMMDD.html` |
+| `demographics` | p3.5 | Demographics (branch, optional) | Project-specific | Figure 1 | |
+| `scoring` | p3.5b | Gene Scoring / Auto Cell Typing / Deconvolution | No | `results/adata.scored.h5ad` | |
+| `celltype_manual` | p4 | Manual Cell Typing (optional, iterative) | Yes | `results/adata.celltyped.h5ad` | `post_celltyping_qc_YYYYMMDD.html` |
+| `biology` | p5 | Downstream Biology | No | `figures/manuscript/` | |
+| `meta_analysis` | p6/p7 | Meta Analysis (optional) | No | `results/adata.{level}.{feature}.h5ad` | |
 
 ---
 

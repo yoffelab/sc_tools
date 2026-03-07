@@ -454,9 +454,7 @@ def generate_post_integration_report(
                     "Computing per-embedding UMAPs for %d methods...",
                     len(embedding_keys),
                 )
-                fig = qc_embedding_umap_grid(
-                    adata, embedding_keys, color_key=color_by
-                )
+                fig = qc_embedding_umap_grid(adata, embedding_keys, color_key=color_by)
                 plots["embedding_umaps"] = fig_to_base64(fig)
                 logger.info("Per-embedding UMAP grid generated successfully")
             except Exception:

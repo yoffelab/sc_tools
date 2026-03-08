@@ -100,43 +100,6 @@
   </div>
 </div>
 
-<!-- Celltype Composition -->
-{% if plots.celltype_abundance or celltype_table %}
-<section>
-  <h2>Celltype Composition</h2>
-  {% if plots.celltype_abundance %}
-  <div class="plot-row full-width">
-    <div class="plot-item">
-      <img src="data:image/png;base64,{{ plots.celltype_abundance }}" alt="Celltype Abundance">
-      <div class="caption">Celltype proportions per sample</div>
-    </div>
-  </div>
-  {% endif %}
-  {% if celltype_table %}
-  <div style="overflow-x: auto; margin-top: 16px;">
-  <table>
-    <thead>
-      <tr>
-        <th>Cell Type</th>
-        <th style="text-align: right;">N cells</th>
-        <th style="text-align: right;">%</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in celltype_table %}
-      <tr>
-        <td><strong>{{ row.celltype }}</strong></td>
-        <td style="text-align: right;">{{ row.n_cells }}</td>
-        <td style="text-align: right;">{{ "%.1f" | format(row.pct) }}%</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  </div>
-  {% endif %}
-</section>
-{% endif %}
-
 <!-- Integration Benchmark — Phase 3 vs Phase 4 -->
 {% if ranking_rows %}
 <section>
@@ -220,6 +183,43 @@
       <div class="caption">UMAP colored by celltype, celltype_broad (if available), leiden, batch, sample</div>
     </div>
   </div>
+</section>
+{% endif %}
+
+<!-- Celltype Composition -->
+{% if plots.celltype_abundance or celltype_table %}
+<section>
+  <h2>Celltype Composition</h2>
+  {% if celltype_table %}
+  <div style="overflow-x: auto; margin-bottom: 16px;">
+  <table>
+    <thead>
+      <tr>
+        <th>Cell Type</th>
+        <th style="text-align: right;">N cells</th>
+        <th style="text-align: right;">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in celltype_table %}
+      <tr>
+        <td><strong>{{ row.celltype }}</strong></td>
+        <td style="text-align: right;">{{ row.n_cells }}</td>
+        <td style="text-align: right;">{{ "%.1f" | format(row.pct) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% if plots.celltype_abundance %}
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ plots.celltype_abundance }}" alt="Celltype Abundance">
+      <div class="caption">Celltype proportions per sample</div>
+    </div>
+  </div>
+  {% endif %}
 </section>
 {% endif %}
 

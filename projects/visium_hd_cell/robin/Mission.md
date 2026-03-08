@@ -1,8 +1,8 @@
 # Mission: robin (visium_hd_cell)
 
 **Project:** `projects/visium_hd_cell/robin`
-**Current Status:** Phase 0b COMPLETE. Ready for QC/filtering.
-**Last Updated:** 2026-03-06
+**Current Status:** Pipeline scripts written (phases 1-4). Ready for SLURM submission.
+**Last Updated:** 2026-03-07
 
 Project-specific goals. Repository-level pipeline and toolkit goals are in the root `Mission.md`.
 
@@ -19,11 +19,11 @@ Single-cell resolution spatial transcriptomics analysis of Visium HD data (Robin
 | Slug | Status | Key Tasks |
 |------|--------|-----------|
 | **ingest_load** | Done | 15/15 samples loaded (1,574,694 cells x 18,132 genes). Cell centroids from geojson. |
-| **qc_filter** | Pending | Per-sample QC, filtering, concatenation QC report |
-| **metadata_attach** | Pending | Metadata attachment |
-| **preprocess** | Pending | Preprocessing, normalization, clustering |
+| **qc_filter** | Ready | `scripts/qc_filter.py` — xenium-like thresholds, pre-filter QC report |
+| **metadata_attach** | Ready | `scripts/attach_metadata.py` — clinical metadata from sibling project |
+| **preprocess** | Ready | `scripts/preprocess.py` — xenium recipe, Harmony integration |
+| **scoring** | Ready | `scripts/score_signatures.py` — project sigs + Hallmark (from sibling) |
 | **demographics** | Pending | Demographics (optional branch) |
-| **scoring** | Pending | Gene scoring, cell typing, deconvolution |
 | **celltype_manual** | Pending | Manual cell typing (optional, iterative) |
 | **biology** | Pending | Downstream biology |
 | **meta_analysis** | Pending | Meta analysis (optional) |
@@ -38,7 +38,9 @@ Single-cell resolution spatial transcriptomics analysis of Visium HD data (Robin
 
 ## 4. Active Tasks
 
-- [ ] QC filtering: run per-sample QC, generate pre-filter report
+- [ ] Submit `scripts/run_pipeline.sbatch` on brb (runs phases 1-4 sequentially)
+- [ ] After pipeline: validate checkpoints, generate QC reports
+- [ ] After scoring: evaluate clusters and decide on manual celltyping vs automated
 
 ---
 

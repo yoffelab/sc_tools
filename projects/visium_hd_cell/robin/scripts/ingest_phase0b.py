@@ -1,8 +1,8 @@
 """Phase 0b ingest: Load per-sample Visium HD cell segmentation data into AnnData.
 
 Reads SpaceRanger 4 segmented outputs for all robin samples, extracts cell
-centroids from geojson, saves per-sample AnnData to data/{sample_id}/adata.h5ad,
-then concatenates into results/adata.raw.h5ad.
+centroids from geojson, saves per-sample AnnData to data/{sample_id}/adata.ingested.h5ad,
+then concatenates into results/adata.filtered.h5ad.
 
 Run from project root (projects/visium_hd_cell/robin/) or via SLURM on brb.
 """
@@ -69,7 +69,7 @@ def main():
             # Save per-sample checkpoint
             out_dir = PROJECT_ROOT / "data" / sample_id
             out_dir.mkdir(parents=True, exist_ok=True)
-            out_path = out_dir / "adata.h5ad"
+            out_path = out_dir / "adata.ingested.h5ad"
             adata.write_h5ad(out_path)
             logger.info(
                 "Saved %s: %d cells x %d genes -> %s",
@@ -97,7 +97,7 @@ def main():
     # Save concatenated
     results_dir = PROJECT_ROOT / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
-    out_path = results_dir / "adata.raw.h5ad"
+    out_path = results_dir / "adata.filtered.h5ad"
     adata_concat.write_h5ad(out_path)
     logger.info(
         "Saved concatenated: %d cells x %d genes -> %s",

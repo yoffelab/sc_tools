@@ -43,7 +43,7 @@ pytest projects/visium_hd_cell/robin/tests/ -v
 
 | Path | Description |
 |------|-------------|
-| `results/adata.raw.h5ad` | qc_filter phase output |
+| `results/adata.filtered.h5ad` | qc_filter phase output |
 | `results/adata.annotated.h5ad` | metadata_attach phase output |
 | `results/adata.normalized.h5ad` | preprocess phase output |
 | `results/adata.scored.h5ad` | scoring phase output (primary analysis input) |

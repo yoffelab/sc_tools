@@ -23,10 +23,10 @@ does gene-panel divergence degrade integration quality?
 - [x] Patient-matched design CONFIRMED: same block IDs across panels
 - [x] Actual filenames CONFIRMED (corrected from plan; RDS in `data_IBD/` subdir)
 - [x] Tissue types CONFIRMED: Ileum + Rectum (16-patient group); Rectum only (4-patient group)
-- [ ] Raw counts in @assays$RNA@counts: **PENDING** (SLURM job submitted; connectivity issues)
-- [ ] Cell type columns in RDS meta.data: **PENDING**
-- [ ] Spatial coordinate extraction method: **PENDING**
-- [ ] noseg cell-level segmentation status: **PENDING**
+- [x] Raw counts CONFIRMED: Seurat v5 `@layers$counts` (integer sparse); `@layers$data` (log-norm); `@layers$scale.data`. scVI usable.
+- [x] Cell type columns CONFIRMED: CosMx has `ct_minor`/`ct_major`/`ct_minor_new`; Xenium 5K/MT have `ct_minor`/`ct_major`; Xenium noseg/withseg/colon have NO cell type annotations (only k-means clusters).
+- [x] Spatial coordinates CONFIRMED: `GetTissueCoordinates()` works on all panels. CosMx: `CenterX/Y_global_px`. Xenium: `x_centroid`/`y_centroid`.
+- [x] noseg cell status CONFIRMED: 28,858 cells present (Xenium default segmentation; usable for integration).
 
 **Note on data path:** All RDS files are under `/athena/project-saha/data_IBD/`
 (NOT `/athena/project-saha/` directly).
@@ -85,45 +85,41 @@ Patient I0355: CosMx_6k #2 + Xenium_5K #2 + ...  (same for #3=I0380, #4=I0387)
 - Tissue: Ileum, Rectum (16-patient group); Rectum (4-patient group)
 - CSV fully readable; 51 rows; patient block IDs confirmed matched across panels
 
-### S0 BLOCKER: Most RDS files are zero-filled (corrupted transfer) -- CRITICAL
+### S0 BLOCKER: RESOLVED (2026-03-07)
 
-**Finding (2026-03-07):** All panels EXCEPT CosMx_6k have RDS files that are
-entirely zero-filled (null bytes from start to end). These files are unreadable.
+**Previous issue:** 6 of 7 panels had zero-filled RDS files from failed S3-to-Lustre sync.
+**Resolution (2026-03-07):** Re-sync completed by `jip2007`. All 7 panels now have valid
+gzip RDS files (magic bytes `1f8b` confirmed via `xxd`). All milestones UNBLOCKED.
 
-| Panel | File status | Evidence |
-|-------|------------|---------|
-| **CosMx_6k** | VALID -- gzip RDS (magic: `1f8b`) | readRDS succeeds; Seurat object |
-| CosMx_1k | CORRUPT -- all null bytes | xxd confirms; readRDS fails |
-| Xenium_MT_16 | CORRUPT -- all null bytes | xxd confirms; readRDS fails |
-| Xenium_5K | CORRUPT -- all null bytes | xxd confirms |
-| Xenium_MT_withseg | CORRUPT -- all null bytes | xxd confirms |
-| Xenium_MT_noseg | CORRUPT -- all null bytes | xxd confirms |
-| Xenium_colon | CORRUPT -- all null bytes | xxd confirms |
-
-**Root cause:** Bulk S3-to-Lustre sync ran on 2026-03-06 18:49 (`jip2007` user).
-All files show identical modification timestamps, suggesting a single sync job. Only
-CosMx_6k (430 MB) appears to have transferred fully. The others (36-180 MB each)
-were pre-allocated on Lustre but the data was never written (or the sync failed).
-
-**Action required:**
-1. **Contact Saha lab (jip2007)** to re-run the S3 sync for the 6 failed panels, OR
-2. **Get AWS credentials** to download from S3 directly:
-   `s3://saha-dulai-collaboration/NC_compare_11122025/{CosMx_1k_16,Xenium_MT_16,...}/`
-3. **In the meantime:** proceed with CosMx_6k only (4 samples, UC + Healthy)
+| Panel | Status | Files | Sizes |
+|-------|--------|-------|-------|
+| CosMx_1k | VALID | 16 | 2.8M-178M |
+| CosMx_6k | VALID | 4 | ~430M each |
+| Xenium_MT_16 | VALID | 16 | varies |
+| Xenium_5K | VALID | 4 | varies |
+| Xenium_MT_withseg | VALID | 4 | varies |
+| Xenium_MT_noseg | VALID | 4 | varies |
+| Xenium_colon | VALID | 4 | varies |
 
 **Note on SeuratObject:** System R on cayuga login node (`/usr/bin/Rscript`) does NOT
-have `SeuratObject` package. Need to either install it or find a conda env with Seurat.
-When inspecting CosMx_6k: class=Seurat confirmed, but further inspection halted on
-missing SeuratObject for method dispatch. Must install before full inspection.
+have `SeuratObject` package. Need to install before full RDS inspection.
 
-### S0.2 Raw counts (PARTIAL -- CosMx_6k only)
-- CosMx_6k: `readRDS` returns Seurat object; full inspection pending (SeuratObject needed)
-- Expected: `@assays$RNA@counts` = integer counts; `@assays$RNA@data` = log-normalized
-- All other panels: blocked until re-sync
+### S0.2 Raw counts -- CONFIRMED (2026-03-07)
+- All panels: Seurat v5 `@layers$counts` = integer sparse (raw); `@layers$data` = log-norm
+- Assay names: `Nanostring` (CosMx), `Xenium` (Xenium) -- NOT `RNA`
+- scVI usable on raw counts
 
-### S0.3 Xenium noseg (BLOCKED -- zero-filled file)
+### S0.3 Xenium noseg -- CONFIRMED (2026-03-07)
+- 28,858 cells present with spatial coordinates (Xenium default segmentation)
+- No cell type annotations (only k-means clusters)
 
-### S0.4 Spatial coordinates (BLOCKED -- zero-filled files)
+### S0.4 Spatial coordinates -- CONFIRMED (2026-03-07)
+- `GetTissueCoordinates()` works on all 7 panels
+
+### S0.5 Batch conversion -- COMPLETE (2026-03-07)
+- All 52 RDS files converted to h5ad (SLURM job 2700745, ~24s each)
+- R packages reinstalled under R/4.4.1 module in `~/R/libs_R441` (SeuratObject, Matrix, sp, Rcpp)
+- Validated: raw counts (int), spatial coords, disease metadata joined from CSV
 
 ---
 
@@ -131,21 +127,21 @@ missing SeuratObject for method dispatch. Must install before full inspection.
 
 ### Infrastructure
 
-- [ ] **BLOCKER: Contact Saha lab** to re-sync the 6 failed panels from S3, OR get AWS credentials
-- [ ] Install SeuratObject in R on cayuga (for CosMx_6k inspection and conversion)
+- [x] ~~BLOCKER: Contact Saha lab~~ — RESOLVED: all 7 panels re-synced and valid
+- [x] Install SeuratObject in R on cayuga (~/R/libs; 2026-03-07)
 - [x] Create HPC working directory structure
 - [x] Write `inspect_rds.R` (scripts/inspect_rds.R in this repo)
-- [ ] Run full S0 inspection once files are available and SeuratObject is installed
-- [ ] Write and test `convert_rds_to_h5ad.R` on CosMx_6k first (only usable panel)
+- [x] Run full S0 inspection on ALL 7 panels (2026-03-07) — Seurat v5 layers, raw counts confirmed, spatial OK
+- [x] Write and test `convert_rds_to_h5ad.R` — tested on Xenium MT sample 1 (5138 cells x 377 genes, 2.9MB h5ad)
+- [x] Batch conversion SLURM array job 2700745 — all 52 tasks completed (2026-03-07)
 - [x] Build batch manifests from NC_compare CSV (all 7 TSVs written)
-- [ ] Batch SLURM job array for all-sample conversion (blocked for most panels)
+- [x] Reinstall R packages under R/4.4.1 module (`~/R/libs_R441`; SeuratObject, Matrix, sp, Rcpp)
 
-### Milestone 0: Technical replicate baseline (upper bound) -- BLOCKED
+### Milestone 0: Technical replicate baseline (upper bound) -- UNBLOCKED
 
 **Scope:** Xenium MT noseg vs Xenium MT withseg (same 4 patients, Rectum, identical ~377-gene panel)
-- **Status: BLOCKED** -- both withseg and noseg RDS files are zero-filled
-- [ ] (BLOCKED) Unblock when files re-synced from S3
-- [ ] Convert 4 noseg + 4 withseg RDS files
+- **Status: UNBLOCKED** -- all RDS files valid (re-synced 2026-03-07)
+- [x] Convert 4 noseg + 4 withseg RDS files (done in batch job 2700745)
 - [ ] Run `run_integration_benchmark(modality="xenium", batch_key="panel_variant")`
 - [ ] Confirm: ASW_batch >> 0.7 (nearly perfect integration expected)
 - [ ] Check celltype concordance between the two runs
@@ -155,21 +151,20 @@ missing SeuratObject for method dispatch. Must install before full inspection.
 **Scope:** CosMx_6k alone (4 samples: 1 Healthy + 3 UC, all Rectum)
 - **Purpose:** Validate conversion pipeline; establish single-platform baseline
 - **Status: UNBLOCKED** (CosMx_6k files are valid gzip RDS)
-- [ ] Install SeuratObject in R on cayuga
-- [ ] Run `inspect_rds.R` on CosMx_6k to confirm raw counts, celltype cols, coords
-- [ ] Write + test `convert_rds_to_h5ad.R` on CosMx_6k sample 1
-- [ ] Convert all 4 CosMx_6k samples via SLURM job array
+- [x] Install SeuratObject in R on cayuga
+- [x] Run `inspect_rds.R` — all checks passed
+- [x] Write + test `convert_rds_to_h5ad.R` on CosMx_6k sample 1
+- [x] Convert all 4 CosMx_6k samples (done in batch job 2700745)
 - [ ] QC report for CosMx_6k
 - This validates the full pipeline before the matched cross-platform milestones
 
-### Milestone 1: Cross-platform, matched patients, same plex (KEY MILESTONE) -- BLOCKED
+### Milestone 1: Cross-platform, matched patients, same plex (KEY MILESTONE) -- UNBLOCKED
 
 **Scope:** CosMx 1k (16 samples) + Xenium MT 16 (same 16 patients), ~377 shared genes
-- **Status: BLOCKED** -- CosMx_1k and Xenium_MT_16 files are zero-filled
+- **Status: UNBLOCKED** -- all RDS files valid (re-synced 2026-03-07)
 - **This is the scientifically most important milestone** -- CD + UC, Ileum + Rectum, matched
-- [ ] (BLOCKED) Unblock when files re-synced from S3
-- [ ] Convert all 16 CosMx_1k + 16 Xenium_MT RDS files
-- [ ] Add metadata from CSV: `disease`, `disease_state`, `tissue_type`, `block` (patient ID)
+- [x] Convert all 16 CosMx_1k + 16 Xenium_MT RDS files (done in batch job 2700745)
+- [x] Metadata from CSV joined during conversion: `disease`, `disease_state`, `tissue_type`, `patient_id`
 - [ ] Run `run_integration_benchmark(batch_key="platform", celltype_key="cell_type")`
   - Methods: Harmony, scVI (if raw counts OK), ComBat, BBKNN, Scanorama
   - Add `patient_id` as additional batch key in secondary analysis
@@ -182,7 +177,7 @@ missing SeuratObject for method dispatch. Must install before full inspection.
 **Scope:** CosMx 6k (4 samples) + Xenium 5K (same 4 patients), ~1,500-2,000 shared genes
 - **Same 4 patients as M0** -- can use M0 integration as scaffold
 - **Disease limitation:** UC only + 1 Healthy (no CD) -- IBD biology limited
-- [ ] Convert CosMx_6k + Xenium_5K RDS files
+- [x] Convert CosMx_6k + Xenium_5K RDS files (done in batch job 2700745)
 - [ ] HVG + SVG gene selection for high-plex panels
 - [ ] gimVI evaluation: impute to reference `SAHA_IBD_RNA.h5ad`
 - [ ] Add Xenium colon 4 (same 4 patients, colon panel ~400 genes) as extension
@@ -195,7 +190,7 @@ missing SeuratObject for method dispatch. Must install before full inspection.
   to separate technical (platform) from biological (disease) variation
 - **Gene intersection:** ~100-300 genes across all panels
 - **Imputation strategy:** gimVI with SAHA_IBD_RNA.h5ad as reference
-- [ ] All samples converted
+- [x] All samples converted (52/52, batch job 2700745)
 - [ ] Run with n_latent=8, n_hidden=32 for scVI (small gene set)
 - [ ] Full IBD biology: CD vs UC spatial patterns (ileum only for CD)
 
@@ -297,15 +292,16 @@ After integration, compute:
 | File | Status |
 |------|--------|
 | `Mission.md` (this file) | Done |
-| `Journal.md` | TODO |
-| `journal_summary.md` | TODO |
-| `config.yaml` | TODO |
-| `scripts/inspect_rds.R` | TODO (write to cayuga directly) |
-| `scripts/convert_rds_to_h5ad.R` | TODO |
+| `Journal.md` | Done |
+| `journal_summary.md` | Done |
+| `config.yaml` | Done |
+| `scripts/inspect_rds.R` | Done (on cayuga) |
+| `scripts/convert_rds_to_h5ad.R` | Done |
+| `scripts/run_convert_array.sh` | Done |
 | `scripts/build_batch_manifests.py` | TODO |
 | `scripts/run_integration_benchmark.py` | TODO |
 | `scripts/run_batch_factor_analysis.py` | TODO |
-| `metadata/phase0/cosmx_1k_samples.tsv` | TODO (populate from CSV) |
-| `metadata/phase0/cosmx_6k_samples.tsv` | TODO |
-| `metadata/phase0/xenium_5k_samples.tsv` | TODO |
-| `metadata/phase0/xenium_mt_samples.tsv` | TODO |
+| `metadata/phase0/cosmx_1k_samples.tsv` | Done (from CSV) |
+| `metadata/phase0/cosmx_6k_samples.tsv` | Done |
+| `metadata/phase0/xenium_5k_samples.tsv` | Done |
+| `metadata/phase0/xenium_mt_samples.tsv` | Done |

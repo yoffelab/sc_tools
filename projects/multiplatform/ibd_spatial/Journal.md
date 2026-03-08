@@ -54,3 +54,66 @@ All files have identical modification timestamps (2026-03-06 18:49) = same bulk 
 2. Write convert_rds_to_h5ad.R and test on 1 sample
 3. Populate batch manifests from NC_compare CSV
 4. HPC directory setup (soft links)
+
+## 2026-03-07 (continued)
+
+**S0 blocker resolved:** All 7 panels have valid gzip RDS files (re-synced by jip2007).
+
+**SeuratObject installed:** `~/R/libs` on cayuga login node. R anndata also installed.
+
+**Full S0 inspection completed on all 7 panels:**
+- Seurat v5 format: assay layers `counts` (raw int), `data` (log-norm), `scale.data`
+- Assay names: `Nanostring` (CosMx), `Xenium` (Xenium) — NOT `RNA`
+- Cell types: CosMx has `ct_minor`/`ct_major`/`ct_minor_new`; Xenium 5K/MT have `ct_minor`/`ct_major`;
+  Xenium noseg/withseg/colon have NO cell type annotations (only k-means clusters)
+- Spatial: `GetTissueCoordinates()` works on all panels (x, y, cell)
+- noseg: 28,858 cells present (Xenium default segmentation)
+- No disease/diagnosis columns inside RDS — must join from CSV
+- Xenium colon: 322 genes (not ~400)
+
+**Key Seurat v5 findings for conversion:**
+- `@layers$counts` has NO dimnames; gene/cell names from `rownames(assay_obj)`/`colnames(assay_obj)`
+- R `anndata` package fails on `var` — switched to MTX+CSV intermediate + Python assembly
+- CSV has BOM and panel names like "CosMx 1K" (space, not underscore)
+
+**Conversion script written and tested:**
+- `convert_rds_to_h5ad.R`: R extracts raw counts (MTX), obs (CSV), spatial + embeddings (CSV);
+  Python assembles into h5ad. Tested on Xenium MT sample 1: 5,138 cells x 377 genes, 2.9 MB.
+  Disease metadata matched from CSV (patient=I0294, CD, Inflamed, Ileum).
+
+**SLURM batch job submitted:** Job 2700475 (array 0-51). First attempt (2700476) failed: Rscript
+not in PATH on compute nodes. Fixed: added `module load R/4.4.1`. Resubmitted but SSH
+connection to cayuga lost before results could be verified.
+
+## 2026-03-07 (batch conversion)
+
+**SLURM debugging (3 failed attempts):**
+- Job 2700581: `sp.so` cannot find `libR.so` — R packages in `~/R/libs` compiled against system R, incompatible with R/4.4.1 module
+- Job 2700633: Added `LD_LIBRARY_PATH=/opt/ohpc/pub/software/R/4.4.1/lib64` — insufficient, `Rcpp.so` same issue
+- Job 2700692: Same — the `.so` files have compiled-in rpaths, not just `LD_LIBRARY_PATH` dependent
+
+**Fix: Reinstalled all R packages under R/4.4.1 module:**
+- Job 2700691: Installed SeuratObject + Matrix + sp into `~/R/libs_R441`
+- Job 2700744: Also installed Rcpp (missed dependency)
+- Both completed successfully; `library(SeuratObject)` works under R/4.4.1
+
+**SSH config updated:** Added `ConnectTimeout 60`, `ServerAliveInterval 30`, `ServerAliveCountMax 5` to `~/.ssh/config` for cayuga and brb.
+
+**Batch conversion SUCCESS — Job 2700745:**
+All 52 tasks completed (exit 0, ~24s each). 52 `adata.p0.h5ad` files produced.
+
+Summary by panel:
+| Panel | N | Genes | Example size |
+|-------|---|-------|-------------|
+| CosMx 1k | 16 | 950 | 2.1–146 MB |
+| CosMx 6k | 4 | 6,175 | 134–181 MB |
+| Xenium MT | 16 | 377 | 2.9–38 MB |
+| Xenium 5K | 4 | 5,001 | 5.2–84 MB |
+| Xenium noseg | 4 | 377 | 3.1–19 MB |
+| Xenium withseg | 4 | 377 | 8.8–22 MB |
+| Xenium colon | 4 | 322 | 6.2–19 MB |
+
+**Validation (cosmx_1k_01):** X.max=70 (raw int), spatial present, disease=CD/Inflamed/Ileum, celltype/celltype_broad present.
+**Validation (xenium_noseg_01):** X.max=102 (raw int), spatial present, disease=Healthy, celltype correctly absent.
+
+**Next:** Proceed to Milestone 0 (noseg vs withseg integration benchmark, 4 matched patients).

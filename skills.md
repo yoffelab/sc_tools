@@ -18,7 +18,7 @@ Core computational steps in execution order (Phases 1-6 of the pipeline).
 
 Phase 0 is split into two sub-steps:
 - **Phase 0a:** Run platform tools (Space Ranger, Xenium Ranger, IMC pipeline, CosMx export) → `data/{sample_id}/outs/`
-- **Phase 0b:** Load per-sample into portable format → `data/{sample_id}/adata.p0.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional, for Visium HD / Xenium)
+- **Phase 0b:** Load per-sample into portable format → `data/{sample_id}/adata.ingested.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional, for Visium HD / Xenium)
 
 Use `sc_tools.ingest.loaders` for Phase 0b loading. Each loader sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
 
@@ -31,7 +31,7 @@ Use `sc_tools.ingest.loaders` for Phase 0b loading. Each loader sets `obs['sampl
 | IMC | `load_imc_sample()` | Reads segmented h5ad |
 | CosMx | `load_cosmx_sample()` | Flat CSV/Parquet or RDS (rpy2+anndata2ri); centroid coords |
 
-Phase 1 then loads all per-sample `adata.p0.h5ad` files, applies per-sample QC, and concatenates via `concat_samples()` → `results/adata.raw.p1.h5ad`.
+Phase 1 then loads all per-sample `adata.ingested.h5ad` files, applies per-sample QC, and concatenates via `concat_samples()` → `results/adata.filtered.h5ad`.
 
 ### Core Skills
 - Load data into standardized containers: **AnnData** for single-modality, **MuData** for multi-modal (multi-omics) in-memory, and **SpatialData** for multi-modal datasets (images, masks, points, and expression).
@@ -622,7 +622,7 @@ srun --partition=scu-gpu --gres=gpu:a100:1 --cpus-per-task=8 --mem=64G --time=2:
 
 #### Per-sample QC and loading (Phase 0b → Phase 1) — array per sample
 
-- Load per-sample adata, apply `filter_spots()`, save `adata.p0.h5ad`.
+- Load per-sample adata, apply `filter_spots()`, save `adata.ingested.h5ad`.
 - Each task: 4–8 CPUs, 32–64G RAM (depending on modality; Visium HD needs more).
 - Concatenation (`concat_samples()`) runs as a single downstream job after all per-sample jobs complete.
 
@@ -870,7 +870,7 @@ Orchestrator agent
 
 #### Rules for multi-agent HPC work
 
-1. **Shared state via files, not memory.** Agents communicate through checkpoint files (`adata.p0.h5ad`, `results/integration_method.txt`, sentinel files `.phase1.done`). No shared in-memory state.
+1. **Shared state via files, not memory.** Agents communicate through checkpoint files (`adata.ingested.h5ad`, `results/integration_method.txt`, sentinel files `.phase1.done`). No shared in-memory state.
 2. **One agent per phase.** Each agent handles one pipeline phase (or one cluster of related jobs). Hand off via checkpoint file existence.
 3. **Idempotent operations.** Every script and sbatch must be safe to re-run: check for existing output before recomputing. Use Snakemake rules — they enforce input/output contracts automatically.
 4. **Explicit status files.** Write `results/.phase1.done` (via `touch`) on success; write `results/.phase1.failed` with error message on failure. Downstream agents gate on these sentinels.

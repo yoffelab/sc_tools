@@ -71,12 +71,12 @@ The pipeline is **non-linear** with human-in-loop phases. Branching points and e
 flowchart TD
     subgraph ING["Ingestion"]
         Z1["ingest_raw<br/>HPC: SpaceRanger / IMC"] --> CP0a[("data/{id}/outs/")]
-        CP0a --> Z2["ingest_load<br/>Load per-sample → adata.h5ad"]
-        Z2 --> CP0b[("adata.p0.h5ad<br/>obs: sample, library_id,<br/>raw_data_dir<br/>obsm: spatial<br/>X: raw counts")]
+        CP0a --> Z2["ingest_load<br/>Load per-sample → adata.ingested.h5ad"]
+        Z2 --> CP0b[("adata.ingested.h5ad<br/>obs: sample, library_id,<br/>raw_data_dir<br/>obsm: spatial<br/>X: raw counts")]
     end
 
     subgraph QC["QC and Metadata"]
-        A1["qc_filter<br/>QC + Concatenation"] --> CP1[("adata.raw.h5ad<br/>obs: sample, raw_data_dir<br/>obsm: spatial<br/>X: raw counts, concatenated")]
+        A1["qc_filter<br/>QC + Concatenation"] --> CP1[("adata.filtered.h5ad<br/>obs: sample, raw_data_dir<br/>obsm: spatial<br/>X: raw counts, concatenated")]
         CP1 --> QR1[/"pre_filter_qc.html"/]
         CP1 --> A2["metadata_attach<br/>Attach clinical metadata"]
         A2 --> CP2[("adata.annotated.h5ad<br/>+ clinical metadata in obs")]
@@ -140,18 +140,20 @@ flowchart TD
 
 ### Phase summary
 
-| Slug | Name | Checkpoint | Required Data | QC Report |
-|------|------|------------|---------------|-----------|
-| `ingest_raw` | Platform tools (Space Ranger / Xenium / IMC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
-| `ingest_load` | Load per-sample into AnnData | `data/{sample_id}/adata.p0.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
-| `qc_filter` | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw counts, all samples concatenated | `pre_filter_qc.html` |
-| `metadata_attach` | Metadata Attachment (HIL) | `results/adata.annotated.h5ad` | All of `qc_filter` + clinical columns in `obs` | `post_filter_qc.html` |
-| `preprocess` | Preprocessing + Integration | `results/adata.normalized.h5ad` | `obsm[X_scvi]` (or embedding), `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |
-| `demographics` | Demographics (branch, optional) | Figure 1 | Cohort metadata from `preprocess` | |
-| `scoring` | Gene Scoring / Auto Cell Typing | `results/adata.scored.h5ad` | `obsm[signature_score, signature_score_z]`, `uns[signature_score_report]` | |
-| `celltype_manual` | Manual Cell Typing (optional) | `results/adata.celltyped.h5ad` | All of `scoring` + `obs[celltype, celltype_broad]` | `post_celltyping_qc.html` |
-| `biology` | Downstream Biology | `figures/manuscript/` | Reads from `scoring` or `celltype_manual` checkpoint | |
-| `meta_analysis` | Meta Analysis (optional) | `results/adata.{level}.{feature}.h5ad` | `obs` indexed by roi/patient; `X` = aggregated feature | |
+<!-- PHASE_TABLE:START -->
+| Slug | Old code | Name | Checkpoint | Required Data | QC Report |
+|------|----------|------|------------|---------------|-----------|
+| `ingest_raw` | p0a | Raw Data Processing | - | - |  |
+| `ingest_load` | p0b | Load into AnnData | `data/{sample_id}/adata.ingested.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts |  |
+| `qc_filter` | p1 | QC Filtering + Concatenation | `results/adata.filtered.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw counts, concatenated | `pre_filter_qc_{date}.html` |
+| `metadata_attach` | p2 | Metadata Attachment | `results/adata.annotated.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw counts, concatenated | `post_filter_qc_{date}.html` |
+| `preprocess` | p3 | Normalize + Integrate + Cluster | `results/adata.normalized.h5ad` | `obs[leiden]`, `obsm[X_scvi]`, `X` normalized (adata.raw backed up) | `post_integration_qc_{date}.html` |
+| `demographics` | p3.5 | Cohort Demographics | - | - |  |
+| `scoring` | p3.5b | Gene Scoring + Auto Cell Typing | `results/adata.scored.h5ad` | `obsm[signature_score, signature_score_z]`, `X` normalized |  |
+| `celltype_manual` | p4 | Manual Cell Typing | `results/adata.celltyped.h5ad` | `obs[celltype, celltype_broad]`, `X` normalized | `post_celltyping_qc_{date}.html` |
+| `biology` | p5 | Downstream Biology | - | - |  |
+| `meta_analysis` | p6/p7 | Meta Analysis | - | - |  |
+<!-- PHASE_TABLE:END -->
 
 > Checkpoints are orange circles in the diagram; QC reports are green parallelograms. All QC reports are date-versioned (`YYYYMMDD`) under `figures/QC/`. See [Architecture.md Section 2.2](Architecture.md) for full validation contracts.
 
@@ -177,10 +179,11 @@ projects/               # All project-specific content
             Mission.md      # Project todo list
             Journal.md      # Project decision log
 docs/                   # Sphinx API documentation (make docs)
+    wiki/               # Obsidian vault — knowledge base, project journals, hypotheses
 containers/             # Apptainer SIF and Dockerfile
 ```
 
-Key docs: **`Mission.md`** (toolkit todos), **`Architecture.md`** (data flow, checkpoint contracts), **`skills.md`** (statistical and coding standards), **`project_setup.md`** (container and environment setup).
+Key docs: **`docs/wiki/`** (knowledge base, project status), **`Architecture.md`** (data flow, checkpoint contracts), **`skills.md`** (statistical and coding standards), **`project_setup.md`** (container and environment setup).
 
 ---
 

@@ -17,22 +17,22 @@
 
 | Phase | Name | Checkpoint | Required Data | QC Report |
 |-------|------|------------|---------------|-----------|
-| **0a** | Platform tools (HPC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
-| **0b** | Load per-sample AnnData | `data/{sample_id}/adata.p0.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
-| **1** | QC and Concatenation | `results/adata.raw.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw, concatenated | `pre_filter_qc.html` |
-| **2** | Metadata Attachment | `results/adata.annotated.h5ad` | + clinical columns in `obs` | `post_filter_qc.html` |
-| **3** | Preprocessing | `results/adata.normalized.h5ad` | `obsm[X_scvi or embedding]`, `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |
-| **3.5** | Demographics | Figure 1 | Cohort metadata from Phase 3 | |
-| **3.5b** | Gene scoring / Auto cell typing | `results/adata.scored.h5ad` | `obsm[signature_score, signature_score_z]`, `uns[signature_score_report]` | |
-| **4** | Manual Cell Typing | `results/adata.celltyped.h5ad` | + `obs[celltype, celltype_broad]` | `post_celltyping_qc.html` |
-| **5** | Downstream Biology | `figures/manuscript/` | Reads from Phase 3.5b or 4 checkpoint | |
-| **6–7** | Meta Analysis | `results/adata.{level}.{feature}.h5ad` | `obs` indexed by roi/patient; `X` = aggregated feature | |
+| **ingest_raw** (0a) | Platform tools (HPC) | `data/{sample_id}/outs/` | Platform-specific raw output | |
+| **ingest_load** (0b) | Load per-sample AnnData | `data/{sample_id}/adata.ingested.h5ad` | `obs[sample, library_id, raw_data_dir]`, `obsm[spatial]`, `X` raw counts | |
+| **qc_filter** (1) | QC and Concatenation | `results/adata.filtered.h5ad` | `obs[sample, raw_data_dir]`, `obsm[spatial]`, `X` raw, concatenated | `pre_filter_qc.html` |
+| **metadata_attach** (2) | Metadata Attachment | `results/adata.annotated.h5ad` | + clinical columns in `obs` | `post_filter_qc.html` |
+| **preprocess** (3) | Preprocessing | `results/adata.normalized.h5ad` | `obsm[X_scvi or embedding]`, `obs[leiden]`, `adata.raw` backed up | `post_integration_qc.html` |
+| **demographics** (3.5) | Demographics | Figure 1 | Cohort metadata from preprocess | |
+| **scoring** (3.5b) | Gene scoring / Auto cell typing | `results/adata.scored.h5ad` | `obsm[signature_score, signature_score_z]`, `uns[signature_score_report]` | |
+| **celltype_manual** (4) | Manual Cell Typing | `results/adata.celltyped.h5ad` | + `obs[celltype, celltype_broad]` | `post_celltyping_qc.html` |
+| **biology** (5) | Downstream Biology | `figures/manuscript/` | Reads from scoring or celltype_manual checkpoint | |
+| **meta_analysis** (6-7) | Meta Analysis | `results/adata.{level}.{feature}.h5ad` | `obs` indexed by roi/patient; `X` = aggregated feature | |
 
 All QC reports are date-versioned (`YYYYMMDD`) and saved to `figures/QC/`. Full validation contracts: Architecture.md Section 2.2.
 
 **Entry points:** Start at Phase 3 (preprocessed AnnData), Phase 3.5b (clustered AnnData), or Phase 4 (phenotyped AnnData). See README diagram for START HERE conditions.
 
-**Checkpoint nomenclature:** Standard filenames are defined in **Architecture.md** (Section 2.1): `adata.raw.h5ad`, `adata.annotated.h5ad`, `adata.normalized.h5ad`, `adata.scored.h5ad`, `adata.celltyped.h5ad`, and `adata.{level}.{feature}.h5ad` for aggregated. Legacy p-code names (`adata.raw.p1.h5ad`, etc.) are accepted during transition but deprecated.
+**Checkpoint nomenclature:** Standard filenames are defined in **Architecture.md** (Section 2.1): `adata.ingested.h5ad` (per-sample), `adata.filtered.h5ad` (concatenated QC), `adata.annotated.h5ad`, `adata.normalized.h5ad`, `adata.scored.h5ad`, `adata.celltyped.h5ad`, and `adata.{level}.{feature}.h5ad` for aggregated. Legacy p-code names (`adata.raw.p1.h5ad`, `adata.p0.h5ad`, `adata.raw.h5ad`, etc.) are accepted during transition but deprecated.
 
 ---
 
@@ -52,19 +52,19 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 #### Phase 0b: Load into AnnData / SpatialData
 
-- [x] **Modality loaders (implemented):** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`. Each sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
+- [x] **Modality loaders (implemented):** `sc_tools.ingest.loaders` — `load_visium_sample()`, `load_visium_hd_sample()`, `load_visium_hd_cell_sample()`, `load_xenium_sample()`, `load_imc_sample()`. Each sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`. Output: `data/{sample_id}/adata.ingested.h5ad`.
 - [ ] **CosMx loader (deprioritized):** `load_cosmx_sample()` — reads flat CSV/Parquet files or RDS (via rpy2+anndata2ri) from NanoString/AtoMx output. Sets spatial coordinates from cell centroid (x, y in microns). Batch TSV schema: `sample_id`, `cosmx_dir`, `batch`. Three panel tiers with different output characteristics:
   - **CosMx 1k:** ~1,000-plex targeted panel; flat CSV/Parquet export from AtoMx.
   - **CosMx 6k:** ~6,000-plex panel; larger expression matrices; same flat file format.
   - **CosMx full_library:** Whole-transcriptome (~18k genes); significantly larger files; may require chunked loading or backed AnnData.
 - [x] **visium_hd_cell modality:** SpaceRanger 4 cell segmentation support. `load_visium_hd_cell_sample()` reads from `outs/cell_segmentation/`. Cell-level QC thresholds (like xenium). Routes to xenium recipe in `preprocess()`. `create_project.sh` accepts `visium_hd_cell` as valid data type.
 - [x] **Concatenation:** `concat_samples()` merges per-sample AnnData with `calculate_qc_metrics()` applied.
-- [ ] **IMC end-to-end ingestion pipeline (priority):** Wire `build_imc_pipeline_cmd()` + `load_imc_sample()` into a complete Snakemake workflow for IMC projects. Includes: Phase 0a Snakemake rules (run ElementoLab pipeline per MCD on HPC → `processed/{sample}/`), Phase 0b rules (load each sample → `data/{sample_id}/adata.p0.h5ad`), and batch manifest templates for IMC (`metadata/phase0/`). Must be done **before** the generic checkpoint script below. Target projects: lymph_dlbcl, ggo-imc.
+- [ ] **IMC end-to-end ingestion pipeline (priority):** Wire `build_imc_pipeline_cmd()` + `load_imc_sample()` into a complete Snakemake workflow for IMC projects. Includes: Phase 0a Snakemake rules (run ElementoLab pipeline per MCD on HPC → `processed/{sample}/`), Phase 0b rules (load each sample → `data/{sample_id}/adata.ingested.h5ad`), and batch manifest templates for IMC (`metadata/phase0/`). Must be done **before** the generic checkpoint script below. Target projects: lymph_dlbcl, ggo-imc.
 - [x] **IMC image loading (Phase 0b):** `load_imc_sample(load_images=True, panel_csv=...)` reads the per-ROI `{roi_id}_full.tiff` multi-channel stack (C, H, W) and companion `{roi_id}_full.csv` channel index file from `processed/{sample}/tiffs/`. Builds arcsinh-normalized full stack + RGB composite (PanCK=R, CD3=G, DNA1=B defaults). Stores in `adata.uns['spatial'][sample_id]` (squidpy/scanpy-compatible). `IMCPanelMapper` resolves names from `MarkerName(IsotopeTag)` format (exact, case-insensitive, isotope tag, partial); reads both `*_full.csv` (per-ROI channel index) and `channel_labels.csv` (project panel with full/ilastik flags). Optional mask loading (`load_mask=True`) for `*_full_mask.tiff`. 18 new unit tests; 74 total pass, lint clean.
 - [x] **H&E image loading (any modality):** `load_he_image(he_path, library_id, adata)` injects any TIFF (RGB, grayscale, or CHW format) into `adata.uns['spatial'][library_id]['images']`. Handles grayscale-to-RGB, uint16/float-to-uint8, channel-first-to-HWC, and downsample. 5 unit tests.
 - [x] **IMC spatial plotting:** `sc_tools.pl.plot_imc_composite()` — same API as `plot_spatial_plain_he`; renders `images['hires']` RGB composite with channel label title. `sc_tools.pl.plot_imc_channel()` — renders single channel from `images['full']` (C, H, W) stack with inferno colormap and percentile-based vmax. Both exported in `sc_tools.pl.__all__`.
-- [x] **Phase 0b checkpoint script (`scripts/ingest.py`):** Generic CLI reads batch manifest, dispatches to modality loaders (`_get_loader()`), saves per-sample `data/{sample_id}/adata.p0.h5ad` (`--save-per-sample`), concatenates, saves final output. 5 tests in `test_ingest_script.py`.
-- [ ] **Phase 0b Snakemake rule:** `adata_p0` rule with sentinel `data/{sample_id}/.adata.p0.done`. Wire `scripts/ingest.py` into project Snakefiles.
+- [x] **Phase 0b checkpoint script (`scripts/ingest.py`):** Generic CLI reads batch manifest, dispatches to modality loaders (`_get_loader()`), saves per-sample `data/{sample_id}/adata.ingested.h5ad` (`--save-per-sample`), concatenates, saves final output. 5 tests in `test_ingest_script.py`.
+- [ ] **Phase 0b Snakemake rule:** `adata_ingested` rule with sentinel `data/{sample_id}/.adata.ingested.done`. Wire `scripts/ingest.py` into project Snakefiles.
 - [ ] **SpatialData (optional):** `data/{sample_id}/spatialdata.zarr` for Visium HD and Xenium when full image pyramids / subcellular coords needed. Loader via `spatialdata-io`.
 
 ### Checkpoint Validation
@@ -75,11 +75,11 @@ All paths below are project-specific: `projects/<platform>/<project_name>/...`. 
 
 ### Phase 1: QC and Concatenation
 
-**Input:** Per-sample `data/{sample_id}/adata.p0.h5ad` produced in Phase 0b.
+**Input:** Per-sample `data/{sample_id}/adata.ingested.h5ad` produced in Phase 0b.
 
-- [x] **Load Phase 0 checkpoints:** Read all per-sample `adata.p0.h5ad` files listed in `metadata/phase0/all_samples.tsv`. Implemented in `scripts/ingest.py`.
+- [x] **Load Phase 0 checkpoints:** Read all per-sample `adata.ingested.h5ad` files listed in `metadata/phase0/all_samples.tsv`. Implemented in `scripts/ingest.py`.
 - [x] **Per-sample QC:** `sc_tools.qc.filter_spots()` (modality-aware thresholds); `compute_sample_metrics()`; `classify_samples()` (absolute + MAD outlier thresholds).
-- [x] **Concatenation:** `concat_samples()` across all passing samples → `results/adata.raw.h5ad`. Implemented in `sc_tools.ingest`.
+- [x] **Concatenation:** `concat_samples()` across all passing samples → `results/adata.filtered.h5ad`. Implemented in `sc_tools.ingest`.
 - [x] **Required annotations:** `obs['sample']`, `obs['raw_data_dir']`, `obsm['spatial']`; `X` raw counts; no normalization.
 
 #### QC Metrics (sc_tools.qc)
@@ -241,7 +241,7 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 ### Completed
 
 - **Docker + conda + UV:** Dockerfile uses miniconda3 with conda env `sc_tools`; UV installs sc_tools. [project_setup.md](project_setup.md) documents build, run, per-project usage. Robin has run_docker.sh.
-- **Journal summary and Mission-as-todo workflow:** journal_summary.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.cursor/skills/journal-and-mission-workflow/`), rule (`.cursor/rules/journal-and-mission.mdc`), Cursor settings reminder; create_project.sh creates journal_summary.md for new projects.
+- **Journal and Mission-as-todo workflow:** Journal.md at root and per project (lymph_dlbcl, ggo_visium); Mission.md is the todo list; in work mode the agent updates Mission after each prompt. Skill (`.claude/skills/journal-and-mission/`); create_project.sh creates Journal.md for new projects.
 - **sc_tools skills as Cursor skill:** Repository root `skills.md` is exposed as Cursor skill `.cursor/skills/sc-tools-skills/SKILL.md`; agent follows skills.md for analysis and coding. Sandbox/local defaults: Docker + Snakemake (documented in skills.md §13 and in the skill).
 - **sc_tools package:** `pl/` (spatial, heatmaps, statistical, volcano, save, gsea), `tl/` (testing, colocalization, deconvolution, io, score_signature, gene_sets, gsea), `memory/` (profiling, gpu), `qc/` (metrics, plots, spatial).
 - **Gene set scoring redesign (Phase 3.5b):** Full overhaul. (1) `sc_tools/data/hallmark_human.json`: 50 bundled MSigDB Hallmark sets (offline). (2) `sc_tools.tl.gene_sets`: `load_hallmark`, `load_msigdb_json`, `load_gmt`, `list_gene_sets`, `validate_gene_signatures`, `merge_gene_signatures`, `update_gene_symbols`, `save_gene_signatures`. (3) `score_signature(method=...)`: scanpy (default), ucell (pyucell), ssgsea (gseapy). (4) `sc_tools.tl.gsea`: `run_ora` (Fisher exact + BH), `run_gsea_pseudobulk` (prerank). (5) `sc_tools.pl.gsea`: `plot_gsea_dotplot`. Optional deps: `pip install sc-tools[geneset]`. 80 tests pass.
@@ -288,8 +288,8 @@ All new code must compile and pass tests. Project scripts that use sc_tools shou
 - [x] 59 new tests (500 total pass, 12 skipped), lint clean.
 
 **4. Phase 0b checkpoint script — PARTIALLY DONE**
-- [x] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.h5ad`. 5 tests.
-- [ ] Snakemake rule `adata_p0` with sentinel `data/{sample_id}/.adata.p0.done`.
+- [x] Generic `scripts/ingest.py` that reads `all_samples.tsv`, calls modality loader, saves per-sample `adata.ingested.h5ad`. 5 tests.
+- [ ] Snakemake rule `adata_ingested` with sentinel `data/{sample_id}/.adata.ingested.done`.
 
 **4. Testing**
 - [ ] ggo_visium project tests: `projects/visium/ggo_visium/tests/`. Integration/smoke tests.

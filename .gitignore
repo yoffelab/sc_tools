@@ -177,9 +177,11 @@ CLAUDE.local.md
 docs/_build/
 docs/api/generated/
 
-# Obsidian — track wiki .obsidian config but ignore root .obsidian workspace
-/.obsidian/workspace.json
-/.obsidian/workspace-mobile.json
+# Obsidian — ignore root workspace state (auto-generated)
+/.obsidian/
+# Wiki: generated files (sync_wiki.py output, Obsidian vault)
+/docs/wiki/
+/docs/archive/
 
 # FST files (R data serialization; always large)
 *.fst

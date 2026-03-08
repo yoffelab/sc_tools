@@ -9,6 +9,51 @@ This journal documents **project-specific** technical and analytical decisions. 
 
 ## Log Entries
 
+### [2026-03-07] — Critical fix: X=zeros in p4 checkpoint; layers['raw'] fallback
+
+- **Root cause:** `adata.immune.celltyped.p4.h5ad` has X matrix = all zeros. Expression data is preserved in `layers['raw']` (Seurat-normalized, centered/scaled values). This caused all heatmaps and marker analyses to show blank/flat output.
+- **Discovery path:** Fig 1b heatmap showed flat colors through 5+ iterations. Diagnostic logging revealed marker std = 0.0000 for ALL 40 markers. SSH inspection confirmed `X[0:5,0:5] = all zeros`, `X.min() = X.max() = 0.0`, but `layers['raw']` has real data with negative values (Seurat scale.data).
+- **Fix applied to 8 scripts:** Added `data_matrix = adata.layers.get("raw", adata.X) if adata.layers else adata.X` pattern to:
+  - `fig1_single_cell_atlas.py` — UMAP (copies layers['raw'] to X for PCA), heatmap, B cell markers
+  - `supp_fig1_qc_panels.py` — marker intensities and distributions
+  - `supp_fig2_bcell.py` — B cell heatmap
+  - `supp_fig3_tcell_myeloid.py` — T cell/myeloid heatmap
+  - `supp_fig4_vessel.py` — endothelial violin plots
+  - `build_lme_classes.py` — TME feature profiles for cluster->LME mapping
+  - `validate_celltypes.py` — validation heatmap
+  - `validate_h5ad_objects.py` — data quality metrics (reports x_source)
+- **Additional fig1 fixes (from prior session, finalized here):**
+  - `figure_config.py`: Added `MORPHOLOGICAL_PATTERNS`, `filter_protein_markers()`, `normalize_celltype()`, `build_celltype_palette(normalize=False)` for distinct colors per subtype, `is_bcell_label()`
+  - Fig 1a UMAP: 19 distinct colors via tab20+tab20b fallback
+  - Fig 1b heatmap: Only T*/M* prefixed subtypes (excludes bcell/stroma/other), z-scored per marker, 40 markers x 16 cell types — shows clear biological patterns (FoxP3 in Tregs, CD68 in macrophages, GrB in cytotoxic)
+  - Fig 1c prevalence: Immune panel only, excludes bcell/Unknown/other
+- **Fig 2-4 safe:** These scripts only use `adata.obs` metadata, not X matrix.
+- **Verified:** Fig1 UMAP, heatmap, prevalence all produce correct output. Supp fig 1 distributions show proper marker intensities.
+
+### [2026-03-07] — Plan B: IMC reprocessing infrastructure (Steps 1-4 of 5)
+
+- **Action:** Implemented Plan B pipeline infrastructure for raw IMC reprocessing from Hyperion MCD files on cayuga. Steps 1-4 complete; Step 5 (SLURM submission) blocked on cayuga VPN access.
+- **Files created/modified:**
+  - `scripts/generate_panel_csv.py` — extracts protein names from h5ad var_names (`Protein-mem`/`-nuc` pattern), filters morphological features, writes imctools-compatible panel CSVs with empty Metal_Tag (to fill from MCD headers). Immune: 38 channels; stromal: 38 channels.
+  - `scripts/generate_phase0_manifests.py` — reads DLC codes from immune h5ad (`DLC_code` column; 84 unique), falls back to clinical TSV for stromal panel (349 cases; stromal h5ad has no patient-level tracking in `orig.ident`). Writes `metadata/phase0/batch1_immune.tsv`, `batch1_stromal.tsv`, `all_samples.tsv`. mcd_file paths are placeholders (`{backup_dir}/{sample_id}.mcd`).
+  - `metadata/panel_immune_t2.csv`, `metadata/panel_stromal_s2.csv` — generated (Metal_Tag empty).
+  - `metadata/phase0/batch1_immune.tsv` (84 rows), `batch1_stromal.tsv` (349 rows), `all_samples.tsv` (433 rows) — generated with placeholder paths.
+  - `config.yaml` — added `phase0a` block (enabled: false, raw_data_dir, output_dir, panel/manifest paths, pipeline_script).
+  - `Snakefile` — added `phase0a_immune`, `phase0a_stromal`, `run_imc_pipeline` rules gated by `_PHASE0A_ENABLED` flag; reads manifests only when enabled.
+- **Key findings from data exploration:**
+  - Immune h5ad (`t2_SO_seurat.h5ad`): 138 unique DLC codes in `obs['DLC_code']` (84 match `DLC\d+` format, rest are CTMA121/0); 49 var_names in `Protein-compartment` format (CellProfiler output, NOT `Protein(IsotopeTag)` format).
+  - Stromal h5ad (`S1_seurat_SO.h5ad`): no DLC codes in any obs column; `orig.ident` = integer cluster IDs; `full_index` = cell row indices. Stromal patient tracking requires `S2_seurat_cellid.csv` from cayuga (not yet downloaded) or path sheet CSVs.
+  - var_names do NOT contain isotope tags — Metal_Tag column must be filled manually from MCD file channel headers or original acquisition panel sheet.
+- **cayuga status:** Not reachable from macOS without Cornell VPN (connection timeout at `cayuga-login1.cac.cornell.edu`). brb is reachable but does not mount cayuga filesystems.
+- **Blocking items for Step 5:**
+  1. Connect to cayuga (VPN) to run discovery commands from Plan Step 1.
+  2. Verify actual MCD file paths (may differ from `{backup_dir}/{sample_id}.mcd` pattern; `3.28.23.DLBCL_image_sheet.csv` on cayuga has authoritative paths).
+  3. Fill `Metal_Tag` in panel CSVs from MCD headers or `6.22.22.file_path_sheet_s1/s2.csv`.
+  4. Verify imctools/CellProfiler availability on cayuga (`conda activate sc_tools && python -c "import imctools"`).
+  5. Confirm `~/elementolab/imc/run_pipeline.py` path for `pipeline_script`.
+  6. Run Snakemake dry-run and submit.
+- **Decision:** Stromal manifest uses clinical TSV fallback (--use-clinical-for-stromal flag) since stromal h5ad has no patient tracking. Once path sheets are downloaded from cayuga, re-run manifest generation with `--path-sheet-stromal` to populate real mcd_file paths and sample IDs.
+
 ### [2025-02-12] – Project setup and planning phase
 
 - **Action:** Created project layout and planning documents for the two-panel IMC DLBCL project (lymph_dlbcl). Added standard directories (`data/`, `figures/`, `metadata/`, `scripts/`, `results/`, `outputs/`) and three core docs: `Mission.md`, `Architecture.md`, `Journal.md`.

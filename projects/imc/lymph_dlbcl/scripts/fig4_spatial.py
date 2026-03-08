@@ -75,8 +75,13 @@ def fig4a_community_composition(adata: ad.AnnData):
             break
 
     ct_col = None
-    for col in ["celltype", "celltype_broad", "major_group", "labels", "meta"]:
+    # Prefer cluster (30 cell types) over broad/unknown labels
+    for col in ["cluster", "celltype", "celltype_broad", "major_group", "labels", "meta"]:
         if col in adata.obs.columns and 2 <= adata.obs[col].nunique() <= 50:
+            # Skip if all values are "Unknown"
+            vals = adata.obs[col].astype(str).str.lower().unique()
+            if len(vals) == 1 and vals[0] == "unknown":
+                continue
             ct_col = col
             break
 
@@ -131,8 +136,11 @@ def fig4b_neighbor_diversity(adata: ad.AnnData):
             break
 
     ct_col = None
-    for col in ["celltype", "celltype_broad", "labels", "meta"]:
+    for col in ["cluster", "celltype", "celltype_broad", "major_group", "labels", "meta"]:
         if col in adata.obs.columns and 2 <= adata.obs[col].nunique() <= 50:
+            vals = adata.obs[col].astype(str).str.lower().unique()
+            if len(vals) == 1 and vals[0] == "unknown":
+                continue
             ct_col = col
             break
 

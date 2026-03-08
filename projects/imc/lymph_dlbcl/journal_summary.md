@@ -6,14 +6,16 @@ Condensed summary. Full entries in `Journal.md`.
 
 Two-panel Hyperion IMC on DLBCL (diffuse large B-cell lymphoma). Immune (T2) and stromal (S2) panels kept separate. Manuscript reproduction: 5 main + 8 supplementary = 13 figures total.
 
-## Current status (2026-03-04)
+## Current status (2026-03-07)
 
-- **Pipeline implemented:** 25 scripts + Snakefile + config.yaml for full manuscript reproduction
-- **Approach:** Hybrid — reuse 47 Seurat-converted h5ad objects (on cayuga); consolidate into sc_tools checkpoints
-- **Remote data:** `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` (cayuga)
+- **Plan A (active):** 25 scripts + Snakefile + config.yaml for full manuscript reproduction using 47 Seurat-converted h5ad objects
+- **Plan B (infrastructure ready, blocked):** Raw MCD reprocessing pipeline; blocked on cayuga VPN access
+  - `generate_panel_csv.py` → `metadata/panel_immune_t2.csv`, `panel_stromal_s2.csv` (38 channels each; Metal_Tag empty)
+  - `generate_phase0_manifests.py` → `metadata/phase0/batch1_immune.tsv` (84 samples), `batch1_stromal.tsv` (349 from clinical fallback)
+  - `config.yaml` `phase0a` block (enabled: false); Snakefile phase0a rules gated by flag
+  - Next: VPN to cayuga → verify MCD paths → fill Metal_Tag → dry-run → submit SLURM
+- **Remote data:** `/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2` (cayuga, VPN required)
 - **48 h5ad files** in `results/seurat_converted/` (immune T1/T2, stromal S1/S2, merged, spatial)
-- **Inventory complete:** 1,668 remote files catalogued with annotated descriptors
-- **Next:** Run download + phase0-1 on cayuga via `snakemake --cores 8 phase0 phase1`
 
 ## Key decisions
 

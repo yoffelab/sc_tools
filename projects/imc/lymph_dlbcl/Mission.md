@@ -78,9 +78,9 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 - [x] **3.2** Assign LME classes (`scripts/build_lme_classes.py`) — 5 classes via Hungarian optimal matching on TME h5ad
   - Cold 31.0% (ms: 35.1%), Stromal 19.2% (21.3%), Cytotoxic 21.3% (20.7%), T cell Reg 15.3% (14.6%), CD206 13.2% (8.2%)
 
-### Phase 4: Figure Reproduction (64 PDFs generated, all scripts pass on cayuga)
+### Phase 4: Figure Reproduction (64 PDFs generated, visual QA in progress)
 
-- [x] **4.1** Fig 1: Single-cell atlas — 4 panels (UMAP x2, heatmap, prevalence; fig1d B cell markers skipped)
+- [x] **4.1** Fig 1: Single-cell atlas — 4 panels (UMAP x2, heatmap, prevalence; fig1d B cell markers skipped). **v9 fix**: layers['raw'] fallback for X=zeros in p4; heatmap now shows z-scored 40 markers x 16 T/M subtypes with clear biological patterns
 - [x] **4.2** Fig 2: LME classes — 6 panels (heatmap, stacked bar x2, violin, proportions x2)
 - [x] **4.3** Fig 3: Clinical — 5 panels (KM OS p=0.0147, KM PFS p=0.0024, Cox forest, COO x2)
 - [x] **4.4** Fig 4: Spatial — 5 panels (community composition, diversity, enrichment, ML, by LME)
@@ -99,9 +99,17 @@ This file holds **project-specific** goals. Repository-level pipeline and phase 
 - [x] **5.1** `config.yaml` with project parameters
 - [x] **5.2** `Snakefile` with full DAG
 
+### Plan B: Raw IMC Reprocessing (Phase 0a) — infrastructure ready, blocked on cayuga VPN
+
+- [x] **B.1** `scripts/generate_panel_csv.py` — extracts markers from h5ad var_names → `metadata/panel_immune_t2.csv`, `metadata/panel_stromal_s2.csv` (Metal_Tag TBD from MCD headers)
+- [x] **B.2** `scripts/generate_phase0_manifests.py` — builds `metadata/phase0/batch1_immune.tsv` (84 samples), `batch1_stromal.tsv` (349 from clinical fallback); mcd_file paths are PLACEHOLDERS
+- [x] **B.3** `config.yaml` `phase0a` block added (enabled: false by default)
+- [x] **B.4** `Snakefile` `phase0a_immune`, `phase0a_stromal`, `run_imc_pipeline` rules (gated by phase0a.enabled)
+- [ ] **B.5 BLOCKED** Cayuga VPN required to: (a) verify MCD file paths, (b) check imctools/CellProfiler availability, (c) fill Metal_Tag in panel CSVs from MCD headers, (d) run dry-run, (e) submit SLURM jobs
+
 ### Phase 6: Verification
 
-- [ ] **6.1** Visual comparison with `manuscript/Figures_v7.1/` originals — QA in progress
+- [ ] **6.1** Visual comparison with `manuscript/Figures_v7.1/` originals — QA in progress. Critical fix applied: X=zeros in p4 checkpoint resolved by layers['raw'] fallback in 8 scripts. Fig 1 heatmap/UMAP/prevalence verified. Supp fig 1-2 verified.
 - [ ] **6.2** Numerical validation (cell counts, LME sizes, KM p-values, AUC)
 - [ ] **6.3** End-to-end Snakemake run
 

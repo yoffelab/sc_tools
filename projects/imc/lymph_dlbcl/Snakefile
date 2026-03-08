@@ -23,8 +23,23 @@ Usage:
 configfile: "config.yaml"
 
 import os
+import pandas as pd
 
 PANELS = config["panels"]  # ["immune", "stromal"]
+
+# ── Plan B: raw IMC reprocessing (Phase 0a) ─────────────────────────────────
+# Activated only when config.phase0a.enabled == true.
+# Requires cayuga access (VPN) and validated raw MCD files.
+_PHASE0A = config.get("phase0a", {})
+_PHASE0A_ENABLED = _PHASE0A.get("enabled", False)
+
+if _PHASE0A_ENABLED:
+    _MANIFEST_IMMUNE = pd.read_csv(_PHASE0A["manifest_immune"], sep="\t")
+    _MANIFEST_STROMAL = pd.read_csv(_PHASE0A["manifest_stromal"], sep="\t")
+    _PHASE0A_SAMPLES_IMMUNE = _MANIFEST_IMMUNE["sample_id"].tolist()
+    _PHASE0A_SAMPLES_STROMAL = _MANIFEST_STROMAL["sample_id"].tolist()
+    _IDX_IMMUNE = _MANIFEST_IMMUNE.set_index("sample_id")
+    _IDX_STROMAL = _MANIFEST_STROMAL.set_index("sample_id")
 
 # ── Backwards-compat checkpoint resolver (panel-aware) ───────────────────────
 # Returns old path when the old file exists and the new one does not.
@@ -48,6 +63,67 @@ ADATA_CELLTYPED = {
 
 # ============================================================
 # Target rules
+# ============================================================
+
+# ============================================================
+# Phase 0a: Raw IMC Reprocessing (Plan B — requires cayuga VPN)
+# ============================================================
+# Enable via: snakemake --config 'phase0a={enabled: true}' phase0a_immune
+# or set phase0a.enabled: true in config.yaml.
+
+if _PHASE0A_ENABLED:
+
+    rule phase0a_immune:
+        """Run IMC pipeline for all immune-panel samples."""
+        input:
+            expand(
+                _PHASE0A["output_dir"] + "/{sample_id}/.done",
+                sample_id=_PHASE0A_SAMPLES_IMMUNE,
+            ),
+
+    rule phase0a_stromal:
+        """Run IMC pipeline for all stromal-panel samples."""
+        input:
+            expand(
+                _PHASE0A["output_dir"] + "/{sample_id}/.done",
+                sample_id=_PHASE0A_SAMPLES_STROMAL,
+            ),
+
+    rule run_imc_pipeline:
+        """Run ElementoLab IMC pipeline for a single sample."""
+        input:
+            mcd=lambda wc: (
+                _IDX_IMMUNE.loc[wc.sample_id, "mcd_file"]
+                if wc.sample_id in _IDX_IMMUNE.index
+                else _IDX_STROMAL.loc[wc.sample_id, "mcd_file"]
+            ),
+            panel=lambda wc: (
+                _IDX_IMMUNE.loc[wc.sample_id, "panel_csv"]
+                if wc.sample_id in _IDX_IMMUNE.index
+                else _IDX_STROMAL.loc[wc.sample_id, "panel_csv"]
+            ),
+        output:
+            done=touch(_PHASE0A["output_dir"] + "/{sample_id}/.done"),
+        params:
+            out_dir=lambda wc: _PHASE0A["output_dir"] + "/" + wc.sample_id,
+            pipeline_script=_PHASE0A["pipeline_script"],
+        log:
+            "outputs/logs/imc_pipeline_{sample_id}.log",
+        resources:
+            mem_mb=16000,
+            cpus=4,
+        shell:
+            """
+            python {params.pipeline_script} \
+                --mcd {input.mcd} \
+                --panel {input.panel} \
+                --output {params.out_dir} \
+                > {log} 2>&1
+            """
+
+
+# ============================================================
+# Main pipeline targets
 # ============================================================
 
 rule all:

@@ -34,6 +34,12 @@ class TestPhaseSpec:
         assert spec.checkpoint is None
         assert spec.optional is False
         assert spec.iterative is False
+        assert spec.required_obs == []
+        assert spec.required_obsm == []
+        assert spec.x_format == ""
+        assert spec.qc_report is None
+        assert spec.old_code == ""
+        assert spec.human_in_loop is False
 
     def test_custom_fields(self):
         from sc_tools.pipeline import PhaseSpec
@@ -50,6 +56,50 @@ class TestPhaseSpec:
         assert spec.checkpoint == "results/custom.h5ad"
         assert spec.optional is True
         assert spec.iterative is True
+
+    def test_new_metadata_fields(self):
+        from sc_tools.pipeline import PhaseSpec
+
+        spec = PhaseSpec(
+            label="Rich Phase",
+            depends_on=[],
+            required_obs=["sample", "batch"],
+            required_obsm=["spatial", "X_pca"],
+            x_format="raw counts",
+            qc_report="pre_filter_qc_{date}.html",
+            old_code="p1",
+            human_in_loop=True,
+        )
+        assert spec.required_obs == ["sample", "batch"]
+        assert spec.required_obsm == ["spatial", "X_pca"]
+        assert spec.x_format == "raw counts"
+        assert spec.qc_report == "pre_filter_qc_{date}.html"
+        assert spec.old_code == "p1"
+        assert spec.human_in_loop is True
+
+    def test_standard_phases_have_old_codes(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        phases_with_old_code = [s for s, p in STANDARD_PHASES.items() if p.old_code]
+        # All 10 standard phases should have old_code set
+        assert len(phases_with_old_code) == 10
+
+    def test_qc_filter_has_required_metadata(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        qc = STANDARD_PHASES["qc_filter"]
+        assert "sample" in qc.required_obs
+        assert "raw_data_dir" in qc.required_obs
+        assert "spatial" in qc.required_obsm
+        assert qc.x_format == "raw counts, concatenated"
+        assert qc.qc_report is not None
+
+    def test_human_in_loop_phases(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        hil_phases = [s for s, p in STANDARD_PHASES.items() if p.human_in_loop]
+        assert "metadata_attach" in hil_phases
+        assert "celltype_manual" in hil_phases
 
 
 # ---------------------------------------------------------------------------
@@ -312,13 +362,13 @@ class TestGetPhaseCheckpoint:
         from sc_tools.pipeline import get_phase_checkpoint
 
         cp = get_phase_checkpoint("qc_filter")
-        assert cp == "results/adata.raw.h5ad"
+        assert cp == "results/adata.filtered.h5ad"
 
     def test_checkpoint_with_sample_id(self):
         from sc_tools.pipeline import get_phase_checkpoint
 
         cp = get_phase_checkpoint("ingest_load", sample_id="sample1")
-        assert cp == "data/sample1/adata.h5ad"
+        assert cp == "data/sample1/adata.ingested.h5ad"
 
     def test_none_checkpoint(self):
         from sc_tools.pipeline import get_phase_checkpoint

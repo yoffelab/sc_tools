@@ -631,6 +631,9 @@ def set_phase_status(
     phase: str,
     status: str,
     notes: str = "",
+    n_obs: int = 0,
+    n_vars: int = 0,
+    n_samples: int = 0,
 ) -> str:
     """Update the pipeline status for a phase.
 
@@ -647,6 +650,12 @@ def set_phase_status(
         New status: not_started | in_progress | complete | failed | skipped.
     notes
         Optional free-text notes (e.g. method selection rationale).
+    n_obs
+        Number of cells/spots at this phase (0 to skip).
+    n_vars
+        Number of genes/proteins at this phase (0 to skip).
+    n_samples
+        Number of samples at this phase (0 to skip).
 
     Returns
     -------
@@ -660,8 +669,18 @@ def set_phase_status(
             phase,
             status=status,
             notes=notes if notes else None,
+            n_obs=n_obs if n_obs else None,
+            n_vars=n_vars if n_vars else None,
+            n_samples=n_samples if n_samples else None,
         )
-        return f"Set phase '{phase}' to status='{status}' for project '{project_name}'."
+        parts = [f"Set phase '{phase}' to status='{status}' for project '{project_name}'."]
+        if n_obs:
+            parts.append(f"n_obs={n_obs:,}")
+        if n_vars:
+            parts.append(f"n_vars={n_vars:,}")
+        if n_samples:
+            parts.append(f"n_samples={n_samples}")
+        return " ".join(parts)
     except Exception as exc:
         return f"ERROR: {exc}"
 

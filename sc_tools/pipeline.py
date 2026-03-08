@@ -19,7 +19,7 @@ Quick start
 
     # Where should the qc_filter output go?
     get_phase_checkpoint('qc_filter')
-    # -> 'results/adata.raw.h5ad'
+    # -> 'results/adata.filtered.h5ad'
 
     # Register a custom phase for a project:
     from sc_tools.pipeline import extend_dag, PhaseSpec
@@ -67,6 +67,18 @@ class PhaseSpec:
         Default output filename template.  May contain ``{sample_id}`` or
         other format fields.  ``None`` means the phase produces no single
         checkpoint file (e.g. figures-only or per-sample outputs).
+    required_obs:
+        obs columns that must exist after this phase completes.
+    required_obsm:
+        obsm keys that must exist after this phase completes.
+    x_format:
+        Description of what X should contain (e.g. "raw counts", "normalized").
+    qc_report:
+        Filename template for the QC report produced by this phase (if any).
+    old_code:
+        Legacy phase code (e.g. "p0a", "p1", "p3.5b") for documentation.
+    human_in_loop:
+        If True, this phase requires human intervention to complete.
     optional:
         If True, this phase can be skipped without breaking downstream phases.
     iterative:
@@ -79,6 +91,12 @@ class PhaseSpec:
     depends_on: list[str] = field(default_factory=list)
     branch: str = "main"
     checkpoint: str | None = None
+    required_obs: list[str] = field(default_factory=list)
+    required_obsm: list[str] = field(default_factory=list)
+    x_format: str = ""
+    qc_report: str | None = None
+    old_code: str = ""
+    human_in_loop: bool = False
     optional: bool = False
     iterative: bool = False
 
@@ -94,25 +112,41 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=[],
         branch="ingestion",
         checkpoint=None,  # platform output dirs (not a single h5ad)
+        old_code="p0a",
     ),
     "ingest_load": PhaseSpec(
         label="Load into AnnData",
         depends_on=["ingest_raw"],
         branch="ingestion",
-        checkpoint="data/{sample_id}/adata.h5ad",  # per-sample
+        checkpoint="data/{sample_id}/adata.ingested.h5ad",  # per-sample
+        required_obs=["sample", "library_id", "raw_data_dir"],
+        required_obsm=["spatial"],
+        x_format="raw counts",
+        old_code="p0b",
     ),
     # ── QC & Metadata ────────────────────────────────────────────────────────
     "qc_filter": PhaseSpec(
         label="QC Filtering + Concatenation",
         depends_on=["ingest_load"],
         branch="main",
-        checkpoint="results/adata.raw.h5ad",
+        checkpoint="results/adata.filtered.h5ad",
+        required_obs=["sample", "raw_data_dir"],
+        required_obsm=["spatial"],
+        x_format="raw counts, concatenated",
+        qc_report="pre_filter_qc_{date}.html",
+        old_code="p1",
     ),
     "metadata_attach": PhaseSpec(
         label="Metadata Attachment",
         depends_on=["qc_filter"],
         branch="main",
         checkpoint="results/adata.annotated.h5ad",
+        required_obs=["sample", "raw_data_dir"],
+        required_obsm=["spatial"],
+        x_format="raw counts, concatenated",
+        qc_report="post_filter_qc_{date}.html",
+        old_code="p2",
+        human_in_loop=True,
     ),
     # ── Preprocessing ────────────────────────────────────────────────────────
     "preprocess": PhaseSpec(
@@ -120,6 +154,11 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=["metadata_attach"],
         branch="main",
         checkpoint="results/adata.normalized.h5ad",
+        required_obs=["leiden"],
+        required_obsm=["X_scvi"],
+        x_format="normalized (adata.raw backed up)",
+        qc_report="post_integration_qc_{date}.html",
+        old_code="p3",
     ),
     # ── Parallel branches from preprocessing ─────────────────────────────────
     "demographics": PhaseSpec(
@@ -127,6 +166,7 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=["preprocess"],
         branch="demographics",
         checkpoint=None,  # figures only, no checkpoint file
+        old_code="p3.5",
         optional=True,
     ),
     "scoring": PhaseSpec(
@@ -134,6 +174,9 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=["preprocess"],
         branch="scoring",
         checkpoint="results/adata.scored.h5ad",
+        required_obsm=["signature_score", "signature_score_z"],
+        x_format="normalized",
+        old_code="p3.5b",
     ),
     # ── Cell typing (from scoring) ────────────────────────────────────────────
     "celltype_manual": PhaseSpec(
@@ -141,6 +184,11 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=["scoring"],
         branch="celltyping",
         checkpoint="results/adata.celltyped.h5ad",
+        required_obs=["celltype", "celltype_broad"],
+        x_format="normalized",
+        qc_report="post_celltyping_qc_{date}.html",
+        old_code="p4",
+        human_in_loop=True,
         optional=True,  # skippable if auto typing is adequate
         iterative=True,  # human-in-loop: annotate → review → repeat
     ),
@@ -150,12 +198,14 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         depends_on=["scoring"],  # can start from scoring or after celltype_manual
         branch="downstream",
         checkpoint=None,
+        old_code="p5",
     ),
     "meta_analysis": PhaseSpec(
         label="Meta Analysis",
         depends_on=["biology"],
         branch="meta",
         checkpoint=None,
+        old_code="p6/p7",
         optional=True,
     ),
 }

@@ -36,9 +36,9 @@ Usage:
     issues = validate_checkpoint(adata, phase="p4")   # -> celltype_manual
 
     # Validate from file (preferred naming)
-    issues = validate_file("results/adata.raw.h5ad", phase="qc_filter")
+    issues = validate_file("results/adata.filtered.h5ad", phase="qc_filter")
     # Legacy filename + legacy code (both still accepted during migration):
-    issues = validate_file("results/adata.raw.p1.h5ad", phase="p1")
+    issues = validate_file("results/adata.raw.h5ad", phase="p1")
 """
 
 from __future__ import annotations

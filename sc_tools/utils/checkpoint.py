@@ -6,14 +6,14 @@ an existing project has data written under the old p-code filenames
 legacy file and return its path (with a :class:`DeprecationWarning`) so
 pipelines do not break.  New runs always write to the current filenames.
 
-Phase slug  -> canonical filename             (legacy filename)
-----------     --------------------------      ----------------------------------------
-qc_filter   -> results/adata.raw.h5ad         results/adata.raw.p1.h5ad
-metadata_attach -> results/adata.annotated.h5ad results/adata.annotated.p2.h5ad
-preprocess  -> results/adata.normalized.h5ad  results/adata.normalized.p3.h5ad
-scoring     -> results/adata.scored.h5ad      results/adata.normalized.scored.p35.h5ad
-celltype_manual -> results/adata.celltyped.h5ad results/adata.celltyped.p4.h5ad
-ingest_load -> data/{sample_id}/adata.h5ad    data/{sample_id}/adata.p0.h5ad
+Phase slug  -> canonical filename                  (legacy filenames)
+----------     --------------------------           ----------------------------------------
+qc_filter   -> results/adata.filtered.h5ad         results/adata.raw.h5ad, results/adata.raw.p1.h5ad
+metadata_attach -> results/adata.annotated.h5ad     results/adata.annotated.p2.h5ad
+preprocess  -> results/adata.normalized.h5ad        results/adata.normalized.p3.h5ad
+scoring     -> results/adata.scored.h5ad            results/adata.normalized.scored.p35.h5ad
+celltype_manual -> results/adata.celltyped.h5ad     results/adata.celltyped.p4.h5ad
+ingest_load -> data/{sample_id}/adata.ingested.h5ad data/{sample_id}/adata.h5ad, data/{sample_id}/adata.p0.h5ad
 
 Usage::
 
@@ -41,8 +41,9 @@ import anndata as ad
 # Canonical (new) and legacy (old) checkpoint filename templates
 # ---------------------------------------------------------------------------
 
-_CHECKPOINT_MAP: dict[str, tuple[str, str]] = {
+_CHECKPOINT_MAP: dict[str, tuple[str, ...]] = {
     "qc_filter": (
+        "results/adata.filtered.h5ad",
         "results/adata.raw.h5ad",
         "results/adata.raw.p1.h5ad",
     ),
@@ -63,6 +64,7 @@ _CHECKPOINT_MAP: dict[str, tuple[str, str]] = {
         "results/adata.celltyped.p4.h5ad",
     ),
     "ingest_load": (
+        "data/{sample_id}/adata.ingested.h5ad",
         "data/{sample_id}/adata.h5ad",
         "data/{sample_id}/adata.p0.h5ad",
     ),
@@ -107,26 +109,28 @@ def resolve_checkpoint_path(
         )
 
     project_dir = Path(project_dir)
-    new_template, old_template = _CHECKPOINT_MAP[slug]
+    templates = _CHECKPOINT_MAP[slug]
+    canonical_template = templates[0]
+    legacy_templates = templates[1:]
 
-    new_path = project_dir / new_template.format(**kwargs)
-    old_path = project_dir / old_template.format(**kwargs)
+    canonical_path = project_dir / canonical_template.format(**kwargs)
 
-    if new_path.exists():
-        return new_path
+    if canonical_path.exists():
+        return canonical_path
 
-    if old_path.exists():
-        warnings.warn(
-            f"Checkpoint found at legacy path '{old_path}'. "
-            f"Consider renaming to '{new_path}' to use the current convention. "
-            "The p-code filenames (adata.raw.p1.h5ad, etc.) are old nomenclature.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return old_path
+    for legacy_template in legacy_templates:
+        legacy_path = project_dir / legacy_template.format(**kwargs)
+        if legacy_path.exists():
+            warnings.warn(
+                f"Checkpoint found at legacy path '{legacy_path}'. "
+                f"Consider renaming to '{canonical_path}' to use the current convention.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return legacy_path
 
-    # Neither exists — return canonical path so callers get a clear FileNotFoundError
-    return new_path
+    # None exists — return canonical path so callers get a clear FileNotFoundError
+    return canonical_path
 
 
 def read_checkpoint(

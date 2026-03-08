@@ -169,7 +169,7 @@ def run_robin_reports():
     output_dir = f"{base}/figures/QC"
     os.makedirs(output_dir, exist_ok=True)
 
-    _raw_new = f"{base}/results/adata.raw.h5ad"
+    _raw_new = f"{base}/results/adata.filtered.h5ad"
     _raw_old = f"{base}/results/adata.raw.p1.h5ad"
     p1_path = _raw_new if os.path.exists(_raw_new) else _raw_old
     _ann_new = f"{base}/results/adata.annotated.h5ad"

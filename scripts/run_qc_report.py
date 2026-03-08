@@ -11,11 +11,11 @@ Supports three report types aligned with pipeline phases:
 Usage:
   # Pre-filter only
   python scripts/run_qc_report.py --report pre_filter \\
-    --adata results/adata.raw.h5ad --figures-dir figures
+    --adata results/adata.filtered.h5ad --figures-dir figures
 
   # Post-filter (pre + post)
   python scripts/run_qc_report.py --report post_filter \\
-    --adata results/adata.raw.h5ad --adata-post results/adata.annotated.h5ad \\
+    --adata results/adata.filtered.h5ad --adata-post results/adata.annotated.h5ad \\
     --figures-dir figures
 
   # Post-integration
@@ -392,7 +392,7 @@ def run_qc_report(
             classified,
             sample_col=sample_col,
             modality=modality,
-            output_path=results_dir / "adata.raw.h5ad",
+            output_path=results_dir / "adata.filtered.h5ad",
             backup_path=results_dir / "adata.raw.backup.qcfail_included.h5ad",
         )
 

@@ -87,7 +87,7 @@ def run_ingestion(
             if save_per_sample and per_sample_dir is not None:
                 out_dir = per_sample_dir / sample_id
                 out_dir.mkdir(parents=True, exist_ok=True)
-                out_path = out_dir / "adata.h5ad"  # ingest_load canonical name
+                out_path = out_dir / "adata.ingested.h5ad"  # ingest_load canonical name
                 adata.write_h5ad(out_path)
                 logger.info("Saved per-sample checkpoint: %s", out_path)
 
@@ -123,13 +123,13 @@ def parse_args(argv=None):
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("results/adata.raw.h5ad"),
-        help="Output path for concatenated h5ad (default: results/adata.raw.h5ad).",
+        default=Path("results/adata.filtered.h5ad"),
+        help="Output path for concatenated h5ad (default: results/adata.filtered.h5ad).",
     )
     parser.add_argument(
         "--save-per-sample",
         action="store_true",
-        help="Save per-sample adata.h5ad checkpoints.",
+        help="Save per-sample adata.ingested.h5ad checkpoints.",
     )
     parser.add_argument(
         "--per-sample-dir",

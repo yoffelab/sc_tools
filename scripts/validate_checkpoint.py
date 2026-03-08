@@ -2,18 +2,18 @@
 """CLI wrapper for sc_tools checkpoint validation.
 
 Usage (preferred — semantic slug names, new nomenclature):
-    python scripts/validate_checkpoint.py results/adata.raw.h5ad --phase qc_filter
+    python scripts/validate_checkpoint.py results/adata.filtered.h5ad --phase qc_filter
     python scripts/validate_checkpoint.py results/adata.annotated.h5ad --phase metadata_attach
     python scripts/validate_checkpoint.py results/adata.normalized.h5ad --phase preprocess
     python scripts/validate_checkpoint.py results/adata.scored.h5ad --phase scoring
     python scripts/validate_checkpoint.py results/adata.celltyped.h5ad --phase celltype_manual
 
 Usage (with flags):
-    python scripts/validate_checkpoint.py results/adata.raw.h5ad --phase qc_filter --fix
-    python scripts/validate_checkpoint.py results/adata.raw.h5ad --phase qc_filter --warn-only
+    python scripts/validate_checkpoint.py results/adata.filtered.h5ad --phase qc_filter --fix
+    python scripts/validate_checkpoint.py results/adata.filtered.h5ad --phase qc_filter --warn-only
 
 Deprecated (old nomenclature — still accepted, emits DeprecationWarning):
-    python scripts/validate_checkpoint.py results/adata.raw.p1.h5ad --phase p1
+    python scripts/validate_checkpoint.py results/adata.raw.h5ad --phase p1
     python scripts/validate_checkpoint.py results/adata.annotated.p2.h5ad --phase p2
 
 Designed for Snakemake shell rules. Exit code 1 on failure unless --warn-only.

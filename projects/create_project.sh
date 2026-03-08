@@ -139,7 +139,7 @@ cat > "${PROJECT_ROOT}/CLAUDE.md" << CLAUDE_EOF
 ## Sync Before Work
 
 1. @Mission.md — current todo list and phase status
-2. @journal_summary.md — recent decisions
+2. @Journal.md — recent decisions and dated entries
 
 For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
 
@@ -179,7 +179,7 @@ pytest projects/${DATA_TYPE}/${PROJECT_NAME}/tests/ -v
 
 | Path | Description |
 |------|-------------|
-| \`results/adata.raw.h5ad\` | qc_filter phase output |
+| \`results/adata.filtered.h5ad\` | qc_filter phase output |
 | \`results/adata.annotated.h5ad\` | metadata_attach phase output |
 | \`results/adata.normalized.h5ad\` | preprocess phase output |
 | \`results/adata.scored.h5ad\` | scoring phase output (primary analysis input) |
@@ -230,7 +230,7 @@ cat > "${PROJECT_ROOT}/Snakefile" << SNAKEFILE_EOF
 # sc_tools.pipeline. Rule names and checkpoint filenames follow the slugs:
 #
 #   Slug              Old code (DEPRECATED)   Checkpoint file
-#   qc_filter         p1                      results/adata.raw.h5ad
+#   qc_filter         p1                      results/adata.filtered.h5ad
 #   metadata_attach   p2                      results/adata.annotated.h5ad
 #   preprocess        p3                      results/adata.normalized.h5ad
 #   scoring           p35                     results/adata.scored.h5ad
@@ -270,22 +270,22 @@ rule ingest_raw:
 
 # ---- qc_filter: QC + Concatenation ----
 rule adata_qc_filter:
-    output: "results/adata.raw.h5ad"
+    output: "results/adata.filtered.h5ad"
     input: "scripts/ingest.py"
     shell: run_container("scripts/ingest.py")
 
 rule validate_qc_filter:
-    input: "results/adata.raw.h5ad"
-    output: touch("results/.adata.raw.validated")
-    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.raw.h5ad --phase qc_filter --fix"
+    input: "results/adata.filtered.h5ad"
+    output: touch("results/.adata.filtered.validated")
+    shell: f"cd {{ROOT}} && python scripts/validate_checkpoint.py {{PROJECT}}/results/adata.filtered.h5ad --phase qc_filter --fix"
 
 rule qc_filter:
-    input: "results/adata.raw.h5ad", "results/.adata.raw.validated"
+    input: "results/adata.filtered.h5ad", "results/.adata.filtered.validated"
 
 # ---- metadata_attach: Metadata Attachment ----
 rule adata_metadata_attach:
     output: "results/adata.annotated.h5ad"
-    input: "results/adata.raw.h5ad", "results/.adata.raw.validated", "metadata/sample_metadata.csv"
+    input: "results/adata.filtered.h5ad", "results/.adata.filtered.validated", "metadata/sample_metadata.csv"
     shell: run_container("scripts/attach_metadata.py")
 
 rule validate_metadata_attach:
@@ -340,19 +340,19 @@ rule celltype_manual:
 
 # ---- QC reports (date-versioned HTML) ----
 rule qc_pre_filter:
-    input: "results/adata.raw.h5ad"
+    input: "results/adata.filtered.h5ad"
     output: touch("figures/QC/pre_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report pre_filter --adata results/adata.raw.h5ad --figures-dir figures --modality ${DATA_TYPE}"
+        + " --report pre_filter --adata results/adata.filtered.h5ad --figures-dir figures --modality ${DATA_TYPE}"
     )
 
 rule qc_post_filter:
-    input: "results/adata.raw.h5ad", "results/adata.annotated.h5ad"
+    input: "results/adata.filtered.h5ad", "results/adata.annotated.h5ad"
     output: touch("figures/QC/post_filter_qc.done")
     shell: (
         run_container(ROOT + "/scripts/run_qc_report.py")
-        + " --report post_filter --adata results/adata.raw.h5ad"
+        + " --report post_filter --adata results/adata.filtered.h5ad"
         + " --adata-post results/adata.annotated.h5ad --figures-dir figures --modality ${DATA_TYPE}"
     )
 

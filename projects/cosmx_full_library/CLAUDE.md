@@ -43,7 +43,7 @@ pytest projects/cosmx_full_library/tests/ -v
 
 | Path | Description |
 |------|-------------|
-| `results/adata.raw.h5ad` | qc_filter output |
+| `results/adata.filtered.h5ad` | qc_filter output |
 | `results/adata.scored.h5ad` | scoring output (primary analysis input) |
 | `metadata/gene_signatures.json` | Gene signatures |
 | `figures/manuscript/` | Publication figures |

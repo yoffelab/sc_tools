@@ -79,7 +79,7 @@ Read background task output via `TaskOutput`. Then:
 - SSH to verify expected output files exist (binned_outputs, segmented_outputs, .h5ad, etc.)
 - Update project Mission.md — mark tasks `[x]`, update status line
 - Add Journal.md entry with date, job ID, results
-- Update journal_summary.md
+- Update Journal.md with dated entry
 
 **If FAILED:**
 - Check SLURM .err log: `ssh brb "cat /path/to/logs/job_<id>.err | tail -50"`

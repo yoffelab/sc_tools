@@ -12,7 +12,7 @@ allowed-tools: Read Write Edit Glob Grep
 ### Mission.md / Journal.md (sc_tools standard)
 - Mission.md: todo list format with checkboxes, phases, blockers
 - Journal.md: dated entries — action, rationale, decisions
-- journal_summary.md: condensed bullets, kept short for context window
+- Journal.md: dated entries recording actions, rationale, and decisions
 - No apostrophes in any generated documentation text
 
 ### Architecture / Design Docs
@@ -26,8 +26,8 @@ Structure:
 Use Mermaid for diagrams:
 ```mermaid
 graph LR
-    A[Phase 0b: adata.p0.h5ad] --> B[Phase 1: adata.raw.p1.h5ad]
-    B --> C[Phase 2: adata.annotated.p2.h5ad]
+    A[Phase 0b: adata.ingested.h5ad] --> B[Phase 1: adata.filtered.h5ad]
+    B --> C[Phase 2: adata.annotated.h5ad]
 ```
 
 ### Runbooks (SLURM jobs, HPC procedures)

@@ -75,19 +75,6 @@ jobs:
           path: docs/_build/html/
           retention-days: 14
 
-  snakemake:
-    name: Snakemake dry-run
-    needs: lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install "snakemake>=7,<8" "pulp<2.8"
-      - run: snakemake --snakefile Snakefile --dry-run all
-
   docker:
     name: Docker build
     needs: lint

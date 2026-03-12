@@ -55,8 +55,8 @@ List things that are explicitly NOT part of this plan to prevent scope creep.
 ## sc_tools Plan Checklist
 
 Before presenting a plan:
-- [ ] Read `Architecture.md` to confirm no checkpoint naming violations
-- [ ] Read `Mission.md` to confirm this aligns with current priorities
+- [ ] Read `docs/Architecture.md` to confirm no checkpoint naming violations
+- [ ] Read `docs/Mission.md` to confirm this aligns with current priorities
 - [ ] Verify the plan follows sc_tools conventions (obsm keys, checkpoint names, no project-specific code in sc_tools)
 - [ ] Include a test step before the implementation step (TDD order)
 - [ ] Include `make lint` in verification

@@ -82,6 +82,26 @@ deconvolution = [
     "scvi-tools>=1.0",
     "tangram-sc>=1.0",
 ]
+# Pipeline runtime: everything needed for HPC jobs (baked into the container image)
+# Install: pip install -e ".[pipeline]"
+pipeline = [
+    "scvi-tools>=1.0",
+    "tangram-sc>=1.0",
+    "harmonypy",
+    "bbknn",
+    "scanorama",
+    "leidenalg",
+    "igraph",
+    "lifelines>=0.27",
+    "scib-metrics>=0.4",
+    "plotly>=5.18",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "marsilea>=0.4",
+    "fsspec>=2024.1",
+    "s3fs>=2024.1",
+    "zarr>=2.18",
+]
 # Gene set scoring and enrichment testing
 geneset = [
     "gseapy>=1.0",

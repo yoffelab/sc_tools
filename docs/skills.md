@@ -8,21 +8,21 @@ This document defines actionable, reproducible skills and best-practice guidelin
 
 # Part I: Analysis Pipeline
 
-Core computational steps in execution order (Phases 1-6 of the pipeline).
+Core computational steps in execution order (pipeline phases `ingest_raw` through `meta_analysis`).
 
 ---
 
 ## 1. Data Ingestion, Integrity, and Multi-Modal Containers
 
-### Phase 0 → AnnData / SpatialData Flow
+### `ingest_raw` / `ingest_load` → AnnData / SpatialData Flow
 
-Phase 0 is split into two sub-steps:
-- **Phase 0a:** Run platform tools (Space Ranger, Xenium Ranger, IMC pipeline, CosMx export) → `data/{sample_id}/outs/`
-- **Phase 0b:** Load per-sample into portable format → `data/{sample_id}/adata.ingested.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional, for Visium HD / Xenium)
+`ingest_raw` / `ingest_load` is split into two sub-steps:
+- **`ingest_raw`:** Run platform tools (Space Ranger, Xenium Ranger, IMC pipeline, CosMx export) → `data/{sample_id}/outs/`
+- **`ingest_load`:** Load per-sample into portable format → `data/{sample_id}/adata.ingested.h5ad` (required) and/or `data/{sample_id}/spatialdata.zarr` (optional, for Visium HD / Xenium)
 
-Use `sc_tools.ingest.loaders` for Phase 0b loading. Each loader sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
+Use `sc_tools.ingest.loaders` for `ingest_load` loading. Each loader sets `obs['sample']`, `obs['library_id']`, `obs['raw_data_dir']`, `obsm['spatial']`.
 
-| Modality | Phase 0b loader | Notes |
+| Modality | `ingest_load` loader | Notes |
 |----------|----------------|-------|
 | Visium | `load_visium_sample()` | H&E in `uns['spatial']` |
 | Visium HD | `load_visium_hd_sample()` | 8um bins default; parquet positions |
@@ -31,7 +31,7 @@ Use `sc_tools.ingest.loaders` for Phase 0b loading. Each loader sets `obs['sampl
 | IMC | `load_imc_sample()` | Reads segmented h5ad |
 | CosMx | `load_cosmx_sample()` | Flat CSV/Parquet or RDS (rpy2+anndata2ri); centroid coords |
 
-Phase 1 then loads all per-sample `adata.ingested.h5ad` files, applies per-sample QC, and concatenates via `concat_samples()` → `results/adata.filtered.h5ad`.
+`qc_filter` then loads all per-sample `adata.ingested.h5ad` files, applies per-sample QC, and concatenates via `concat_samples()` → `results/adata.filtered.h5ad`.
 
 ### Core Skills
 - Load data into standardized containers: **AnnData** for single-modality, **MuData** for multi-modal (multi-omics) in-memory, and **SpatialData** for multi-modal datasets (images, masks, points, and expression).
@@ -70,13 +70,13 @@ Phase 1 then loads all per-sample `adata.ingested.h5ad` files, applies per-sampl
 - **scVI-tools:** Use raw counts for training Variational Autoencoders (VAEs) to learn a latent space that accounts for technical noise and library size without manual scaling.
 - Ensure normalization logic does not introduce spatial artifacts or over-correct biological variance.
 
-### Modality-Specific Normalization (Phase 3)
+### Modality-Specific Normalization (`preprocess`)
 
 | Modality | Normalization | Integration | Feature Selection | Special Notes |
 |----------|--------------|-------------|-------------------|---------------|
 | Visium / Visium HD | Raw counts to scVI (no manual norm for VAE path); `normalize_total` + `log1p` for non-VAE | scVI (default) | HVG with `batch_key`; optionally intersect with SVG | Backup `adata.raw`; filter MT/RP/HB genes |
 | Xenium | `normalize_total` + `log1p` | Standard PCA or Harmony/scVI for multi-sample | HVG on log-normalized data | Tune normalization per dataset; n_PCs critical for KNN |
-| CosMx | `normalize_total` + `log1p` | Standard or Harmony/scVI | HVG | Phase 0b: flat CSV/Parquet or RDS → `load_cosmx_sample()`; detection algorithm changed 2023-2024 |
+| CosMx | `normalize_total` + `log1p` | Standard or Harmony/scVI | HVG | `ingest_load`: flat CSV/Parquet or RDS → `load_cosmx_sample()`; detection algorithm changed 2023-2024 |
 | IMC | `arcsinh(X/5)` -- NOT `log1p` | CytoVI (scvi-tools, totalVI-inspired) | All markers (30-50 proteins); no HVG step | Segmentation quality is critical upstream step |
 
 **Implementation:** `sc_tools.pp.preprocess(adata, modality=..., integration=..., ...)` dispatches to modality-specific recipes. Individual steps (`backup_raw`, `normalize_total`, `log_transform`, `arcsinh_transform`, `filter_genes_by_pattern`, `pca`, `cluster`, etc.) are all importable from `sc_tools.pp` for fine-grained control.
@@ -449,7 +449,7 @@ Workflow standards, metadata management, testing, and continuous improvement.
 
 ### Required Practices
 - Use version control (Git) for all analysis code and notebook checkpoints.
-- **Workflow Manager:** **Snakemake** is the workflow engine for all environments (dev, sandbox, production, CI). Each project has a Snakefile implementing the phase-dependent pipeline (Phases 1-7 documented in Mission.md, Architecture.md, README). Makefile may coexist for convenience targets. Run Snakemake dry-run in CI to validate the workflow.
+- **Workflow Manager:** **Snakemake** is the workflow engine for all environments (dev, sandbox, production, CI). Each project has a Snakefile implementing the phase-dependent pipeline (pipeline phases documented in Mission.md, Architecture.md, README). Makefile may coexist for convenience targets. Run Snakemake dry-run in CI to validate the workflow.
 - **Containerization:** Use **Apptainer/Singularity** as the primary container runtime (Linux/HPC). Use **Docker** as the fallback for macOS and Windows where Apptainer is not natively available. The pipeline **auto-configures** via `scripts/run_container.sh`: detect platform and select the appropriate runtime. Define one container image per pipeline; publish to a registry (e.g. Docker Hub, GHCR) so HPC can pull via Apptainer. Ensure environment parity across local and HPC runs.
 - **Packaging and distribution:** Make package compatible with pip, uv, and poetry; support **PyPI deployment** so the package can be installed via `pip install <package_name>`. Use `pyproject.toml` with build-backend and versioning; publish via GitHub Actions on release (trusted publishing or secrets), never store PyPI credentials in the repo.
 - **Linting:** Apply a consistent linter (e.g. **Ruff** or flake8) and optionally a formatter (e.g. Ruff format or Black); config in repo (`pyproject.toml` or `ruff.toml`). Do not commit code that fails the configured lint check; fix or explicitly ignore with justification.
@@ -620,7 +620,7 @@ srun --partition=scu-gpu --gres=gpu:a100:1 --cpus-per-task=8 --mem=64G --time=2:
 - For custom Cellpose/StarDist segmentation: separate GPU array job.
 - `--gres=gpu:1`, 4–8 CPUs, 32G RAM per task.
 
-#### Per-sample QC and loading (Phase 0b → Phase 1) — array per sample
+#### Per-sample QC and loading (`ingest_load` → `qc_filter`) — array per sample
 
 - Load per-sample adata, apply `filter_spots()`, save `adata.ingested.h5ad`.
 - Each task: 4–8 CPUs, 32–64G RAM (depending on modality; Visium HD needs more).
@@ -702,7 +702,7 @@ rsc.get.anndata_to_CPU(adata)          # move back before saving
 | rapids neighbors+UMAP+leiden | 4 | 64G | 1 | 30min–2h |
 | Deconvolution (per library) | 8–16 | 64–128G | 1 | 1–4h |
 | Signature scoring | 8 | 32G | — | 30min |
-| Phase 5 figures | 4 | 32G | — | 1h |
+| `biology` figures | 4 | 32G | — | 1h |
 
 Always add 20–30% headroom to RAM estimates (Lustre buffering, Python overhead).
 
@@ -874,7 +874,7 @@ Orchestrator agent
 2. **One agent per phase.** Each agent handles one pipeline phase (or one cluster of related jobs). Hand off via checkpoint file existence.
 3. **Idempotent operations.** Every script and sbatch must be safe to re-run: check for existing output before recomputing. Use Snakemake rules — they enforce input/output contracts automatically.
 4. **Explicit status files.** Write `results/.phase1.done` (via `touch`) on success; write `results/.phase1.failed` with error message on failure. Downstream agents gate on these sentinels.
-5. **Parallel branches are independent.** Phase 3.5 (Demographics) and 3.5b (Gene scoring) can run as parallel agents from the same Phase 3 checkpoint. Neither blocks the other.
+5. **Parallel branches are independent.** `demographics` and `scoring` can run as parallel agents from the same `preprocess` checkpoint. Neither blocks the other.
 6. **Job submission agent is separate from analysis agent.** One agent writes and submits sbatch files; a separate agent (or the same agent in a later turn) monitors and acts on results. Do not poll in a tight loop — poll with `gh run list` or `sacct` at 60–120 second intervals.
 
 #### Example: launching parallel per-sample ingestion in Claude Code
@@ -899,12 +899,12 @@ for batch in ["batch1", "batch2"]:
 
 | Stage | Agent role | Parallelism |
 |-------|-----------|-------------|
-| Phase 0a (SpaceRanger) | Job submission agent | Array: 1 task/sample |
-| Phase 0b (load) | Job submission agent | Array: 1 task/sample |
-| Phase 1 (QC + concat) | Single analysis agent | Sequential (depends on all 0b) |
-| Phase 3 (integration benchmark) | Benchmark agent | Array: 1 task/method (9 methods) |
-| Phase 3.5 + 3.5b | Two parallel agents | Independent branches |
-| Phase 5 (figures) | Figure agent per figure set | Parallel by figure group |
+| `ingest_raw` (SpaceRanger) | Job submission agent | Array: 1 task/sample |
+| `ingest_load` (load) | Job submission agent | Array: 1 task/sample |
+| `qc_filter` (QC + concat) | Single analysis agent | Sequential (depends on all ingest_load) |
+| `preprocess` (integration benchmark) | Benchmark agent | Array: 1 task/method (9 methods) |
+| `demographics` + `scoring` | Two parallel agents | Independent branches |
+| `biology` (figures) | Figure agent per figure set | Parallel by figure group |
 
 #### Integration benchmark as parallel array (9 methods)
 

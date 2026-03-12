@@ -6,23 +6,32 @@ This document outlines the directory structure, data flow, and script inventory.
 
 ```text
 .
-├── Architecture.md         # System roadmap (this file)
-├── Mission.md              # Todo list and roadmap (general); project-specific in projects/<type>/<name>/Mission.md
-├── Journal.md              # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
-├── journal_summary.md      # Short summary of Journal.md for context; per-project under projects/<type>/<name>/
-├── skills.md               # Mandatory coding and statistical standards
+├── CLAUDE.md               # Claude Code project config (repo root)
+├── README.md               # GitHub landing page (repo root)
 ├── pyproject.toml          # Package build (sc_tools installable)
 ├── environment.yml         # Conda environment
 ├── requirements.txt        # pip dependencies
 ├── Makefile                # Pipeline orchestration (project-aware; default PROJECT=projects/visium/ggo_visium)
-├── ENVIRONMENT_SETUP.md    # Environment setup notes
+│
+├── docs/                   # All documentation
+│   ├── Architecture.md     # System roadmap (this file)
+│   ├── Mission.md          # Toolkit todo list and roadmap; project-specific in projects/<type>/<name>/Mission.md
+│   ├── Journal.md          # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
+│   ├── journal_summary.md  # Short summary of Journal.md; per-project under projects/<type>/<name>/
+│   ├── skills.md           # Mandatory coding and statistical standards
+│   ├── project_setup.md    # Environment and container setup notes
+│   ├── Scratch Pad.md      # Exploratory notes
+│   ├── wiki/               # Obsidian vault (symlinks + wiki-native + .gen.md files)
+│   └── ...                 # Sphinx source (conf.py, index.rst, api/, tutorials/)
 │
 ├── sc_tools/               # Reusable Python package (scanpy-style API) — NOT project-specific
 │   ├── pl/                  # Plotting: spatial, heatmaps, statistical, volcano, save
-│   ├── tl/                  # Tools: testing, colocalization, deconvolution, io
+│   ├── tl/                  # Tools: testing, colocalization, deconvolution, io, celltype (automated cell typing)
 │   ├── qc/                  # QC: calculate_qc_metrics, filter_cells, filter_genes, highly_variable_genes, spatially_variable_genes
 │   ├── pp/                  # Preprocessing: normalization, integration, clustering, recipes
-│   ├── ingest/              # Phase 0: batch manifests, command builders, modality loaders
+│   ├── ingest/              # ingest_raw: batch manifests, command builders, modality loaders
+│   ├── bm/                  # Benchmarking: integration scoring, IMC segmentation benchmark, CLI, reports
+│   ├── data/                # Bundled reference data: Hallmark signatures, IMC benchmark data, QC/report templates
 │   ├── pipeline.py          # Phase DAG: PhaseSpec, STANDARD_PHASES, get_available_next(), get_phase_checkpoint()
 │   ├── storage.py           # fsspec URI resolution + smart read/write (local, S3, SFTP, GCS, Box)
 │   ├── registry.py          # SQLAlchemy registry: projects, datasets, SLURM jobs, agent tasks, project_phases
@@ -51,7 +60,7 @@ This document outlines the directory structure, data flow, and script inventory.
 │   │       ├── Journal.md
 │   │       └── journal_summary.md
 │   ├── visium_hd/
-│   ├── xenium/
+│   ├── xenium/             # Placeholder — no active project yet (.gitkeep only)
 │   ├── imc/
 │   ├── cosmx_1k/
 │   ├── cosmx_6k/
@@ -72,6 +81,7 @@ All of the following live under `projects/<platform>/<project_name>/`. **Checkpo
 **Phase slug → old code mapping:**
 
 <!-- PHASE_TABLE:START -->
+
 | Slug | Old code | Name | Checkpoint | Required Data | QC Report |
 |------|----------|------|------------|---------------|-----------|
 | `ingest_raw` | p0a | Raw Data Processing | - | - |  |
@@ -84,6 +94,7 @@ All of the following live under `projects/<platform>/<project_name>/`. **Checkpo
 | `celltype_manual` | p4 | Manual Cell Typing | `results/adata.celltyped.h5ad` | `obs[celltype, celltype_broad]`, `X` normalized | `post_celltyping_qc_{date}.html` |
 | `biology` | p5 | Downstream Biology | - | - |  |
 | `meta_analysis` | p6/p7 | Meta Analysis | - | - |  |
+
 <!-- PHASE_TABLE:END -->
 
 ### 2.1 Mandatory checkpoint filenames (results/)
@@ -119,7 +130,7 @@ Checkpoints must satisfy the following so scripts and validators can rely on the
 | **adata.celltyped.h5ad** (`celltype_manual`) | All of `scoring`; `obs['celltype']`, `obs['celltype_broad']` from `metadata/celltype_map.json`. |
 | **adata.{level}.{feature}.h5ad** (`meta_analysis`) | `obs` indexed by `level` (roi or patient); `X` or layer holds aggregated `feature` (mean expression or celltype frequency). |
 
-### 2.2b IMC image schema in adata.uns['spatial'] (optional Phase 0b)
+### 2.2b IMC image schema in adata.uns['spatial'] (optional `ingest_load` phase)
 
 When `load_imc_sample(load_images=True)` is called, the per-ROI TIFF stack is loaded and stored in the standard squidpy/scanpy format, making `sc.pl.spatial(img_key="hires")` work without modification:
 
@@ -158,10 +169,10 @@ adata.uns['spatial'][sample_id]
 
 | Path | Description |
 |------|-------------|
-| `metadata/sample_metadata.csv` or `.xlsx` | Sample→clinical metadata map. Enables Phase 2 bypass. |
-| `metadata/celltype_map.json` | cluster_id→celltype mapping for Phase 4. |
+| `metadata/sample_metadata.csv` or `.xlsx` | Sample→clinical metadata map. Enables `metadata_attach` bypass. |
+| `metadata/celltype_map.json` | cluster_id→celltype mapping for `celltype_manual`. |
 | `metadata/gene_signatures.json` | Gene signatures for scoring (and per-signature `metadata/{name}.json` for obsm storage). |
-| `results/adata.deconvolution.h5ad` | Cell-type proportions (optional; Phase 3.5b). |
+| `results/adata.deconvolution.h5ad` | Cell-type proportions (optional; `scoring`). |
 | `results/tmp/integration_test/{method}.h5ad` | Intermediate integration test results from benchmark subsample. Kept for re-annotation and further scoring without re-running integration. |
 | `results/integration_method.txt` | Records which integration method was selected and used for the final dataset. |
 
@@ -172,7 +183,7 @@ adata.uns['spatial'][sample_id]
 | `figures/scratch/` | **Skip** — never evaluated | Throwaway exploratory plots; use freely without triggering review |
 | `figures/QC/` | **Technical only** (Part 1) | Auto-generated pipeline QC reports (`pre_filter_qc_YYYYMMDD.html`, `post_filter_qc_YYYYMMDD.html`, `post_integration_qc_YYYYMMDD.html`, `post_celltyping_qc_YYYYMMDD.html`) |
 | `figures/exploratory/` | **Standard** (Parts 1 + 2) | Analysis in progress — real figures not yet curated for manuscript |
-| `figures/deconvolution/` | **Standard** (Parts 1 + 2) | Cell-type deconvolution outputs (Phase 3.5b); per-method subdirs (`cell2location/`, `tangram/`) are recognised automatically |
+| `figures/deconvolution/` | **Standard** (Parts 1 + 2) | Cell-type deconvolution outputs (`scoring`); per-method subdirs (`cell2location/`, `tangram/`) are recognised automatically |
 | `figures/insightful/` | **High** (Parts 1 + 2, high bar) | Clear biological findings; candidate figures for manuscript or key communication |
 | `figures/manuscript/` | **Strict** (Parts 1 + 2, publication bar) | Final publication figures — must be fully publication-ready |
 | `figures/supplementary/` | **Strict** (Parts 1 + 2, publication bar) | Supplementary material — same standard as manuscript |
@@ -183,7 +194,7 @@ Files named `*_draft.*`, `*_test.*`, `*_tmp.*`, or `*_temp.*` are skipped by the
 
 **Snakemake:** Use `$(PROJECT)` or config-based paths for all project paths, e.g. `$(PROJECT)/results/adata.filtered.h5ad`.
 
-### 2.4 Signature scoring (Phase 3.5b / `scoring`): how to run, inputs, outputs
+### 2.4 Signature scoring (`scoring`): how to run, inputs, outputs
 
 Gene signature scoring uses `sc_tools.tl.score_signature` and writes **obsm** (`signature_score`, `signature_score_z`) and **uns** (`signature_score_report`). Each project has a thin script; run via Snakemake from **project root** (so paths like `results/` and `metadata/` resolve).
 
@@ -202,10 +213,10 @@ The pipeline produces four QC HTML reports at key checkpoints. Each report is da
 
 | # | Report | Phase | Primary Metrics | Notes |
 |---|--------|-------|-----------------|-------|
-| 1 | `pre_filter_qc_YYYYMMDD.html` | 1 (entry) | Per-sample cell/spot counts, gene/protein detection, %MT | Raw data overview before any filtering. |
-| 2 | `post_filter_qc_YYYYMMDD.html` | 1-2 (exit) | Pre-vs-post comparison, HVG/SVG, sample pass/fail | After QC filtering and metadata attachment. |
-| 3 | `post_integration_qc_YYYYMMDD.html` | 3 (exit) | **Batch score (primary)**, UMAP grid, cluster distribution, integration benchmark | After integration. Bio metrics (ARI, NMI, ASW celltype) are informational only — celltype labels are preliminary (leiden clustering). |
-| 4 | `post_celltyping_qc_YYYYMMDD.html` | 4 (exit) | **Full bio + batch scores**, re-scored integration methods | After validated celltyping. Bio conservation metrics are now meaningful. Re-evaluates all candidate integrations if `results/tmp/integration_test/` exists. |
+| 1 | `pre_filter_qc_YYYYMMDD.html` | `qc_filter` (entry) | Per-sample cell/spot counts, gene/protein detection, %MT | Raw data overview before any filtering. |
+| 2 | `post_filter_qc_YYYYMMDD.html` | `qc_filter`/`metadata_attach` (exit) | Pre-vs-post comparison, HVG/SVG, sample pass/fail | After QC filtering and metadata attachment. |
+| 3 | `post_integration_qc_YYYYMMDD.html` | `preprocess` (exit) | **Batch score (primary)**, UMAP grid, cluster distribution, integration benchmark | After integration. Bio metrics (ARI, NMI, ASW celltype) are informational only — celltype labels are preliminary (leiden clustering). |
+| 4 | `post_celltyping_qc_YYYYMMDD.html` | `celltype_manual` (exit) | **Full bio + batch scores**, re-scored integration methods | After validated celltyping. Bio conservation metrics are now meaningful. Re-evaluates all candidate integrations if `results/tmp/integration_test/` exists. |
 
 **Key principle:** Batch score is the primary metric for integration method selection (report 3). Bio metrics become the primary evaluation criterion only after celltyping is validated (report 4). This avoids circular reasoning where integration is optimized for celltype labels derived from that same integration.
 
@@ -213,11 +224,11 @@ The pipeline produces four QC HTML reports at key checkpoints. Each report is da
 
 ## 3. Phase Details and Data Flow
 
-### Phase 0: Upstream Raw Data Processing
+### ingest_raw: Upstream Raw Data Processing
 
-**Purpose:** Run platform-specific upstream tools on HPC and produce per-sample AnnData / SpatialData objects ready for QC and concatenation in Phase 1. Phase 0 has two sub-steps:
+**Purpose:** Run platform-specific upstream tools on HPC and produce per-sample AnnData / SpatialData objects ready for QC and concatenation in `qc_filter`. `ingest_raw` has two sub-steps:
 
-#### Phase 0a: Platform tools (HPC)
+#### ingest_raw: Platform tools (HPC)
 
 Run Space Ranger, Xenium Ranger, or the IMC pipeline on raw FASTQs / images to produce platform output directories.
 
@@ -232,7 +243,7 @@ Run Space Ranger, Xenium Ranger, or the IMC pipeline on raw FASTQs / images to p
 | Visium HD / Visium HD Cell | `sample_id`, `fastq_dir`, `cytaimage`, `slide`, `area`, `batch` |
 | Xenium | `sample_id`, `xenium_dir`, `batch` |
 | IMC | `sample_id`, `mcd_file`, `panel_csv`, `batch` |
-| CosMx | `sample_id`, `cosmx_dir`, `panel_tier` (1k/6k/full_library), `batch` — flat files / RDS converted to AnnData in Phase 0b |
+| CosMx | `sample_id`, `cosmx_dir`, `panel_tier` (1k/6k/full_library), `batch` — flat files / RDS converted to AnnData in `ingest_load` |
 
 **Snakemake:** `spaceranger_count` (or equivalent) per-sample rule; `phase0` target expands all samples from `all_samples.tsv`.
 
@@ -240,9 +251,9 @@ Run Space Ranger, Xenium Ranger, or the IMC pipeline on raw FASTQs / images to p
 
 **Output:** `data/{sample_id}/outs/` per sample.
 
-#### Phase 0b: Load into AnnData / SpatialData
+#### ingest_load: Load into AnnData / SpatialData
 
-Convert per-sample platform outputs into portable AnnData (or SpatialData) objects with standardized metadata. This is the Phase 0 checkpoint consumed by Phase 1.
+Convert per-sample platform outputs into portable AnnData (or SpatialData) objects with standardized metadata. This is the `ingest_raw` checkpoint consumed by `qc_filter`.
 
 **Loaders (`sc_tools.ingest.loaders`):**
 
@@ -277,12 +288,12 @@ Legacy phase codes (`p1`, `p2`, `p3`, `p35`, `p4`) are still accepted but emit a
 
 **Auto-fix (--fix):** Renames `obs['batch']` to `obs['raw_data_dir']` (p1 only). All other issues require human intervention.
 
-### Phase 1: QC and Concatenation
+### qc_filter: QC and Concatenation
 
-**Input:** Per-sample `data/{sample_id}/adata.ingested.h5ad` objects produced in Phase 0b.
+**Input:** Per-sample `data/{sample_id}/adata.ingested.h5ad` objects produced in `ingest_load`.
 
 **Steps:**
-1. Load all per-sample Phase 0 AnnData objects.
+1. Load all per-sample `ingest_load` AnnData objects.
 2. Apply per-sample QC: `sc_tools.qc.filter_spots()` (modality-aware thresholds); compute metrics via `sc_tools.qc.calculate_qc_metrics()`.
 3. Classify and optionally remove low-quality samples: `sc_tools.qc.sample_qc.classify_samples()`, `apply_qc_filter()`.
 4. Concatenate across samples: `sc_tools.ingest.concat_samples()`.
@@ -296,7 +307,7 @@ Legacy phase codes (`p1`, `p2`, `p3`, `p35`, `p4`) are still accepted but emit a
 
 ---
 
-### Phase 2: Metadata Attachment (Human-in-Loop)
+### metadata_attach: Metadata Attachment (Human-in-Loop)
 
 **Bypass:** Provide `$(PROJECT)/metadata/sample_metadata.csv` or `.xlsx`.
 
@@ -306,67 +317,74 @@ Legacy phase codes (`p1`, `p2`, `p3`, `p35`, `p4`) are still accepted but emit a
 
 ---
 
-### Phase 3: Preprocessing
+### preprocess: Preprocessing
 
-Backup `adata.raw`; filter; normalize; batch correct; cluster. Post-QC → `$(PROJECT)/figures/QC/post/`. No automated cell typing (that is in Phase 3.5b).
+Backup `adata.raw`; filter; normalize; batch correct; cluster. Post-QC → `$(PROJECT)/figures/QC/post/`. No automated cell typing (that is in `scoring`).
 
-#### Integration Benchmark Workflow (Phase 3 sub-step)
+#### Integration Benchmark Workflow (preprocess sub-step)
 
 Before committing to a single integration method for the full dataset, run a benchmark on a subsample:
 
 1. **Subsample:** Select ~20 samples (or all if fewer) to keep benchmark tractable.
 2. **Run all candidate methods:** Each method produces an embedding stored in a temporary AnnData under `results/tmp/integration_test/{method}.h5ad`. Methods tested depend on modality:
    - **IMC:** Harmony, ComBat, scVI (raw), scANVI (raw), CytoVI (arcsinh), IMC Phenotyping, IMC Pheno+Harmony, Z-score+Harmony, Unintegrated PCA.
-   - **Transcriptomic (Visium, Xenium, CosMx):** Harmony, ComBat, scVI, scANVI (if celltypes), BBKNN, Scanorama, Unintegrated PCA.
+   - **Transcriptomic (Visium, Xenium, CosMx):** Harmony, ComBat, scVI, scANVI (if celltypes), resolVI (spatial-aware), BBKNN, Scanorama, Unintegrated PCA.
+   - **Visium HD (bin-level, `visium_hd`):** Same as Transcriptomic.
+   - **Visium HD Cell (`visium_hd_cell`):** Same as Transcriptomic. No deconvolution step — cell segmentation (SpaceRanger 4) provides single-cell resolution directly; `adata.deconvolution.h5ad` is not produced.
 3. **Benchmark (batch-focused):** `compare_integrations()` computes batch metrics (ASW batch, PCR, graph connectivity) and informational bio metrics (ASW celltype, ARI, NMI — based on preliminary leiden clustering, not validated celltypes). **Batch score is the primary selection criterion** at this stage because celltype labels are not yet validated. Bio metrics are reported but should not drive method selection pre-celltyping.
 4. **Select best method:** Automatically pick the method with the highest batch score. Record the choice in `results/integration_method.txt`.
 5. **Integrate full dataset:** Apply the selected method to all samples. Save `results/adata.normalized.h5ad`.
 6. **Generate post-integration QC report:** `figures/QC/post_integration_qc_YYYYMMDD.html` with batch score highlighted as the primary metric.
 
-The temporary `results/tmp/integration_test/{method}.h5ad` files are kept for later use: after celltyping (Phase 4), the same embeddings can be re-scored with validated celltypes to produce the post-celltyping QC report.
+The temporary `results/tmp/integration_test/{method}.h5ad` files are kept for later use: after celltyping (`celltype_manual`), the same embeddings can be re-scored with validated celltypes to produce the post-celltyping QC report.
 
 **Outputs:** `$(PROJECT)/results/adata.normalized.h5ad`. Must satisfy required metadata for `preprocess` (Section 2.2).
 
 ---
 
-### Phase 3.5: Demographics (Branching)
+### demographics: Demographics (Branching)
 
-Separate branch from Phase 3 (parallel to 3.5b). sc_tools helpers: piechart, histogram, violinplot, barplot, stacked barplot, scatterplot, correlogram, heatmap. Figure 1 for cohort description.
-
----
-
-### Phase 3.5b: Gene Scoring, Automated Cell Typing, Deconvolution
-
-Separate branch from Phase 3 (parallel to 3.5); connects to Phase 4. Always apply basic gene sets (e.g. Hallmark, loaded via `sc_tools.tl.load_hallmark()`) and any project-provided signatures from `metadata/{signature_name}.json`. Store scores in **`adata.obsm['signature_score']`** (raw) and **`adata.obsm['signature_score_z']`** (z-scored) via `sc_tools.tl.score_signature`; column names are full paths (e.g. `Hallmark/HYPOXIA`, `Myeloid/Macrophage_Core`). Scores are **not** stored in `obs` by default. Automated cell typing (cluster → celltype). Optional cell-type deconvolution (DestVI, Cell2location, Tangram) → `$(PROJECT)/results/adata.deconvolution.h5ad`.
-
-**Outputs:** `$(PROJECT)/results/adata.scored.h5ad` (must satisfy Section 2.2); optional `adata.deconvolution.h5ad`. Required for Phase 5.
+Separate branch from `preprocess` (parallel to `scoring`). sc_tools helpers: piechart, histogram, violinplot, barplot, stacked barplot, scatterplot, correlogram, heatmap. Figure 1 for cohort description.
 
 ---
 
-### Phase 4: Manual Cell Typing (Human-in-Loop; Skippable)
+### scoring: Gene Scoring, Automated Cell Typing, Deconvolution
 
-Skippable if automated cell typing in 3.5b is adequate. JSON format `{cluster_id: {celltype_name, total_obs_count}}`; match cluster_id type; produce celltype and celltype_broad. Iterative until satisfactory. Save to `$(PROJECT)/metadata/celltype_map.json`.
+Separate branch from `preprocess` (parallel to `demographics`); connects to `celltype_manual`. Always apply basic gene sets (e.g. Hallmark, loaded via `sc_tools.tl.load_hallmark()`) and any project-provided signatures from `metadata/{signature_name}.json`. Store scores in **`adata.obsm['signature_score']`** (raw) and **`adata.obsm['signature_score_z']`** (z-scored) via `sc_tools.tl.score_signature`; column names are full paths (e.g. `Hallmark/HYPOXIA`, `Myeloid/Macrophage_Core`). Scores are **not** stored in `obs` by default. Automated cell typing (cluster → celltype). For Visium and Visium HD only: optional cell-type deconvolution (DestVI, Cell2location, Tangram) → `$(PROJECT)/results/adata.deconvolution.h5ad`.
 
-#### Post-Celltyping QC Report (Phase 4 exit)
+**Deconvolution applicability by modality:**
+- **Visium (`visium`):** Deconvolution applies — each spot covers ~10–50 cells.
+- **Visium HD (`visium_hd`, bin-level):** Deconvolution applies — 8 µm bins still capture multiple cells.
+- **Visium HD Cell (`visium_hd_cell`), Xenium, CosMx, IMC:** Deconvolution is **skipped** — all produce single-cell resolution data (cell segmentation or targeted single-cell capture). Cell type composition is determined directly from clustering and cell typing.
+
+**Outputs:** `$(PROJECT)/results/adata.scored.h5ad` (must satisfy Section 2.2); optional `adata.deconvolution.h5ad`. Required for `biology`.
+
+---
+
+### celltype_manual: Manual Cell Typing (Human-in-Loop; Skippable)
+
+Skippable if automated cell typing in `scoring` is adequate. JSON format `{cluster_id: {celltype_name, total_obs_count}}`; match cluster_id type; produce celltype and celltype_broad. Iterative until satisfactory. Save to `$(PROJECT)/metadata/celltype_map.json`.
+
+#### Post-Celltyping QC Report (celltype_manual exit)
 
 After celltyping is finalized, generate `figures/QC/post_celltyping_qc_YYYYMMDD.html`. This report re-evaluates integration quality using **validated celltype labels**, making bio conservation metrics (ARI, NMI, ASW celltype, isolated labels, cLISI) fully meaningful. The report includes:
 
 - Full integration benchmark table with both batch and bio scores (bio metrics now trustworthy).
 - Comparison to the post-integration report (which used preliminary leiden labels).
 - Note on which integration method was used (from `results/integration_method.txt`).
-- If `results/tmp/integration_test/{method}.h5ad` files exist, re-score all candidate methods with the validated celltypes to show whether the batch-score-based selection at Phase 3 also performs well on bio metrics. This reveals if a different method would have been better given the final celltypes.
+- If `results/tmp/integration_test/{method}.h5ad` files exist, re-score all candidate methods with the validated celltypes to show whether the batch-score-based selection at `preprocess` also performs well on bio metrics. This reveals if a different method would have been better given the final celltypes.
 
 **Outputs:** `$(PROJECT)/results/adata.celltyped.h5ad`. Must satisfy required metadata for `celltype_manual` (Section 2.2).
 
 ---
 
-### Phase 5: Downstream Biology
+### biology: Downstream Biology
 
-Uses gene scores and (optionally) deconvolution from Phase 3.5b. Spatial/process analysis, colocalization, neighborhood enrichment, publication figures. Reads from `adata.scored.h5ad` (or `adata.celltyped.h5ad` if Phase 4 was run).
+Uses gene scores and (optionally) deconvolution from `scoring`. Spatial/process analysis, colocalization, neighborhood enrichment, publication figures. Reads from `adata.scored.h5ad` (or `adata.celltyped.h5ad` if `celltype_manual` was run).
 
 ---
 
-### Phase 6–7: Meta Analysis (Optional)
+### meta_analysis: Meta Analysis (Optional)
 
 Aggregate ROI/patient; downstream on aggregated data.
 
@@ -376,85 +394,18 @@ Aggregate ROI/patient; downstream on aggregated data.
 
 ## 4. Storage Layer and Registry
 
-### 4.1 Storage Layer (`sc_tools/storage.py`)
+Storage backends, registry schema, BioData hierarchy, Subject/Sample model, and MCP servers
+are documented in full in `docs/registry.md` (symlinked as [[registry]] in the wiki).
 
-All data loading and writing goes through the storage layer so that code works identically
-against local paths, HPC scratch (SFTP), S3, GCS, Azure, or Box.
+Quick reference:
 
-| URI scheme | Backend | Install |
-|------------|---------|---------|
-| `/path` or `file://` | Local filesystem | stdlib (always available) |
-| `sftp://brb//athena/...` | SSH/HPC | `pip install sshfs` |
-| `s3://bucket/key` | AWS S3 | `pip install s3fs` |
-| `gs://bucket/key` | GCS | `pip install gcsfs` |
-| `az://container/blob` | Azure Blob | `pip install adlfs` |
-| `box://folder/path` | Box | `pip install boxfs` |
-
-**Install all remote backends:** `pip install "sc-tools[storage]"`
-
-Key functions:
-
-| Function | Purpose |
-|----------|---------|
-| `resolve_fs(uri)` | Returns `(AbstractFileSystem, path)` for any URI |
-| `open_file(uri, mode)` | Context manager; opens any URI for read/write |
-| `with_local_copy(uri)` | Downloads remote file to tmp; yields local Path |
-| `smart_read_h5ad(uri)` | Reads .h5ad from local or remote URI |
-| `smart_write_checkpoint(adata, uri, fmt)` | Writes h5ad or zarr to any URI |
-| `smart_read_csv(uri)` | Reads CSV/TSV from any URI |
-
-**Data placement by storage tier:**
-
-| Data type | Location | Format | URI example |
-|-----------|----------|--------|-------------|
-| Raw FASTQs, TIFFs, MCDs | HPC scratch | native | `sftp://brb//athena/.../sample1/` |
-| Active checkpoints (p0-p4) | HPC scratch | h5ad | `sftp://brb//athena/.../adata.filtered.h5ad` |
-| Archived checkpoints | AWS S3 | zarr | `s3://yoffelab-sc/projects/ggo_visium/results/adata.celltyped.zarr` |
-| Manuscript figures | Box | PNG/PDF | `box://YoffeLab/sc_tools/ggo_visium/figures/` |
-| Registry DB | Local or lab server | SQLite/PG | `~/.sc_tools/registry.db` |
-
-### 4.2 Registry Database (`sc_tools/registry.py`)
-
-SQLite by default (zero-config). PostgreSQL via `SC_TOOLS_REGISTRY_URL` env var.
-
-```bash
-# Default (local SQLite)
-python -m sc_tools registry status
-
-# Postgres (lab server)
-export SC_TOOLS_REGISTRY_URL="postgresql://user:pass@host:5432/sc_tools"
-```
-
-**Schema tables:**
-
-| Table | Tracks |
-|-------|--------|
-| `projects` | project name, platform, phases_complete |
-| `datasets` | AnnData checkpoints with URI, phase, status, md5 |
-| `slurm_jobs` | Submitted SLURM jobs with cluster, status, log URI |
-| `agent_tasks` | Running Claude Code agent tasks with inputs/outputs |
-
-**Install:** `pip install "sc-tools[registry]"` (adds SQLAlchemy + Alembic)
-
-Schema migrations are managed via Alembic in `sc_tools/migrations/`. For new installs,
-`Registry()` calls `create_all()` automatically.
-
-### 4.3 MCP Servers (`sc_tools/mcp/`)
-
-Two FastMCP servers registered in `.mcp.json` at repo root (auto-discovered by Claude Code):
-
-| Server | Module | Tools |
-|--------|--------|-------|
-| `sc-tools` | `sc_tools.mcp.tools_server` | validate_checkpoint, generate_qc_report, score_gene_signatures, run_deconvolution, generate_sbatch_spaceranger, generate_sbatch_imc, collect_batch_manifests, load_sample |
-| `sc-registry` | `sc_tools.mcp.registry_server` | registry_status, list_datasets, get_checkpoint_uri, register_dataset, list_slurm_jobs, list_agent_tasks, mark_phase_complete |
-
-**Install:** `pip install "sc-tools[mcp,registry]"`
-
-**CLI status check (read the registry at session start):**
-
-```
-python -m sc_tools registry status
-```
+| Topic | Where |
+|-------|-------|
+| URI schemes, storage functions, data placement tiers | [[registry]] §1 |
+| Registry schema tables, SQLite/PG setup | [[registry]] §2 |
+| BioData JTI hierarchy and platform taxonomy | [[registry]] §2 + [[biodata-hierarchy]] |
+| Subject/Sample model, 775-patient cohort schema | [[registry]] §2 + [[clinical-data-schema]] |
+| MCP server tools (`sc-tools`, `sc-registry`) | [[registry]] §3 |
 
 ---
 
@@ -483,10 +434,21 @@ Scripts should write standard checkpoint names (Section 2.1). Legacy projects ma
 | `scripts/run_qc_report.py` | `qc_filter` | `$(PROJECT)/figures/QC/pre_filter_qc_YYYYMMDD.html` |
 | Metadata join script | `metadata_attach` | `$(PROJECT)/results/adata.annotated.h5ad` |
 | Preprocessing, clustering | `preprocess` | `$(PROJECT)/results/adata.normalized.h5ad` |
-| `scripts/score_gene_signatures.py`, automated celltyping | `scoring` | `$(PROJECT)/results/adata.scored.h5ad` |
+| Project scoring scripts (e.g. `projects/*/scripts/score_gene_signatures.py`) | `scoring` | `$(PROJECT)/results/adata.scored.h5ad` |
+| `scripts/plot_deconvolution_spatial.py` | `scoring` | `$(PROJECT)/figures/deconvolution/` |
+| `scripts/signature_heatmap_versioned.py` | `biology` | `$(PROJECT)/figures/manuscript/` |
 | Manual cell typing workflow | `celltype_manual` | `$(PROJECT)/results/adata.celltyped.h5ad` |
 | Downstream biology scripts | `biology` | `$(PROJECT)/figures/manuscript/` |
 | Aggregation scripts | `meta_analysis` | `$(PROJECT)/results/adata.{level}.{feature}.h5ad` |
+
+### Maintenance / utility scripts (active but not in a pipeline phase)
+
+| Script | Purpose | Output |
+|--------|---------|--------|
+| `scripts/sync_wiki.py` | Regenerates `*.gen.md` wiki files from registry + pipeline DAG | `docs/wiki/**/*.gen.md` |
+| `scripts/save_plan.py` | Hook called by ExitPlanMode to persist plans | `docs/wiki/plans/YYYY-MM-DD-{slug}.md` |
+| `scripts/validate_checkpoint.py` | CLI wrapper around `sc_tools.validate`; exit 0/1 | Sentinel file or exit code |
+| `scripts/run_qc_reports_all_projects.py` | Batch QC report generation across all registered projects | Per-project HTML reports |
 
 ### Legacy (read-only)
 - **`scripts/old_code/`**: Reference only.
@@ -498,10 +460,10 @@ Scripts should write standard checkpoint names (Section 2.1). Legacy projects ma
 1. **File placement:** All project outputs under `projects/<platform>/<project_name>/` (figures, results, metadata, data, outputs). No root-level metadata, results, or figures.
 2. **Checkpoint nomenclature:** New pipelines and scripts **must** write AnnData checkpoints using the standard names in Section 2.1 (`adata.ingested.h5ad`, `adata.filtered.h5ad`, `adata.annotated.h5ad`, `adata.normalized.h5ad`, `adata.scored.h5ad`, `adata.celltyped.h5ad`). Legacy names (`adata.p0.h5ad`, `adata.raw.h5ad`, `adata.raw.p1.h5ad`, etc.) are accepted during transition but deprecated. Validators should check required metadata (Section 2.2) when loading checkpoints.
 3. **Paths:** Scripts use `$(PROJECT)` or `PROJECT` variable for project paths.
-4. **Statistics:** Benjamini–Hochberg (FDR); significance bars per `skills.md`.
+4. **Statistics:** Benjamini–Hochberg (FDR); significance bars per `docs/skills.md`.
 5. **Legacy:** Do not modify `scripts/old_code/`. Legacy checkpoint names (e.g. `adata.annotation.masked.h5ad`, `scvi.leiden.phenotyped.h5ad`) are allowed during migration; document which convention each project uses.
 6. **Documentation:** Avoid apostrophes in generated text.
-7. **Entry points:** Preprocessed projects may start at Phase 3, 3.5b, or 4.
+7. **Entry points:** Preprocessed projects may start at `preprocess`, `scoring`, or `celltype_manual`.
 
 ---
 

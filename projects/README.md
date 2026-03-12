@@ -35,7 +35,7 @@ Each project directory contains:
 | `Journal.md` | Project-specific decision log |
 | `journal_summary.md` | Short condensed summary of Journal.md |
 
-Root `Mission.md`, `Journal.md`, and `journal_summary.md` cover toolkit-level work; each project has its own for study-specific goals.
+`docs/Mission.md`, `docs/Journal.md`, and `docs/journal_summary.md` cover toolkit-level work; each project has its own for study-specific goals.
 
 ---
 
@@ -72,7 +72,7 @@ Or from the project directory:
 cd projects/visium_hd/robin && snakemake -d . -s Snakefile all
 ```
 
-See [project_setup.md](../project_setup.md) for container and environment details.
+See [project_setup.md](../docs/project_setup.md) for container and environment details.
 
 ---
 

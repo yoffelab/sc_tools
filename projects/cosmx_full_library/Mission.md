@@ -4,7 +4,7 @@
 **Current Status:** Setup
 **Last Updated:** 2026-03-04
 
-Project-specific goals. Repository-level pipeline and toolkit goals are in the root `Mission.md`.
+Project-specific goals. Repository-level pipeline and toolkit goals are in the `docs/Mission.md`.
 
 ---
 
@@ -30,7 +30,7 @@ Project-specific goals. Repository-level pipeline and toolkit goals are in the r
 
 ## 3. Active Tasks
 
-- [ ] Phase 1: data ingestion
+- [ ] `qc_filter`: data ingestion
 
 ---
 

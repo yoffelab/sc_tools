@@ -36,7 +36,7 @@ Write down what you expect to see BEFORE running statistical tests. Prevents p-h
 
 ## Phase 3: Statistical Validation
 
-Follow sc_tools standards (skills.md §10):
+Follow sc_tools standards (docs/skills.md §10):
 
 - **FDR:** Benjamini-Hochberg always; never report uncorrected p-values
 - **Group comparisons:** 2 groups → pairwise Wilcoxon / t-test; >2 groups → 1-vs-rest (default) or all-pairwise

@@ -17,8 +17,8 @@ Project documentation lives in the actual project directories. The wiki (`docs/w
 | `Journal.md` | `projects/<platform>/<project>/` (symlinked into wiki) | Chronological log: dates, actions, rationale, decisions. |
 | `hypotheses.md` | `docs/wiki/projects/{name}/` (wiki-native) | Scientific questions and status. Tags: `#hypothesis/investigating`, `#hypothesis/supported`. |
 | `status.gen.md` | `docs/wiki/projects/{name}/` (auto-generated) | Pipeline status from registry. **Never edit manually.** |
-| Root `Mission.md` | Repo root (symlinked into `docs/wiki/sc_tools/`) | Toolkit-level todo list and pipeline roadmap. |
-| Root `Journal.md` | Repo root (symlinked into `docs/wiki/sc_tools/`) | Toolkit-level decision log. |
+| Root `Mission.md` | `docs/Mission.md` (symlinked into `docs/wiki/sc_tools/`) | Toolkit-level todo list and pipeline roadmap. |
+| Root `Journal.md` | `docs/Journal.md` (symlinked into `docs/wiki/sc_tools/`) | Toolkit-level decision log. |
 
 ## File ownership
 
@@ -33,7 +33,7 @@ Project documentation lives in the actual project directories. The wiki (`docs/w
 
 1. Read project **`Mission.md`** — active work items and phase status
 2. Read **`docs/wiki/projects/{name}/hypotheses.md`** — big picture context
-3. Read **Architecture.md** — data flow, conventions, checkpoint names
+3. Read **docs/Architecture.md** — data flow, conventions, checkpoint names
 
 ## Recording (after significant work)
 

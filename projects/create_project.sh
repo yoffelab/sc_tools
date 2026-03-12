@@ -63,7 +63,7 @@ cat > "${PROJECT_ROOT}/Mission.md" << MISSION_EOF
 **Current Status:** Setup
 **Last Updated:** $(date +%Y-%m-%d)
 
-Project-specific goals. Repository-level pipeline and toolkit goals are in the root \`Mission.md\`.
+Project-specific goals. Repository-level pipeline and toolkit goals are in \`docs/Mission.md\`.
 
 ---
 

@@ -14,6 +14,13 @@ Tools
     mark_phase_complete  -- mark a pipeline phase as complete for a project
     get_phase_status     -- status and checkpoint details for a specific phase
     set_phase_status     -- update the pipeline status for a phase
+    add_subject          -- register a de-identified subject
+    list_subjects        -- query subjects
+    add_sample           -- register a sample
+    list_samples         -- query samples
+    register_biodata     -- register a typed BioData object
+    list_biodata         -- query BioData objects
+    project_data_summary -- counts by category/platform
 
 Start the server::
 
@@ -71,6 +78,9 @@ def registry_status() -> str:
             "=" * 40,
             f"  Projects          : {s['n_projects']}",
             f"  Datasets          : {s['n_datasets']}",
+            f"  Subjects          : {s['n_subjects']}",
+            f"  Samples           : {s['n_samples']}",
+            f"  BioData objects   : {s['n_biodata']}",
             f"  Active SLURM jobs : {s['active_slurm_jobs']}",
             f"  Running tasks     : {s['running_agent_tasks']}",
         ]
@@ -852,6 +862,452 @@ def link_project_data_source(
             f"Linked project '{project_name}' → data source '{data_source_name}' "
             f"(role={role}, link_id={link_id})."
         )
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: add_subject
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def add_subject(
+    subject_id: str,
+    organism: str = "human",
+    sex: str = "",
+    age_at_collection: float = 0,
+    diagnosis: str = "",
+    diagnosis_code: str = "",
+    disease_stage: str = "",
+    treatment_status: str = "",
+    tissue_of_origin: str = "",
+    vital_status: str = "",
+    survival_days: float = 0,
+) -> str:
+    """Register a de-identified subject in the registry.
+
+    Subjects are cross-project and can be linked to multiple projects.
+    No PHI (names, DOB, MRNs) should be stored.
+
+    Parameters
+    ----------
+    subject_id
+        Unique de-identified identifier (e.g. PT001).
+    organism
+        human (default), mouse, rat, etc.
+    sex
+        M, F, or unknown.
+    diagnosis
+        Free text diagnosis (e.g. DLBCL, UC, GGO).
+
+    Returns
+    -------
+    str
+        Confirmation with assigned subject DB id.
+    """
+    try:
+        reg = _registry()
+        kwargs: dict = {}
+        if sex:
+            kwargs["sex"] = sex
+        if age_at_collection:
+            kwargs["age_at_collection"] = age_at_collection
+        if diagnosis:
+            kwargs["diagnosis"] = diagnosis
+        if diagnosis_code:
+            kwargs["diagnosis_code"] = diagnosis_code
+        if disease_stage:
+            kwargs["disease_stage"] = disease_stage
+        if treatment_status:
+            kwargs["treatment_status"] = treatment_status
+        if tissue_of_origin:
+            kwargs["tissue_of_origin"] = tissue_of_origin
+        if vital_status:
+            kwargs["vital_status"] = vital_status
+        if survival_days:
+            kwargs["survival_days"] = survival_days
+        sid = reg.add_subject(subject_id, organism=organism, **kwargs)
+        return f"Subject '{subject_id}' registered (id={sid})."
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_subjects
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_subjects(
+    project_name: str = "",
+    diagnosis: str = "",
+    tissue: str = "",
+) -> str:
+    """List subjects in the registry, with optional filters.
+
+    Parameters
+    ----------
+    project_name
+        Filter by linked project name.
+    diagnosis
+        Filter by diagnosis keyword (partial match).
+    tissue
+        Filter by tissue_of_origin keyword (partial match).
+
+    Returns
+    -------
+    str
+        Formatted list of subjects.
+    """
+    try:
+        reg = _registry()
+        subjects = reg.list_subjects(
+            project_name=project_name or None,
+            diagnosis=diagnosis or None,
+            tissue=tissue or None,
+        )
+        if not subjects:
+            return "No subjects found matching the given filters."
+        lines = [f"Subjects ({len(subjects)} total):"]
+        for s in subjects:
+            parts = [f"  {s['subject_id']}"]
+            if s.get("organism"):
+                parts.append(f"organism={s['organism']}")
+            if s.get("sex"):
+                parts.append(f"sex={s['sex']}")
+            if s.get("diagnosis"):
+                parts.append(f"dx={s['diagnosis']}")
+            if s.get("tissue_of_origin"):
+                parts.append(f"tissue={s['tissue_of_origin']}")
+            lines.append(" ".join(parts))
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: add_sample
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def add_sample(
+    sample_id: str,
+    subject_id: str = "",
+    project_name: str = "",
+    tissue: str = "",
+    tissue_region: str = "",
+    fixation_method: str = "",
+    sample_type: str = "",
+    batch: str = "",
+    notes: str = "",
+) -> str:
+    """Register a sample in the registry.
+
+    Samples link subjects to physical specimens within projects.
+
+    Parameters
+    ----------
+    sample_id
+        Sample identifier (e.g. S001_A1).
+    subject_id
+        De-identified subject ID (optional, must already exist).
+    project_name
+        Project name (optional, must already exist).
+    tissue
+        Tissue type (e.g. colon, lymph_node, lung).
+    fixation_method
+        FFPE, fresh_frozen, OCT, PFA.
+    sample_type
+        biopsy, resection, TMA, organoid, xenograft.
+    batch
+        Experimental batch identifier.
+
+    Returns
+    -------
+    str
+        Confirmation with assigned sample DB id.
+    """
+    try:
+        reg = _registry()
+        kwargs: dict = {}
+        if tissue:
+            kwargs["tissue"] = tissue
+        if tissue_region:
+            kwargs["tissue_region"] = tissue_region
+        if fixation_method:
+            kwargs["fixation_method"] = fixation_method
+        if sample_type:
+            kwargs["sample_type"] = sample_type
+        if batch:
+            kwargs["batch"] = batch
+        if notes:
+            kwargs["notes"] = notes
+        sid = reg.add_sample(
+            sample_id,
+            subject_id=subject_id or None,
+            project_name=project_name or None,
+            **kwargs,
+        )
+        return f"Sample '{sample_id}' registered (id={sid})."
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_samples
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_samples(
+    project_name: str = "",
+    subject_id: str = "",
+    batch: str = "",
+) -> str:
+    """List samples in the registry, with optional filters.
+
+    Parameters
+    ----------
+    project_name
+        Filter by project name.
+    subject_id
+        Filter by subject de-identified ID.
+    batch
+        Filter by batch identifier.
+
+    Returns
+    -------
+    str
+        Formatted list of samples.
+    """
+    try:
+        reg = _registry()
+        samples = reg.list_samples(
+            project_name=project_name or None,
+            subject_id=subject_id or None,
+            batch=batch or None,
+        )
+        if not samples:
+            return "No samples found matching the given filters."
+        lines = [f"Samples ({len(samples)} total):"]
+        for s in samples:
+            parts = [f"  id={s['id']} {s['sample_id']}"]
+            if s.get("tissue"):
+                parts.append(f"tissue={s['tissue']}")
+            if s.get("batch"):
+                parts.append(f"batch={s['batch']}")
+            if s.get("fixation_method"):
+                parts.append(f"fix={s['fixation_method']}")
+            lines.append(" ".join(parts))
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: register_biodata
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def register_biodata(
+    project_name: str,
+    category: str,
+    platform: str,
+    uri: str,
+    fmt: str = "",
+    status: str = "pending",
+    file_role: str = "primary",
+    phase: str = "",
+    n_obs: int = 0,
+    n_vars: int = 0,
+) -> str:
+    """Register a typed BioData object in the registry.
+
+    The category determines the data type: spatial_seq, image, rnaseq,
+    epigenomics, or genome_seq. Default field values are auto-filled from
+    the platform registry when available.
+
+    Parameters
+    ----------
+    project_name
+        Project name (must already exist).
+    category
+        BioData type: spatial_seq | image | rnaseq | epigenomics | genome_seq.
+    platform
+        Platform slug (e.g. visium, imc, xenium, chromium_3p).
+    uri
+        Path or URI to the data file.
+    fmt
+        File format: h5ad, zarr, tiff, tsv, fastq, bam, bed.
+    phase
+        Pipeline phase slug (optional).
+
+    Returns
+    -------
+    str
+        Confirmation with assigned BioData id.
+    """
+    try:
+        reg = _registry()
+        bd_id = reg.register_biodata(
+            project_name,
+            category,
+            platform,
+            uri,
+            fmt=fmt or None,
+            status=status,
+            file_role=file_role,
+            phase=phase or None,
+            n_obs=n_obs or None,
+            n_vars=n_vars or None,
+        )
+        return f"BioData[{category}] registered (id={bd_id}) for '{project_name}' at {uri}"
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_biodata
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_biodata(
+    project_name: str = "",
+    category: str = "",
+    platform: str = "",
+    modality: str = "",
+) -> str:
+    """List BioData objects in the registry, with optional filters.
+
+    Parameters
+    ----------
+    project_name
+        Filter by project name.
+    category
+        Filter by category: spatial_seq | image | rnaseq | epigenomics | genome_seq.
+    platform
+        Filter by platform slug (e.g. visium, imc).
+    modality
+        Filter by modality string (e.g. "Spatial Proteomics - Mass Spec").
+
+    Returns
+    -------
+    str
+        Formatted list of BioData objects.
+    """
+    try:
+        reg = _registry()
+        items = reg.list_biodata(
+            project_name=project_name or None,
+            category=category or None,
+            platform=platform or None,
+        )
+        if modality:
+            items = [bd for bd in items if bd.get("modality") == modality]
+        if not items:
+            return "No BioData objects found matching the given filters."
+        lines = [f"BioData objects ({len(items)} total):"]
+        for bd in items:
+            role = bd.get("file_role", "primary")
+            mod = bd.get("modality", "")
+            mod_str = f" modality={mod}" if mod else ""
+            lines.append(
+                f"  id={bd['id']} type={bd['type']} platform={bd.get('platform', '')} "
+                f"role={role} status={bd.get('status', '')}{mod_str}"
+            )
+            lines.append(f"    uri: {bd['uri']}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_modalities
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_modalities(biodata_type: str = "") -> str:
+    """List all known BioData modalities from the platform registry.
+
+    The modality tier sits between BioDataType (5 JTI types) and platform slug,
+    grouping related platforms (e.g. "Spatial Proteomics - Mass Spec" groups
+    imc, mibi, maldi_ims).
+
+    Parameters
+    ----------
+    biodata_type
+        Optional filter: spatial_seq | image | rnaseq | epigenomics | genome_seq.
+        Empty means all.
+
+    Returns
+    -------
+    str
+        Formatted list of modalities with platform counts.
+    """
+    try:
+        from sc_tools.biodata import list_modalities as _list_mods
+        from sc_tools.biodata import list_platforms_by_modality
+
+        mods = _list_mods(biodata_type=biodata_type or None)
+        if not mods:
+            return "No modalities found."
+        lines = [f"BioData Modalities ({len(mods)} total):"]
+        for mod in mods:
+            platforms = list_platforms_by_modality(mod)
+            plat_names = ", ".join(p.name for p in platforms[:8])
+            if len(platforms) > 8:
+                plat_names += f", ... (+{len(platforms) - 8} more)"
+            lines.append(f"  {mod} ({len(platforms)} platforms)")
+            lines.append(f"    {plat_names}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: project_data_summary
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def project_data_summary(project_name: str) -> str:
+    """Return a summary of BioData objects for a project, grouped by category and platform.
+
+    Parameters
+    ----------
+    project_name
+        Project name.
+
+    Returns
+    -------
+    str
+        Formatted summary with counts.
+    """
+    try:
+        reg = _registry()
+        summary = reg.project_data_summary(project_name)
+        lines = [
+            f"Data summary for '{project_name}':",
+            f"  Total BioData objects: {summary['total']}",
+        ]
+        if summary["by_category"]:
+            lines.append("  By category:")
+            for cat, count in sorted(summary["by_category"].items()):
+                lines.append(f"    {cat}: {count}")
+        if summary.get("by_modality"):
+            lines.append("  By modality:")
+            for mod, count in sorted(summary["by_modality"].items()):
+                lines.append(f"    {mod}: {count}")
+        if summary["by_platform"]:
+            lines.append("  By platform:")
+            for plat, count in sorted(summary["by_platform"].items()):
+                lines.append(f"    {plat}: {count}")
+        return "\n".join(lines)
     except Exception as exc:
         return f"ERROR: {exc}"
 

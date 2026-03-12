@@ -349,6 +349,11 @@ def fig3d_coo(df: pd.DataFrame):
         return
 
     data = df.dropna(subset=["COO", "LME_class"])
+    # Filter invalid COO labels (FAIL, NA, empty strings)
+    data = data[~data["COO"].astype(str).str.upper().isin(["FAIL", "NA", "NAN", ""])]
+    if len(data) < 10:
+        logger.warning("  Insufficient COO data after filtering")
+        return
     ct = pd.crosstab(data["LME_class"], data["COO"])
 
     # Reorder

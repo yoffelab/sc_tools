@@ -1,10 +1,10 @@
 # Mission: robin (visium_hd_cell)
 
 **Project:** `projects/visium_hd_cell/robin`
-**Current Status:** Pipeline scripts written (phases 1-4). Ready for SLURM submission.
+**Current Status:** Pipeline scripts written (`qc_filter` through `scoring`). Ready for SLURM submission.
 **Last Updated:** 2026-03-07
 
-Project-specific goals. Repository-level pipeline and toolkit goals are in the root `Mission.md`.
+Project-specific goals. Repository-level pipeline and toolkit goals are in the `docs/Mission.md`.
 
 ---
 
@@ -32,13 +32,13 @@ Single-cell resolution spatial transcriptomics analysis of Visium HD data (Robin
 
 ## 3. Completed Tasks
 
-- [x] **Phase 0b ingest:** 15 samples loaded from SR4 `segmented_outputs/`. Cell centroids extracted from `cell_segmentations.geojson`. Per-sample `data/{sample_id}/adata.h5ad` + concatenated `results/adata.raw.h5ad` (4.1 GB). Pat5_Samp3 excluded (QC fail). Job 13971144 on brb.
+- [x] **`ingest_load`:** 15 samples loaded from SR4 `segmented_outputs/`. Cell centroids extracted from `cell_segmentations.geojson`. Per-sample `data/{sample_id}/adata.h5ad` + concatenated `results/adata.raw.h5ad` (4.1 GB). Pat5_Samp3 excluded (QC fail). Job 13971144 on brb.
 
 ---
 
 ## 4. Active Tasks
 
-- [ ] Submit `scripts/run_pipeline.sbatch` on brb (runs phases 1-4 sequentially)
+- [ ] Submit `scripts/run_pipeline.sbatch` on brb (runs `qc_filter` → `scoring` sequentially)
 - [ ] After pipeline: validate checkpoints, generate QC reports
 - [ ] After scoring: evaluate clusters and decide on manual celltyping vs automated
 

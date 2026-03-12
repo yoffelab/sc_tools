@@ -89,10 +89,10 @@ Read background task output via `TaskOutput`. Then:
 
 ### 5. Manifest and Doc Hygiene
 
-After any Phase 0 job completes, also:
+After any `ingest_raw` job completes, also:
 - Verify slide IDs match between manifest and CytAssist TIF filenames
 - Update `metadata/phase0/all_samples.tsv` if corrections needed
-- Update overall Phase 0a status count in Mission.md
+- Update overall `ingest_raw` status count in Mission.md
 
 ## SSH and Lustre Rules
 

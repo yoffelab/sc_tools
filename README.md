@@ -141,6 +141,7 @@ flowchart TD
 ### Phase summary
 
 <!-- PHASE_TABLE:START -->
+
 | Slug | Old code | Name | Checkpoint | Required Data | QC Report |
 |------|----------|------|------------|---------------|-----------|
 | `ingest_raw` | p0a | Raw Data Processing | - | - |  |
@@ -153,6 +154,7 @@ flowchart TD
 | `celltype_manual` | p4 | Manual Cell Typing | `results/adata.celltyped.h5ad` | `obs[celltype, celltype_broad]`, `X` normalized | `post_celltyping_qc_{date}.html` |
 | `biology` | p5 | Downstream Biology | - | - |  |
 | `meta_analysis` | p6/p7 | Meta Analysis | - | - |  |
+
 <!-- PHASE_TABLE:END -->
 
 > Checkpoints are orange circles in the diagram; QC reports are green parallelograms. All QC reports are date-versioned (`YYYYMMDD`) under `figures/QC/`. See [Architecture.md Section 2.2](Architecture.md) for full validation contracts.

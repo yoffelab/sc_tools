@@ -90,12 +90,26 @@ if _PHASE0A_ENABLED:
             ),
 
     rule run_imc_pipeline:
-        """Run ElementoLab IMC pipeline for a single sample."""
+        """Run steinbock IMC pipeline for a single sample via Apptainer.
+
+        Handles both MCD files and txt-file directories as raw input.
+        Input ``mcd_file`` column may be:
+          - a path to a ``.mcd`` file, or
+          - a path to a directory containing per-ROI ``.txt`` files.
+
+        Pipeline steps (steinbock):
+          1. preprocess imc  — extracts per-ROI TIFFs from raw
+          2. segment cellpose — cell segmentation on nuclear + membrane markers
+          3. measure intensities — per-cell intensity tables
+          4. export adata — final cells.h5ad checkpoint
+
+        Setup: pull steinbock SIF once on cayuga with scripts/setup_steinbock.sh.
+        """
         input:
-            mcd=lambda wc: (
-                _IDX_IMMUNE.loc[wc.sample_id, "mcd_file"]
+            raw=lambda wc: (
+                _IDX_IMMUNE.loc[wc.sample_id, "raw_path"]
                 if wc.sample_id in _IDX_IMMUNE.index
-                else _IDX_STROMAL.loc[wc.sample_id, "mcd_file"]
+                else _IDX_STROMAL.loc[wc.sample_id, "raw_path"]
             ),
             panel=lambda wc: (
                 _IDX_IMMUNE.loc[wc.sample_id, "panel_csv"]
@@ -103,22 +117,67 @@ if _PHASE0A_ENABLED:
                 else _IDX_STROMAL.loc[wc.sample_id, "panel_csv"]
             ),
         output:
+            h5ad=_PHASE0A["output_dir"] + "/{sample_id}/adata/cells.h5ad",
             done=touch(_PHASE0A["output_dir"] + "/{sample_id}/.done"),
         params:
             out_dir=lambda wc: _PHASE0A["output_dir"] + "/" + wc.sample_id,
-            pipeline_script=_PHASE0A["pipeline_script"],
+            sif=_PHASE0A["steinbock_sif"],
         log:
             "outputs/logs/imc_pipeline_{sample_id}.log",
         resources:
-            mem_mb=16000,
+            mem_mb=32000,
             cpus=4,
         shell:
-            """
-            python {params.pipeline_script} \
-                --mcd {input.mcd} \
-                --panel {input.panel} \
-                --output {params.out_dir} \
-                > {log} 2>&1
+            r"""
+            set -euo pipefail
+            SIF={params.sif}
+            OUTDIR={params.out_dir}
+            RAW={input.raw}
+
+            # 1. Setup steinbock working directory layout
+            mkdir -p "$OUTDIR/raw" "$OUTDIR/img" "$OUTDIR/masks" \
+                     "$OUTDIR/intensities" "$OUTDIR/adata"
+
+            # 2. Stage raw input (MCD file or txt directory)
+            if [ -f "$RAW" ]; then
+                # MCD file: link into raw/
+                ln -sf "$(realpath "$RAW")" "$OUTDIR/raw/"
+            elif [ -d "$RAW" ]; then
+                # txt directory: link all .txt files into raw/
+                find "$RAW" -maxdepth 1 -name "*.txt" \
+                    -exec ln -sf "$(realpath {{}})" "$OUTDIR/raw/" \;
+            else
+                echo "ERROR: raw path not found: $RAW" >&2
+                exit 1
+            fi
+
+            # 3. Convert panel CSV to steinbock format (name/keep/ilastik columns)
+            python scripts/convert_panel_for_steinbock.py \
+                {input.panel} "$OUTDIR/panel.csv"
+
+            # 4. Preprocess: extract per-ROI TIFFs
+            apptainer exec "$SIF" steinbock preprocess imc \
+                --panel "$OUTDIR/panel.csv" "$OUTDIR/" \
+                >> {log} 2>&1
+
+            # 5. Segment: cell segmentation with Cellpose (nuclear + membrane)
+            apptainer exec "$SIF" steinbock segment cellpose \
+                --panel "$OUTDIR/panel.csv" \
+                --nuclear-channels "HistoneH3" "DNA1" \
+                "$OUTDIR/" \
+                >> {log} 2>&1
+
+            # 6. Measure per-cell intensities
+            apptainer exec "$SIF" steinbock measure intensities \
+                --panel "$OUTDIR/panel.csv" "$OUTDIR/" \
+                >> {log} 2>&1
+
+            # 7. Export to AnnData h5ad
+            apptainer exec "$SIF" steinbock export adata \
+                --panel "$OUTDIR/panel.csv" "$OUTDIR/" \
+                >> {log} 2>&1
+
+            echo "steinbock pipeline complete: $OUTDIR" >> {log}
             """
 
 

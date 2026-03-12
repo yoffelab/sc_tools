@@ -45,7 +45,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 fix(ingest): correct load_imc_sample() to accept processed_dir
 
-Previously required h5ad_path which did not exist at Phase 0b time.
+Previously required h5ad_path which did not exist at `ingest_load` time.
 Now auto-discovers cells.h5ad inside processed_dir.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

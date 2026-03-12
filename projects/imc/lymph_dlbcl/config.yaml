@@ -64,18 +64,24 @@ figure_dpi: 300
 figure_format: "pdf"
 figure_dir: "figures/manuscript"
 
-# --- Plan B: raw IMC reprocessing from MCD files on cayuga ---
+# --- Plan B: raw IMC reprocessing via steinbock (Apptainer) on cayuga ---
 # Set phase0a.enabled=true to activate; leave false to use Plan A (Seurat-converted h5ad).
-# Requires cayuga VPN access for SLURM submission and raw file access.
+# Tool: steinbock Docker image run via Apptainer v1.1.8 (Docker not available on cayuga).
+# Raw data: /athena/elementolab/scratch/dym2001/data/hyperion/DLBCL/ (1286 txt + some MCDs)
+# Panel CSVs: metadata/panel_immune_t2.csv, metadata/panel_stromal_s2.csv (Metal_Tag filled in)
+# NOTE: ~/elementolab/imc/run_pipeline.py does NOT exist on cayuga.
+#       imctools and steinbock are NOT installed in any conda env.
+#       Use: apptainer exec steinbock.sif steinbock <cmd>
 phase0a:
   enabled: false
-  raw_data_dir: "/home/fs01/juk4007/elementolab/backup/dylan/hyperion/DLBCLv2"
-  output_dir: "data/processed"          # per-sample pipeline output on cayuga
+  raw_data_dir: "/athena/elementolab/scratch/dym2001/data/hyperion/DLBCL"
+  output_dir: "data/processed"          # steinbock output root on cayuga scratch
   panel_immune: "metadata/panel_immune_t2.csv"
   panel_stromal: "metadata/panel_stromal_s2.csv"
   manifest_immune: "metadata/phase0/batch1_immune.tsv"
   manifest_stromal: "metadata/phase0/batch1_stromal.tsv"
-  pipeline_script: "~/elementolab/imc/run_pipeline.py"  # confirm path on cayuga
+  steinbock_sif: "~/elementolab/scratch/steinbock.sif"   # pull if absent (see scripts/setup_steinbock.sh)
+  steinbock_img: "ghcr.io/bodenmillergroup/steinbock:latest-cellpose"
 
 # --- ML parameters (Fig 5) ---
 ml:

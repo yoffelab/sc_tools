@@ -7,7 +7,7 @@ allowed-tools: Read Glob Grep
 
 # sc_tools Skills and Standards
 
-Read and follow the full standards in @skills.md.
+Read and follow the full standards in @docs/skills.md.
 
 ## When to use
 
@@ -39,5 +39,5 @@ Read and follow the full standards in @skills.md.
 | Colors | `adata.uns[f'{name}_colors']`; do not overwrite if length matches |
 | Linting | Ruff; never commit failing lint |
 | Tests | Unit + integration; fail-proof with empty/sub/full fixtures |
-| Checkpoints | Standard names only — see Architecture.md §2.1 |
+| Checkpoints | Standard names only — see docs/Architecture.md §2.1 |
 | Signature scores | `obsm['signature_score']` / `obsm['signature_score_z']`; not in obs |

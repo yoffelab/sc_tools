@@ -1,6 +1,6 @@
 # Project Architecture: Two-Panel IMC DLBCL (lymph_dlbcl)
 
-This document describes the **project-specific** directory layout, data sources, and data flow for the DLBCL two-panel IMC project. Repository-wide conventions are in the root `Architecture.md`.
+This document describes the **project-specific** directory layout, data sources, and data flow for the DLBCL two-panel IMC project. Repository-wide conventions are in the `docs/Architecture.md`.
 
 ---
 
@@ -20,8 +20,8 @@ projects/imc/lymph_dlbcl/
 │   ├── notebook_rds_summary.csv  # Per-notebook: which RDS it reads/writes (analyze_rds_notebook_usage.py)
 │   ├── files_to_download.csv     # Step 2: list of remote paths to download (required for AnnData)
 │   ├── download_manifest.csv     # After download: remote_path, local_path, date (traceability)
-│   ├── sample_metadata.csv        # Phase 2: sample → clinical (when ready)
-│   └── celltype_map.json         # Phase 4: cluster_id → celltype (when ready)
+│   ├── sample_metadata.csv        # metadata_attach: sample → clinical (when ready)
+│   └── celltype_map.json         # celltype_manual: cluster_id → celltype (when ready)
 ├── notebooks/         # Existing DLBCL notebooks (reference + extraction)
 │   └── dlbcl_notebooks/
 │       └── DLBCLv2/   # Two-panel immune and stromal preprocessing and analyses
@@ -59,15 +59,15 @@ All CSV and directory-structure discovery is done against this path. Notebooks f
 
 ## 3. Checkpoint Nomenclature (alignment with root Architecture.md)
 
-Once Phase 1–4 are implemented, use the standard checkpoint names:
+Once the pipeline phases are implemented, use the standard checkpoint names:
 
 | Phase | Standard path (under `results/`) | Description |
 |-------|----------------------------------|-------------|
-| 1 | `adata.raw.p1.h5ad` | Raw AnnData after ingestion and QC. |
-| 2 | `adata.annotated.p2.h5ad` | With sample/clinical metadata attached. |
-| 3 | `adata.normalized.p3.h5ad` | Filtered, normalized, clustered. |
-| 3.5b | `adata.normalized.scored.p35.h5ad` | Normalized + signature scores (and optional automated cell typing). |
-| 4 | `adata.celltyped.p4.h5ad` | Manual cell type labels applied. |
+| `qc_filter` | `adata.filtered.h5ad` | Raw AnnData after ingestion and QC. |
+| `metadata_attach` | `adata.annotated.h5ad` | With sample/clinical metadata attached. |
+| `preprocess` | `adata.normalized.h5ad` | Filtered, normalized, clustered. |
+| `scoring` | `adata.scored.h5ad` | Normalized + signature scores (and optional automated cell typing). |
+| `celltype_manual` | `adata.celltyped.h5ad` | Manual cell type labels applied. |
 
 For **two-panel** structure, keep **immune** and **stromal** panels **separate**. Use panel-prefixed checkpoints (e.g. `results/adata.immune.raw.p1.h5ad`, `results/adata.stromal.raw.p1.h5ad`, `results/adata.immune.normalized.p3.h5ad`, `results/adata.stromal.normalized.p3.h5ad`). Document any additional naming in this file and in Mission.md.
 
@@ -79,7 +79,7 @@ For **two-panel** structure, keep **immune** and **stromal** panels **separate**
 
 1. **Step 1 — Inventory:** Remote `find` for `*.csv` (and optionally `*.h5ad`, `*.rds`, `*.h5`); notebook scan for path references; build `metadata/remote_csv_inventory.csv` with descriptor, inferred_role, and processed/raw tag.
 2. **Step 2 (priority) — Identify, download, reuse:** From inventory, identify **required** processed/normalized/filtered files; record in `metadata/files_to_download.csv`; **download** them to `data/downloaded/`; record in `metadata/download_manifest.csv`; build AnnData from downloaded files into `results/adata.immune.*.h5ad` and `results/adata.stromal.*.h5ad`.
-3. **Step 3 (fallback) — Raw:** For panel(s) without suitable processed data, ingest raw and run Phase 1; write panel-specific `results/adata.{immune|stromal}.raw.p1.h5ad` and downstream checkpoints. Keep immune and stromal pipelines separate.
+3. **Step 3 (fallback) — Raw:** For panel(s) without suitable processed data, ingest raw and run `qc_filter`; write panel-specific `results/adata.{immune|stromal}.raw.p1.h5ad` and downstream checkpoints. Keep immune and stromal pipelines separate.
 
 ---
 

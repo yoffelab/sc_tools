@@ -17,10 +17,10 @@ For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
 **Platform:** 10x Visium spatial transcriptomics
 
 **Phase status** (see Mission.md for full detail):
-- Phases 1–4: Complete
-- Phase 3.5 (Demographics): Partial
-- **Phase 5 (Active):** tumor_differences, macrophage localization, neutrophil–cytotoxic T-cell colocalization, process colocalization, TLS, signature heatmaps, manuscript figures
-- Phases 6–7: Pending
+- `qc_filter` through `celltype_manual`: Complete
+- `demographics`: Partial
+- **`biology` (Active):** tumor_differences, macrophage localization, neutrophil–cytotoxic T-cell colocalization, process colocalization, TLS, signature heatmaps, manuscript figures
+- `meta_analysis`: Pending
 
 ---
 
@@ -68,7 +68,7 @@ pytest projects/visium/ggo_visium/tests/ -v
 
 ---
 
-## Active Scripts (Phase 5)
+## Active Scripts (`biology`)
 
 | Script | Output |
 |--------|--------|

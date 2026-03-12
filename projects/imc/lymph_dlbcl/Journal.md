@@ -1,6 +1,6 @@
 # Research Journal & Decision Log: lymph_dlbcl (Two-Panel IMC DLBCL)
 
-This journal documents **project-specific** technical and analytical decisions. Repository-level decisions are in the root `Journal.md`.
+This journal documents **project-specific** technical and analytical decisions. Repository-level decisions are in the `docs/Journal.md`.
 
 **Project:** `projects/imc/lymph_dlbcl`  
 **Reference:** Root `Mission.md` (toolkit); this project's `Mission.md` (study aims and roadmap).
@@ -8,6 +8,67 @@ This journal documents **project-specific** technical and analytical decisions. 
 ---
 
 ## Log Entries
+
+### [2026-03-09] — Visual QA pass: all non-blocked figures PASS; 4 bug fixes
+
+**QA results:**
+- Fig 1 (UMAP x2, heatmap, prevalence): PASS
+- Fig 2a (LME heatmap z-scored): PASS; 2b (stacked bar 30 subtypes): FIXED+PASS; 2c (violin+sig): PASS; 2d (LME proportions all 5 classes): PASS
+- Fig 3 (OS KM p=0.0147, PFS p=0.0024, Cox forest): PASS
+- Fig 4a (30 cell types x 18 communities): PASS; 4b (diversity bar): PASS; 4c (enrichment bubble): PASS; 4d (ML ROC+FI AUC=0.80-0.94): PASS
+- Supp 1-5, 8: PASS; Supp 6: BLOCKED (mutations CSV missing); Supp 7: placeholder only
+
+**Bugs fixed:**
+1. **Fig 2b all-gray stacked bar** — `CELLTYPE_COLORS.get()` returned gray for all 30 Seurat subtype names (B0, M1, etc.). Fixed with `build_celltype_palette(feature_cols)` which has tab20 fallback.
+2. **Fig 4a only 3 cell types** — script picked `celltype_broad` (Unknown/bcell/stroma) instead of `cluster` (30 types). Fixed column priority order and Unknown-skip logic.
+3. **Supp 8 no output** — `lifelines` not installed on cayuga. Installed via `pip install lifelines`.
+4. **Supp 8 OS column mismatch** — `DLC380_clinical.tsv` uses `"Overall survival (y)"` not `"os_time"`. Added to pattern matching. LME join produces 272/332 matched samples.
+
+**Stale artifacts identified** (from old script runs, not from current scripts):
+- `fig2b_lme_proportions.pdf`, `fig2d_composition_stacked.pdf`, `fig4d_community_by_lme.pdf` — leftover from previous script versions, can be deleted.
+
+### [2026-03-07] — Plan B: steinbock via Apptainer; panel CSVs finalized; setup scripts
+
+**Context:** Working toward Plan B (raw IMC reprocessing on cayuga) instead of reusing Seurat-converted h5ad files.
+
+**Discovery (previous session):**
+- Actual raw data is at `/athena/elementolab/scratch/dym2001/data/hyperion/DLBCL/` (1286 txt files across 7 slide directories + some MCDs), NOT the `DLBCLv2` backup path that had only CSVs/RDS.
+- `imctools` and `CellProfiler` are not installed on cayuga in any conda env. `~/elementolab/imc/run_pipeline.py` does not exist.
+- Apptainer v1.1 is available on cayuga and can run the steinbock Docker image.
+- Obtained immune panel header (from `cornell_tcell/` txt file) and stroma panel header (from `DLBCL_TMA_slide1/split_images_1/` txt file) via nohup background jobs to avoid Lustre SSH timeout.
+
+**Panel CSV updates:**
+- `metadata/panel_immune_t2.csv`: added `Metal_Tag` isotope codes and `raw_channel_name` column matching exact txt file headers (38 channels; HistoneH3 and DNA1 marked ilastik=1).
+- `metadata/panel_stromal_s2.csv`: same update (37 channels; PDL1 and Pax5 flagged with notes as absent from slide1 header — likely panel version difference or different slides).
+
+**config.yaml fix:**
+- Corrected `phase0a.raw_data_dir` to actual data location (`/athena/elementolab/scratch/dym2001/data/hyperion/DLBCL`).
+- Removed non-existent `pipeline_script` key; replaced with `steinbock_sif` and `steinbock_img` for Apptainer approach.
+
+**Snakefile fix:**
+- `run_imc_pipeline` rule updated: removed broken `pipeline_script` reference; now uses steinbock via Apptainer with a 7-step pipeline (mkdir, stage raw, convert panel CSV, preprocess imc, segment cellpose, measure intensities, export adata).
+- Shell handles both MCD files and txt directories via `[ -f ]` / `[ -d ]` detection.
+- Output now includes `{out_dir}/adata/cells.h5ad` (standard Phase 0b checkpoint) + `.done` sentinel.
+
+**New scripts:**
+- `scripts/setup_steinbock.sh`: pulls steinbock SIF from Docker Hub via Apptainer on cayuga; includes disk space check, Lmod module load, and next-step instructions.
+- `scripts/convert_panel_for_steinbock.py`: converts sc_tools panel CSV (channel/Target/full/ilastik) to steinbock format (channel/name/keep/ilastik); drops rows with empty channel names with a warning.
+
+**Key decision — steinbock over imctools+CellProfiler:**
+Steinbock is the current ElementoLab standard pipeline (v0.16.2, actively maintained), handles both MCD and txt input natively, runs as a Docker/Apptainer container with no conda install needed, and produces AnnData h5ad output directly. The older imctools+CellProfiler workflow is not installed on cayuga and would require significant setup effort.
+
+**Key decision — Cellpose for segmentation:**
+Steinbock supports DeepCell and Cellpose. Cellpose is preferred here because:
+- DeepCell requires TensorFlow which conflicts with the numpy version in the steinbock container
+- Cellpose v4 is bundled in the steinbock SIF
+- Nuclear channels: HistoneH3 (In113Di) and DNA1 (Ir191Di)
+
+**Remaining blockers (cayuga VPN required):**
+- Pull steinbock SIF (run setup_steinbock.sh once on login node)
+- Confirm actual raw file paths and populate real `mcd_file` paths in batch manifests
+- Note: manifests currently have placeholder paths under DLBCLv2 (wrong directory)
+
+---
 
 ### [2026-03-07] — Critical fix: X=zeros in p4 checkpoint; layers['raw'] fallback
 

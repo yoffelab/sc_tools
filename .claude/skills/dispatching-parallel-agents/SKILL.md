@@ -12,7 +12,7 @@ description: "[Tier 1 — Core] Handle 2+ independent problems simultaneously in
 
 **Use when:**
 - 3+ test files failing with different root causes
-- Multiple pipeline phases that are independent (Phase 3.5 + 3.5b)
+- Multiple pipeline phases that are independent (`demographics` + `scoring`)
 - Per-sample processing (SpaceRanger, QC, deconvolution per library)
 - Each problem is self-contained with no shared state
 
@@ -75,7 +75,7 @@ Do NOT change other functions. Return: what you found and what you fixed.
 |-----------|---------------|
 | SpaceRanger batch1 + batch2 | Two submission agents, one per batch |
 | 9-method integration benchmark | 9 agents, one per method |
-| Phase 3.5 + Phase 3.5b | Two analysis agents from same p3 checkpoint |
+| `demographics` + `scoring` | Two analysis agents from same `preprocess` checkpoint |
 | Deconvolution per library | One agent per library (GPU-limited: max 2 concurrent) |
 | Per-sample QC (16 samples) | SLURM array (not agents); agents submit array jobs |
 

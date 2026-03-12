@@ -373,42 +373,96 @@ def fig1d_bcell_markers(adatas: dict, celltype_cols: dict):
         break  # only need one panel for B cell markers
 
 
-def fig1e_coo(adatas: dict, celltype_cols: dict):
-    """COO distribution if available.
+def fig1e_coo(adatas: dict, celltype_cols: dict):  # noqa: ARG001
+    """COO x LME class distribution — sample-level join from clinical TSV.
 
-    Insight: Cell of origin (GCB vs ABC) subtypes show distinct
-    microenvironment compositions.
+    Insight: Cell of origin (GCB vs ABC) subtypes show non-random distribution
+    across LME classes, revealing microenvironment-tumor cell biology links.
     """
-    logger.info("  Fig 1e: COO comparison")
+    import re
 
-    for panel, adata in adatas.items():
-        if "COO" not in adata.obs.columns:
-            continue
+    from figure_config import LME_ORDER  # noqa: PLC0415
+    from scipy import stats as _stats
 
-        col = celltype_cols[panel]
-        data = adata.obs.dropna(subset=["COO"])
-        if len(data) < 10:
-            continue
+    logger.info("  Fig 1e: COO by LME class (sample-level join)")
 
-        ct = pd.crosstab(data[col], data["COO"])
-        ct_norm = ct.div(ct.sum(axis=1), axis=0)
+    clinical_path = PROJECT_DIR / "metadata" / "DLC380_clinical.tsv"
+    lme_path = PROJECT_DIR / "metadata" / "lme_class_assignments.csv"
 
-        # Use COO colors
-        coo_cols = [COO_COLORS.get(c, "#999999") for c in ct_norm.columns]
+    if not clinical_path.exists() or not lme_path.exists():
+        logger.warning("  Fig 1e: clinical or LME file missing; skipping")
+        return
 
-        fig, ax = plt.subplots(figsize=(max(6, ct_norm.shape[0] * 0.5), 5))
-        ct_norm.plot(kind="bar", stacked=True, ax=ax, color=coo_cols, width=0.8)
-        ax.set_ylabel("Proportion")
-        ax.set_xlabel("")
-        ax.set_title("COO Distribution by Cell Type")
-        ax.legend(title="COO", bbox_to_anchor=(1.02, 1), loc="upper left")
-        plt.xticks(rotation=45, ha="right")
+    def _norm_dlc(s):
+        m = re.match(r"DLC[_\s-]?(\d+)", str(s), re.IGNORECASE)
+        return f"DLC_{int(m.group(1)):04d}" if m else str(s)
 
-        out = FIG_DIR / f"fig1e_coo_{panel}.pdf"
-        plt.savefig(out, dpi=300, bbox_inches="tight")
-        plt.close()
-        logger.info(f"    Saved: {out}")
-        break
+    # Load and filter clinical
+    clinical = pd.read_csv(clinical_path, sep="\t")
+    if "FINAL_COHORT" in clinical.columns:
+        clinical = clinical[clinical["FINAL_COHORT"] == "YES"].copy()
+    clinical = clinical.rename(columns={"LYMPH2CX_COO": "COO"})
+    clinical["DLC_ID_norm"] = clinical["DLC_ID"].astype(str).apply(_norm_dlc)
+
+    # Filter invalid COO
+    valid_coo = ["GCB", "ABC", "U", "Unclassified"]
+    clinical = clinical[clinical["COO"].astype(str).str.upper().isin(
+        [c.upper() for c in valid_coo] + [c.upper() for c in ["GCB", "ABC", "U"]]
+    )]
+    # Normalize COO labels: U -> Unclassified
+    coo_remap = {"U": "Unclassified"}
+    clinical["COO"] = clinical["COO"].replace(coo_remap)
+    logger.info(f"    Clinical after filter: {len(clinical)} cases, COO: {clinical['COO'].value_counts().to_dict()}")
+
+    # Load LME assignments
+    lme = pd.read_csv(lme_path)
+    lme["sample_norm"] = lme["sample"].astype(str).apply(_norm_dlc)
+    lme_col = "LME_display" if "LME_display" in lme.columns else "LME_class"
+
+    # Join clinical + LME
+    merged = clinical.merge(
+        lme[["sample_norm", lme_col]].rename(columns={lme_col: "LME_class"}),
+        left_on="DLC_ID_norm", right_on="sample_norm", how="inner",
+    )
+    logger.info(f"    Merged clinical + LME: {len(merged)} cases")
+
+    if len(merged) < 10:
+        logger.warning("  Fig 1e: insufficient merged data; skipping")
+        return
+
+    ct = pd.crosstab(merged["LME_class"], merged["COO"])
+
+    # Reorder rows to manuscript LME order
+    lme_present = [l for l in LME_ORDER if l in ct.index]
+    if not lme_present:
+        logger.warning(f"  Fig 1e: no LME classes found in {ct.index.tolist()}")
+        return
+    ct = ct.loc[lme_present]
+
+    chi2, p_val, _, _ = _stats.chi2_contingency(ct)
+    logger.info(f"    Chi2 test: p = {p_val:.4e}, n = {len(merged)}")
+
+    ct_norm = ct.div(ct.sum(axis=1), axis=0)
+    coo_cols = [COO_COLORS.get(c, "#999999") for c in ct_norm.columns]
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ct_norm.plot(kind="bar", stacked=True, ax=ax, color=coo_cols, width=0.8)
+    ax.set_ylabel("Proportion")
+    ax.set_xlabel("")
+    ax.set_title(f"Cell of Origin by LME Class (chi2 p = {p_val:.2e})")
+    ax.legend(title="COO", bbox_to_anchor=(1.02, 1), loc="upper left")
+    plt.xticks(rotation=30, ha="right")
+
+    for i, lme_cls in enumerate(lme_present):
+        n = ct.loc[lme_cls].sum()
+        ax.text(i, 1.02, f"n={n}", ha="center", fontsize=6)
+
+    sns.despine()
+
+    out = FIG_DIR / "fig1e_coo_immune.pdf"
+    plt.savefig(out, dpi=300, bbox_inches="tight")
+    plt.close()
+    logger.info(f"    Saved: {out}")
 
 
 def main():

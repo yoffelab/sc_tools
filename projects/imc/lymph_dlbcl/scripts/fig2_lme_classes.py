@@ -47,6 +47,7 @@ from figure_config import (
     LME_COLORS,
     LME_ORDER,
     apply_figure_style,
+    build_celltype_palette,
     significance_label,
 )
 
@@ -183,8 +184,9 @@ def fig2b_composition_stacked(df: pd.DataFrame):
     lme_present = [l for l in LME_ORDER if l in mean_props.index]
     mean_props = mean_props.loc[lme_present]
 
-    # Build color list from CELLTYPE_COLORS
-    colors = [CELLTYPE_COLORS.get(ct, "#999999") for ct in feature_cols]
+    # Build color list with fuzzy matching (handles varied naming conventions)
+    palette = build_celltype_palette(feature_cols)
+    colors = [palette[ct] for ct in feature_cols]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     mean_props.plot(kind="bar", stacked=True, ax=ax, width=0.8, color=colors)

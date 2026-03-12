@@ -1,6 +1,6 @@
 # Research Journal & Decision Log: GGO Visium Project
 
-This journal documents the technical evolution, parameters, and rationale behind **project-specific** analytical decisions for the Lung Tumor Evolution and TLS transcriptomics study. Repository-level decisions (architecture, script sanity check, scalable layout) are in the root `Journal.md`.
+This journal documents the technical evolution, parameters, and rationale behind **project-specific** analytical decisions for the Lung Tumor Evolution and TLS transcriptomics study. Repository-level decisions (architecture, script sanity check, scalable layout) are in the `docs/Journal.md`.
 
 **Project:** `projects/visium/ggo_visium`  
 **Reference:** Root `Mission.md` (toolkit); this project's `Mission.md` (study aims).

@@ -36,21 +36,25 @@ WIKI_ROOT = REPO_ROOT / "docs" / "wiki"
 # Phase table generation from pipeline.py
 # ---------------------------------------------------------------------------
 
+
 def _get_phases() -> dict:
     """Import STANDARD_PHASES from sc_tools.pipeline."""
     sys.path.insert(0, str(REPO_ROOT))
     from sc_tools.pipeline import STANDARD_PHASES
+
     return STANDARD_PHASES
 
 
 def generate_phases_md(phases: dict) -> str:
     """Generate docs/wiki/sc_tools/phases.gen.md from PhaseSpec data."""
-    fm = _frontmatter({
-        "type": "phases",
-        "tier": "tool-design",
-        "cssclasses": ["generated"],
-        "generated": True,
-    })
+    fm = _frontmatter(
+        {
+            "type": "phases",
+            "tier": "tool-design",
+            "cssclasses": ["generated"],
+            "generated": True,
+        }
+    )
     lines = [
         fm,
         "",
@@ -76,12 +80,14 @@ def generate_phases_md(phases: dict) -> str:
 
 def generate_checkpoints_md(phases: dict) -> str:
     """Generate docs/wiki/sc_tools/checkpoints.gen.md with required metadata per phase."""
-    fm = _frontmatter({
-        "type": "checkpoints",
-        "tier": "tool-design",
-        "cssclasses": ["generated"],
-        "generated": True,
-    })
+    fm = _frontmatter(
+        {
+            "type": "checkpoints",
+            "tier": "tool-design",
+            "cssclasses": ["generated"],
+            "generated": True,
+        }
+    )
     lines = [
         fm,
         "",
@@ -129,12 +135,14 @@ def _frontmatter(props: dict) -> str:
 
 def generate_changelog_md() -> str:
     """Generate docs/wiki/sc_tools/changelog.gen.md from registry phase transitions."""
-    fm = _frontmatter({
-        "type": "changelog",
-        "tier": "tool-design",
-        "cssclasses": ["generated"],
-        "generated": True,
-    })
+    fm = _frontmatter(
+        {
+            "type": "changelog",
+            "tier": "tool-design",
+            "cssclasses": ["generated"],
+            "generated": True,
+        }
+    )
     lines = [
         fm,
         "",
@@ -146,6 +154,7 @@ def generate_changelog_md() -> str:
     ]
     try:
         from sc_tools.registry import Registry
+
         reg = Registry()
         # Collect all phases across all projects, sort by updated_at desc
         all_entries: list[tuple[str, dict]] = []
@@ -185,6 +194,7 @@ def generate_project_status_md(project_name: str) -> str:
     phases_data: list[dict] = []
     try:
         from sc_tools.registry import Registry
+
         reg = Registry()
         phases_data = reg.list_phases(project_name)
 
@@ -246,6 +256,7 @@ def generate_project_status_md(project_name: str) -> str:
 # Sentinel table replacement in doc files
 # ---------------------------------------------------------------------------
 
+
 def _build_phase_table(phases: dict) -> str:
     """Build the markdown phase table used in README, CLAUDE.md, Architecture.md."""
     lines = [
@@ -264,9 +275,7 @@ def _build_phase_table(phases: dict) -> str:
             parts.append(f"`X` {spec.x_format}")
         req = ", ".join(parts) if parts else "-"
         qc = f"`{spec.qc_report}`" if spec.qc_report else ""
-        lines.append(
-            f"| `{slug}` | {spec.old_code} | {spec.label} | {cp} | {req} | {qc} |"
-        )
+        lines.append(f"| `{slug}` | {spec.old_code} | {spec.label} | {cp} | {req} | {qc} |")
     return "\n".join(lines)
 
 
@@ -280,6 +289,11 @@ PROJECT_TABLE_PATTERN = re.compile(
     re.DOTALL,
 )
 
+ACTIVE_PLANS_PATTERN = re.compile(
+    r"(<!-- ACTIVE_PLANS:START -->)\n.*?\n(<!-- ACTIVE_PLANS:END -->)",
+    re.DOTALL,
+)
+
 
 def update_sentinel_file(filepath: Path, table: str) -> bool:
     """Replace content between PHASE_TABLE sentinels. Returns True if changed."""
@@ -288,7 +302,7 @@ def update_sentinel_file(filepath: Path, table: str) -> bool:
     content = filepath.read_text()
     if "<!-- PHASE_TABLE:START -->" not in content:
         return False
-    replacement = f"<!-- PHASE_TABLE:START -->\n{table}\n<!-- PHASE_TABLE:END -->"
+    replacement = f"<!-- PHASE_TABLE:START -->\n\n{table}\n\n<!-- PHASE_TABLE:END -->"
     new_content = SENTINEL_PATTERN.sub(replacement, content)
     if new_content == content:
         return False
@@ -321,6 +335,7 @@ def _build_project_table() -> str:
     table with links.  Extra registry-only projects are listed in a collapsed
     details block underneath.
     """
+
     def _friendly_platform(proj: dict) -> str:
         raw = proj.get("imaging_modality") or proj.get("domain") or ""
         return _PLATFORM_LABELS.get(raw, raw)
@@ -362,6 +377,7 @@ def _build_project_table() -> str:
     ]
     try:
         from sc_tools.registry import Registry
+
         reg = Registry()
         for proj in reg.list_projects():
             name = proj["name"]
@@ -375,20 +391,17 @@ def _build_project_table() -> str:
                     f"| **{name}** | {platform} | {current} | {n_obs} | {n_vars} | {progress} | {links} |"
                 )
             else:
-                extra_lines.append(
-                    f"| {name} | {platform} | {current} | {progress} |"
-                )
+                extra_lines.append(f"| {name} | {platform} | {current} | {progress} |")
     except Exception:
         main_lines.append("| *(registry unavailable)* | | | | | | |")
 
     parts = ["\n".join(main_lines)]
     if len(extra_lines) > 2:  # more than just header + separator
         parts.append("")
-        parts.append("<details><summary>Registry-only projects (no wiki pages)</summary>")
-        parts.append("")
-        parts.append("\n".join(extra_lines))
-        parts.append("")
-        parts.append("</details>")
+        # Use Obsidian callout (foldable) instead of <details> for rendering
+        parts.append("> [!info]- Registry-only projects (no wiki pages)")
+        for line in extra_lines:
+            parts.append(f"> {line}")
     return "\n".join(parts)
 
 
@@ -399,7 +412,7 @@ def update_project_table_file(filepath: Path, table: str) -> bool:
     content = filepath.read_text()
     if "<!-- PROJECT_TABLE:START -->" not in content:
         return False
-    replacement = f"<!-- PROJECT_TABLE:START -->\n{table}\n<!-- PROJECT_TABLE:END -->"
+    replacement = f"<!-- PROJECT_TABLE:START -->\n\n{table}\n\n<!-- PROJECT_TABLE:END -->"
     new_content = PROJECT_TABLE_PATTERN.sub(replacement, content)
     if new_content == content:
         return False
@@ -408,15 +421,314 @@ def update_project_table_file(filepath: Path, table: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Active plans table from docs/wiki/plans/
+# ---------------------------------------------------------------------------
+
+
+def _parse_frontmatter(content: str) -> dict[str, str]:
+    """Parse simple YAML frontmatter (key: value pairs) into a dict."""
+    props: dict[str, str] = {}
+    lines = content.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return props
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            key, _, val = line.partition(":")
+            props[key.strip()] = val.strip().strip('"').strip("'")
+    return props
+
+
+def _build_active_plans_table(plans_dir: Path | None = None) -> str:
+    """Build a markdown table of active/in_progress plans from docs/wiki/plans/.
+
+    Scans tier1/, tier2/, untiered/, and the plans root (legacy flat files).
+
+    Parameters
+    ----------
+    plans_dir:
+        Override for the plans directory (used in tests).
+    """
+    if plans_dir is None:
+        plans_dir = WIKI_ROOT / "plans"
+
+    if not plans_dir.exists():
+        return "*No active plans*"
+
+    active_statuses = {"active", "in_progress"}
+    rows: list[tuple[str, str, str, str, str]] = []  # (date, slug, title, status, tier)
+
+    # Scan root (legacy/flat) + tier subdirs
+    scan_dirs = [
+        (plans_dir, "untiered"),
+        (plans_dir / "tier1", "tier1"),
+        (plans_dir / "tier2", "tier2"),
+        (plans_dir / "untiered", "untiered"),
+    ]
+    seen: set[str] = set()
+    for scan_dir, _tier_label in scan_dirs:
+        if not scan_dir.exists():
+            continue
+        for plan_file in sorted(scan_dir.glob("*.md")):
+            if plan_file.name.startswith(".") or plan_file.stem in seen:
+                continue
+            # Skip _index files
+            if plan_file.stem.startswith("_"):
+                continue
+            seen.add(plan_file.stem)
+            content = plan_file.read_text()
+            fm = _parse_frontmatter(content)
+            status = fm.get("status", "active")
+            if status not in active_statuses:
+                continue
+            title = fm.get("summary", "") or ""
+            for line in content.splitlines():
+                if line.strip().startswith("# "):
+                    title = line.strip()[2:].strip()
+                    break
+            created = fm.get("created", "")
+            slug = plan_file.stem
+            # Determine link prefix relative to plans/
+            rel = plan_file.relative_to(plans_dir).parent
+            link_prefix = str(rel) if str(rel) != "." else ""
+            rows.append((created, slug, title, status, link_prefix))
+
+    if not rows:
+        return "*No active plans*"
+
+    lines = [
+        "| Plan | Tier | Date | Status |",
+        "|------|------|------|--------|",
+    ]
+    for created, slug, title, status, link_prefix in rows:
+        path = f"plans/{link_prefix}/{slug}" if link_prefix else f"plans/{slug}"
+        link = f"[[{path}|{title}]]"
+        tier_label = link_prefix if link_prefix else "untiered"
+        lines.append(f"| {link} | {tier_label} | {created} | {status} |")
+    return "\n".join(lines)
+
+
+def update_active_plans_file(filepath: Path, table: str) -> bool:
+    """Replace content between ACTIVE_PLANS sentinels. Returns True if changed."""
+    if not filepath.exists():
+        return False
+    content = filepath.read_text()
+    if "<!-- ACTIVE_PLANS:START -->" not in content:
+        return False
+    replacement = f"<!-- ACTIVE_PLANS:START -->\n\n{table}\n\n<!-- ACTIVE_PLANS:END -->"
+    new_content = ACTIVE_PLANS_PATTERN.sub(replacement, content)
+    if new_content == content:
+        return False
+    filepath.write_text(new_content)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Nexus dashboard
+# ---------------------------------------------------------------------------
+
+
+def _build_next_phases_table() -> str:
+    """Build a table of available next phases per project using the pipeline DAG."""
+    lines = [
+        "| Project | Can Start Next |",
+        "|---------|----------------|",
+    ]
+    try:
+        from sc_tools.pipeline import get_available_next
+        from sc_tools.registry import Registry
+
+        reg = Registry()
+        any_rows = False
+        for proj in reg.list_projects():
+            name = proj["name"]
+            phases = reg.list_phases(name)
+            completed = {p["phase"] for p in phases if p["status"] == "complete"}
+            available = get_available_next(completed)
+            if available:
+                next_str = ", ".join(f"`{s}`" for s in available)
+                lines.append(f"| {name} | {next_str} |")
+                any_rows = True
+        if not any_rows:
+            return "*No project phase data recorded.*"
+    except Exception:
+        return "*Registry not available.*"
+    return "\n".join(lines)
+
+
+def generate_nexus_md(phases: dict, plans_dir: Path | None = None) -> str:
+    """Generate docs/wiki/sc_tools/nexus.gen.md — flat ecosystem state for Claude Code.
+
+    Parameters
+    ----------
+    phases:
+        STANDARD_PHASES dict from sc_tools.pipeline.
+    plans_dir:
+        Override for plans directory (used in tests).
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    fm = _frontmatter(
+        {
+            "type": "nexus",
+            "tier": "tool-design",
+            "cssclasses": ["generated"],
+            "generated": True,
+            "updated": now,
+        }
+    )
+
+    # Section 1: All projects (flat — no Obsidian transclusion)
+    project_table = _build_project_table()
+
+    # Section 2: Available next phases
+    next_phases = _build_next_phases_table()
+
+    # Section 3: Active plans (reuse existing builder)
+    active_plans = _build_active_plans_table(plans_dir=plans_dir)
+
+    # Section 4: BioData summary
+    biodata_summary = _build_biodata_summary()
+
+    # Section 5: Recent phase transitions (last 10)
+    recent_transitions = _build_recent_transitions(limit=10)
+
+    key_docs = (
+        "| Doc | Path | Purpose |\n"
+        "|-----|------|---------|\n"
+        "| Architecture | `docs/Architecture.md` | Pipeline phases, checkpoints, data flow |\n"
+        "| Registry | `docs/registry.md` | Storage layer, schema, BioData, MCP servers |\n"
+        "| Mission | `docs/Mission.md` | Toolkit-level todo list and roadmap |\n"
+        "| Journal | `docs/Journal.md` | Toolkit-level decision log |\n"
+        "| Skills | `docs/skills.md` | Coding and analysis standards |\n"
+        "| BioData hierarchy | `docs/wiki/knowledge/biodata-hierarchy.md` | Platform taxonomy |\n"
+        "| Clinical schema | `docs/wiki/knowledge/clinical-data-schema.md` | Subject/cohort fields |\n"
+        "| Plans | `docs/wiki/plans/` | tier1 (architectural), tier2 (sub-task), untiered (auto-save) |"
+    )
+
+    lines = [
+        fm,
+        "",
+        "# sc_tools Nexus — Ecosystem State",
+        "",
+        "> [!generated] Auto-generated by `make wiki-sync`",
+        "> Do not edit manually. Last updated: " + now,
+        "",
+        "---",
+        "",
+        "## Key Docs",
+        "",
+        key_docs,
+        "",
+        "---",
+        "",
+        "## All Projects",
+        "",
+        project_table,
+        "",
+        "---",
+        "",
+        "## Available Next Phases",
+        "",
+        next_phases,
+        "",
+        "---",
+        "",
+        "## Active Plans",
+        "",
+        active_plans,
+        "",
+        "---",
+        "",
+        "## BioData Registry",
+        "",
+        biodata_summary,
+        "",
+        "---",
+        "",
+        "## Recent Phase Transitions",
+        "",
+        recent_transitions,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _build_biodata_summary() -> str:
+    """Return a markdown summary of BioData, Subject, and Sample counts."""
+    try:
+        from sc_tools.registry import Registry
+
+        reg = Registry()
+        s = reg.status()
+        n_subjects = s.get("n_subjects", 0)
+        n_samples = s.get("n_samples", 0)
+        n_biodata = s.get("n_biodata", 0)
+        n_datasets = s.get("n_datasets", 0)
+
+        lines = [
+            f"**Totals:** {n_subjects} subjects, {n_samples} samples, "
+            f"{n_biodata} BioData objects, {n_datasets} legacy datasets",
+            "",
+            "| Project | BioData Type | Modality | Count |",
+            "|---------|-------------|----------|-------|",
+        ]
+        for proj in reg.list_projects():
+            summary = reg.project_data_summary(proj["name"])
+            if summary["total"] > 0:
+                for cat, count in sorted(summary["by_category"].items()):
+                    # Find the dominant modality for this category
+                    mod_str = ""
+                    by_mod = summary.get("by_modality", {})
+                    if by_mod:
+                        mod_str = ", ".join(m for m in sorted(by_mod.keys()) if m != "unknown")
+                    lines.append(f"| {proj['name']} | {cat} | {mod_str} | {count} |")
+        if len(lines) == 4:  # only header
+            lines.append("| *(no BioData registered)* | | | |")
+        return "\n".join(lines)
+    except Exception:
+        return "*Registry not available for BioData summary.*"
+
+
+def _build_recent_transitions(limit: int = 10) -> str:
+    """Return a markdown table of the most recent phase transitions."""
+    try:
+        from sc_tools.registry import Registry
+
+        reg = Registry()
+        all_entries: list[tuple[str, dict]] = []
+        for proj in reg.list_projects():
+            proj_name = proj["name"]
+            for phase in reg.list_phases(proj_name):
+                all_entries.append((proj_name, phase))
+        all_entries.sort(key=lambda x: x[1].get("updated_at", ""), reverse=True)
+        entries = all_entries[:limit]
+        if not entries:
+            return "*No phase transitions recorded yet.*"
+        lines = [
+            "| Date | Project | Phase | Status |",
+            "|------|---------|-------|--------|",
+        ]
+        for proj_name, phase in entries:
+            date_str = str(phase.get("updated_at", ""))[:10] or "?"
+            lines.append(f"| {date_str} | {proj_name} | `{phase['phase']}` | {phase['status']} |")
+        return "\n".join(lines)
+    except Exception:
+        return "*Registry not available.*"
+
+
+# ---------------------------------------------------------------------------
 # Discover projects
 # ---------------------------------------------------------------------------
+
 
 def discover_projects() -> list[str]:
     """Find project names from docs/wiki/projects/ or projects/ directory."""
     wiki_projects = WIKI_ROOT / "projects"
     if wiki_projects.exists():
         return [
-            d.name for d in sorted(wiki_projects.iterdir())
+            d.name
+            for d in sorted(wiki_projects.iterdir())
             if d.is_dir() and not d.name.startswith(".")
         ]
     # Fallback: scan projects/ for directories with Mission.md or Journal.md
@@ -427,8 +739,7 @@ def discover_projects() -> list[str]:
             continue
         for proj_dir in sorted(platform_dir.iterdir()):
             if proj_dir.is_dir() and (
-                (proj_dir / "Journal.md").exists()
-                or (proj_dir / "Snakefile").exists()
+                (proj_dir / "Journal.md").exists() or (proj_dir / "Snakefile").exists()
             ):
                 names.append(proj_dir.name)
     return names
@@ -437,6 +748,7 @@ def discover_projects() -> list[str]:
 # ---------------------------------------------------------------------------
 # sync subcommand
 # ---------------------------------------------------------------------------
+
 
 def cmd_sync() -> None:
     """Generate all .gen.md files and update sentinel tables."""
@@ -466,7 +778,7 @@ def cmd_sync() -> None:
 
     # 3. Sentinel tables in doc files
     table = _build_phase_table(phases)
-    for doc in ["README.md", "CLAUDE.md", "Architecture.md"]:
+    for doc in ["README.md", "CLAUDE.md", "docs/Architecture.md"]:
         filepath = REPO_ROOT / doc
         if update_sentinel_file(filepath, table):
             print(f"  updated sentinel in {doc}")
@@ -478,7 +790,18 @@ def cmd_sync() -> None:
     project_table = _build_project_table()
     index_path = WIKI_ROOT / "index.md"
     if update_project_table_file(index_path, project_table):
-        print(f"  updated PROJECT_TABLE in index.md")
+        print("  updated PROJECT_TABLE in index.md")
+
+    # 5. Active plans table in Mission.md
+    active_plans_table = _build_active_plans_table()
+    mission_path = REPO_ROOT / "docs" / "Mission.md"
+    if update_active_plans_file(mission_path, active_plans_table):
+        print("  updated ACTIVE_PLANS in Mission.md")
+
+    # 6. Nexus dashboard (flat ecosystem state for Claude Code)
+    nexus_md = generate_nexus_md(phases)
+    (sc_dir / "nexus.gen.md").write_text(nexus_md)
+    print(f"  wrote {sc_dir / 'nexus.gen.md'}")
 
     print(f"\nwiki-sync complete at {now}")
 
@@ -486,6 +809,7 @@ def cmd_sync() -> None:
 # ---------------------------------------------------------------------------
 # lint subcommand
 # ---------------------------------------------------------------------------
+
 
 def cmd_lint() -> None:
     """Check .gen.md files are not hand-edited and .suggest.md are not stale."""
@@ -497,7 +821,9 @@ def cmd_lint() -> None:
         try:
             result = subprocess.run(
                 ["git", "diff", "--name-only", "--"] + [str(f) for f in gen_files],
-                capture_output=True, text=True, cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                cwd=REPO_ROOT,
             )
             dirty = [l for l in result.stdout.strip().split("\n") if l]
             if dirty:
@@ -525,6 +851,7 @@ def cmd_lint() -> None:
 # ---------------------------------------------------------------------------
 # suggest subcommand
 # ---------------------------------------------------------------------------
+
 
 def cmd_suggest() -> None:
     """Generate .suggest.md files with agent-proposed content for human review."""
@@ -566,6 +893,7 @@ def cmd_suggest() -> None:
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     if len(sys.argv) < 2 or sys.argv[1] not in ("sync", "lint", "suggest"):

@@ -26,8 +26,8 @@ Structure:
 Use Mermaid for diagrams:
 ```mermaid
 graph LR
-    A[Phase 0b: adata.ingested.h5ad] --> B[Phase 1: adata.filtered.h5ad]
-    B --> C[Phase 2: adata.annotated.h5ad]
+    A[ingest_load: adata.ingested.h5ad] --> B[qc_filter: adata.filtered.h5ad]
+    B --> C[metadata_attach: adata.annotated.h5ad]
 ```
 
 ### Runbooks (SLURM jobs, HPC procedures)

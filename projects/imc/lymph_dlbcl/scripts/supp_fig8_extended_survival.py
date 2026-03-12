@@ -40,18 +40,24 @@ def main():
         logger.error("lifelines not installed; pip install lifelines")
         return
 
-    # Load clinical + LME
-    clinical_path = PROJECT_DIR / config["clinical"]["clinical_full"]
+    # Load clinical from primary TSV (DLC380_clinical.tsv — standardized column names)
+    clinical_path = PROJECT_DIR / config["clinical"]["clinical_tsv"]
     lme_path = METADATA_DIR / "lme_class_assignments.csv"
 
     if not clinical_path.exists():
         logger.error(f"Clinical file not found: {clinical_path}")
         return
 
-    # Auto-detect separator
     sep = "\t" if clinical_path.suffix == ".tsv" else ","
     clinical = pd.read_csv(clinical_path, sep=sep)
+    logger.info(f"Clinical: {clinical.shape}, cols: {list(clinical.columns[:8])}")
 
+    # Filter to final cohort if column present
+    if "FINAL_COHORT" in clinical.columns:
+        clinical = clinical[clinical["FINAL_COHORT"].str.upper() == "YES"].copy()
+        logger.info(f"After FINAL_COHORT filter: {len(clinical)}")
+
+    # Join LME classes using DLC_ID
     if lme_path.exists():
         import re as _re
         def _norm_dlc(s):
@@ -63,40 +69,40 @@ def main():
         lme["sample_norm"] = lme["sample"].apply(_norm_dlc)
         lme_col = "LME_display" if "LME_display" in lme.columns else "LME_class"
 
-        # Join using normalized DLC IDs
-        if "DLC_ID" in clinical.columns:
-            clinical["DLC_ID_norm"] = clinical["DLC_ID"].astype(str).apply(_norm_dlc)
-            clinical = clinical.merge(
-                lme[["sample_norm", lme_col]].rename(columns={lme_col: "LME_class"}),
-                left_on="DLC_ID_norm", right_on="sample_norm", how="inner",
-            )
-        else:
-            for col in clinical.columns:
-                clinical[col + "_norm"] = clinical[col].astype(str).apply(_norm_dlc)
-                overlap = set(clinical[col + "_norm"]) & set(lme["sample_norm"])
-                if len(overlap) > 10:
-                    clinical = clinical.merge(
-                        lme[["sample_norm", lme_col]].rename(columns={lme_col: "LME_class"}),
-                        left_on=col + "_norm", right_on="sample_norm", how="inner",
-                    )
-                    break
-                clinical = clinical.drop(columns=[col + "_norm"])
+        # Find the DLC_ID column in clinical
+        id_col = None
+        for cname in ["DLC_ID", "DLC_code", "sample", "patient_id", "ID"]:
+            if cname in clinical.columns:
+                id_col = cname
+                break
+        if id_col is None:
+            # Try first column
+            id_col = clinical.columns[0]
+        logger.info(f"Joining on clinical column: {id_col}")
+        clinical["_id_norm"] = clinical[id_col].astype(str).apply(_norm_dlc)
+        pre = len(clinical)
+        clinical = clinical.merge(
+            lme[["sample_norm", lme_col]].rename(columns={lme_col: "LME_class"}),
+            left_on="_id_norm", right_on="sample_norm", how="inner",
+        )
+        logger.info(f"After LME join: {pre} -> {len(clinical)} samples")
 
-    # Find survival columns — handle multiple naming conventions
+    # Detect survival columns — handles DLC380_clinical.tsv and legacy CSV conventions
     surv_cols = {}
     for col in clinical.columns:
         cl = col.lower().strip()
-        if cl in ("os_time", "os", "overall survival (y)", "time to last\nfollow up\n(years)"):
+        if cl in ("os_time", "os", "overall_survival_y", "overall survival (y)"):
             surv_cols["os_time"] = col
-        elif cl in ("os_event", "code_os", "status at last\nfollow up"):
+        elif cl in ("os_event", "code_os", "os_status"):
             surv_cols["os_event"] = col
-        elif cl in ("pfs_time", "pfs"):
+        elif cl in ("pfs_time", "pfs", "progression_free_survival_y", "progression free survival (y)"):
             surv_cols["pfs_time"] = col
-        elif cl in ("pfs_event", "code_pfs"):
+        elif cl in ("pfs_event", "code_pfs", "pfs_status"):
             surv_cols["pfs_event"] = col
 
+    logger.info(f"Survival columns found: {surv_cols}")
     if "os_time" not in surv_cols:
-        logger.error(f"No OS time column found in: {list(clinical.columns)}")
+        logger.error(f"No OS time column found. Available: {list(clinical.columns)}")
         return
 
     time_col = surv_cols["os_time"]

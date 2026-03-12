@@ -10,6 +10,23 @@ This journal documents **repository-level** technical and structural decisions. 
 
 ## Log Entries (toolkit / repo structure)
 
+### [2026-03-11] - BioData OOP Hierarchy v1.1: Modality Taxonomy, Real Clinical Data, Documentation
+
+Completed v1.1 of the BioData hierarchy. Key changes and decisions:
+
+- **Modality taxonomy tier**: Added `modality` and `platform_version` fields to `PlatformSpec`. 19 modalities organized across 5 `BioDataType` categories, covering all 95 platforms. Three-tier classification: BioDataType -> BioDataModality -> BioDataPlatform. Query helpers: `list_modalities()`, `list_platforms_by_modality()`, `get_modality_for_platform()`.
+- **Denormalized modality in DB**: Added `modality` column to `bio_data` table (Alembic migration 0006). Denormalized from PlatformSpec for query efficiency — avoids joining external Python registry. Auto-filled at registration time.
+- **PlatformSpec defaults**: Populated `defaults` dict for key platforms (IMC: staining_protocol+image_type, Xenium: spatial_resolution+coordinate_system, Chromium 3p: library_type+chemistry, etc.). `register_biodata()` auto-fills child columns from these defaults unless explicitly overridden.
+- **Format inference from URI**: `register_biodata()` infers format from URI extension (.h5ad, .zarr, .tiff, .bam, etc.) when not explicitly provided.
+- **Phase B dual-write**: `register_dataset()` now creates a companion BioData row and links via `bio_data_id`. Session detach bug fixed (capture `proj.platform` inside session context). Deprecation path: Phase A (warning, v1.0) -> Phase B (dual-write, v1.1) -> Phase C (future removal).
+- **Real clinical data**: `scripts/seed_clinical_data.py` parses 4 XLSX files (DRAKE 456, ROS 135, GGO-IMC 146, PLM 38 = 775 real patients). Column mappings standardize vital_status, sex, stage across cohorts. JSON overflow for cohort-specific fields. Dry-run verified.
+- **MCP updates**: `list_modalities` tool added; `list_biodata` gets modality filter; `project_data_summary` shows modality breakdown.
+- **Migration tests**: `test_migrations.py` (3 tests, skipped without alembic).
+- **Documentation**: 3 new wiki pages (biodata-hierarchy.md, biodata-api.md, clinical-data-schema.md). Architecture.md section 4.2 updated with modality tier, clinical data, dual-write.
+- **Tests**: 752 passing (up from 701 in v1.0), 13 skipped, lint clean. Target of 750+ exceeded.
+
+Plan files: `docs/wiki/plans/tier1/2026-03-08-biodata-v1.md` (v1.0 retrospective), `docs/wiki/plans/tier1/2026-03-11-biodata-v1-1.md` (v1.1).
+
 ### [2026-03-06] - Automated cell typing (sc_tools.tl.celltype) + post-celltyping QC report overhaul
 
 **Plan A: sc_tools.tl.celltype subpackage (automated cell typing)**

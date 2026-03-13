@@ -49,6 +49,16 @@ Score each dimension 1-5:
 - Correctness (tests pass? edge cases handled?)
 - Style (lint clean? follows sc_tools conventions?)
 - Testing (adequate coverage? TDD followed?)
+- **Real-data validation** (critical for pipeline functions):
+  - Must test on real (existing) data from project modalities, not just synthetic fixtures
+  - Subset samples to keep tests fast — never run on full datasets
+  - Build test cases from these edge conditions:
+    - Empty sample (0 cells)
+    - Sample with multiple `library_id` values where one has 0 cells
+    - Full celltype diversity vs sparse celltypes (0 cells for some categories)
+    - Small spatial grid crop (`x1, x2, y1, y2`) if sample has `obsm['spatial']`
+  - If the function touches AnnData, the reviewer must verify these edge cases are covered
+  - REVISE if only synthetic/happy-path tests exist for a function that will run on real data
 
 ### Step 3: Self-critique questions
 Always ask and answer:

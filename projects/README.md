@@ -31,11 +31,10 @@ Each project directory contains:
 | `tests/` | Project integration tests (pytest) |
 | `Snakefile` | Project pipeline |
 | `config.yaml` | Snakemake config (paths, parameters) |
-| `Mission.md` | Project todo list and roadmap |
+| `Plan.md` | Master todo list, phase status, and implementation plan |
 | `Journal.md` | Project-specific decision log |
-| `journal_summary.md` | Short condensed summary of Journal.md |
 
-`docs/Mission.md`, `docs/Journal.md`, and `docs/journal_summary.md` cover toolkit-level work; each project has its own for study-specific goals.
+`docs/Plan.md` and `docs/Journal.md` cover toolkit-level work; each project has its own for study-specific goals.
 
 ---
 

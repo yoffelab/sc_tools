@@ -11,7 +11,7 @@
 #   make docs        - Build Sphinx HTML docs
 # ============================================================================
 
-.PHONY: lint format test docs docs-clean docs-open wiki-sync wiki-lint
+.PHONY: lint format test docs docs-clean docs-open
 
 # Lint: check sc_tools (package). Scripts: add once fixed.
 lint:
@@ -38,14 +38,6 @@ docs-clean:
 # Docs open: build then open in browser (macOS)
 docs-open: docs
 	open docs/_build/html/index.html
-
-# Wiki: sync .gen.md files and sentinel tables from pipeline.py + registry
-wiki-sync:
-	python scripts/sync_wiki.py sync
-
-# Wiki: lint .gen.md and .suggest.md files
-wiki-lint:
-	python scripts/sync_wiki.py lint
 
 # ============================================================================
 # Container targets (Docker → Apptainer SIF → HPC deploy)

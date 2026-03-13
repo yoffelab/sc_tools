@@ -8,9 +8,10 @@
 # Example:
 #   ./projects/create_project.sh my_project visium
 #   -> creates ./projects/visium/my_project/ with:
-#      data/, figures/, metadata/, scripts/, results/, outputs/, tests/
-#      Mission.md, Journal.md, journal_summary.md
-#      CLAUDE.md, Snakefile, config.yaml, pyproject.toml
+#      figures/, metadata/, scripts/, results/, outputs/, tests/
+#      (data/ is NOT scaffolded — data paths live in registry.db projects table)
+#      Plan.md, Journal.md
+#      Snakefile, config.yaml, pyproject.toml
 #
 # Valid data_type: visium | visium_hd | visium_hd_cell | xenium | imc | cosmx_1k | cosmx_6k | cosmx_full_library
 # =============================================================================
@@ -33,7 +34,7 @@ if [[ ! " ${VALID_TYPES[*]} " =~ " ${DATA_TYPE} " ]]; then
 fi
 
 PROJECT_ROOT="${REPO_ROOT}/projects/${DATA_TYPE}/${PROJECT_NAME}"
-SUBDIRS=(data metadata scripts results outputs tests)
+SUBDIRS=(metadata scripts results outputs tests)
 
 mkdir -p "$PROJECT_ROOT"
 for d in "${SUBDIRS[@]}"; do
@@ -55,52 +56,69 @@ done
 mkdir -p "${PROJECT_ROOT}/metadata/phase0"
 printf "sample_id\tstatus\tnotes\n" > "${PROJECT_ROOT}/metadata/phase0/phase0_status.tsv"
 
-# ---- Mission.md ----
-cat > "${PROJECT_ROOT}/Mission.md" << MISSION_EOF
-# Mission: ${PROJECT_NAME} (${DATA_TYPE})
+# ---- Plan.md ----
+cat > "${PROJECT_ROOT}/Plan.md" << PLAN_EOF
+# Plan: ${PROJECT_NAME} (${DATA_TYPE})
+
+## Context
+
+(Scientific objective of this project.)
 
 **Project:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`
-**Current Status:** Setup
-**Last Updated:** $(date +%Y-%m-%d)
-
-Project-specific goals. Repository-level pipeline and toolkit goals are in \`docs/Mission.md\`.
+**Platform:** ${DATA_TYPE}
 
 ---
 
-## 1. Objective
-(Describe the scientific objective of this project.)
+## Phase Status
+
+Query registry via \`get_phase_status\` or check registry. Last completed: (none).
 
 ---
 
-## 2. Phase Alignment
+## Tasks
 
-| Slug | Status | Key Tasks |
-|------|--------|-----------|
-| **qc_filter** | Pending | Data ingestion, QC, concatenation |
-| **metadata_attach** | Pending | Metadata attachment |
-| **preprocess** | Pending | Preprocessing, normalization, clustering |
-| **demographics** | Pending | Demographics (optional branch) |
-| **scoring** | Pending | Gene scoring, cell typing, deconvolution |
-| **celltype_manual** | Pending | Manual cell typing (optional, iterative) |
-| **biology** | Pending | Downstream biology |
-| **meta_analysis** | Pending | Meta analysis (optional) |
+### Current Priority
+
+- [ ] (First task)
+
+### Backlog
+
+- [ ] (Future tasks)
 
 ---
 
-## 3. Active Tasks
+## Blocked
 
-- [ ] Phase 1: data ingestion
-
----
-
-## 4. Blockers and Sanity Checks
-(Project-specific blockers and checks.)
+(Items waiting on external input, data, or decisions.)
 
 ---
 
-## 5. Technical Decisions
-(Key parameter and method choices — reference Journal.md for full log.)
-MISSION_EOF
+## Technical Decisions
+
+(Key parameter choices, method selections, conventions specific to this project.
+Reference Journal.md for the full dated log.)
+
+---
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+| \`results/adata.filtered.h5ad\` | qc_filter output |
+| \`results/adata.annotated.h5ad\` | metadata_attach output |
+| \`results/adata.normalized.h5ad\` | preprocess output |
+| \`results/adata.scored.h5ad\` | scoring output |
+| \`results/adata.celltyped.h5ad\` | celltype_manual output |
+| \`metadata/gene_signatures.json\` | Gene signatures |
+
+---
+
+## Conventions
+
+(Project-specific conventions: tumor stage ordering, comparison mode,
+normalization parameters, panel names, etc. Repo-wide conventions are
+in root CLAUDE.md and docs/skills.md -- do not duplicate here.)
+PLAN_EOF
 
 # ---- Journal.md ----
 cat > "${PROJECT_ROOT}/Journal.md" << JOURNAL_EOF
@@ -115,83 +133,6 @@ cat > "${PROJECT_ROOT}/Journal.md" << JOURNAL_EOF
 ### $(date +%Y-%m-%d) — Project created
 - Scaffolded with create_project.sh.
 JOURNAL_EOF
-
-# ---- journal_summary.md ----
-cat > "${PROJECT_ROOT}/journal_summary.md" << SUMMARY_EOF
-# Journal Summary: ${PROJECT_NAME} (${DATA_TYPE})
-
-Condensed summary of \`Journal.md\`. Full entries in Journal.md.
-
-## Project scope
-(One short paragraph on scientific goal and current phase.)
-
-## Recent phase
-(Bullets on latest decisions and outcomes.)
-
-## Key conventions
-(One line each: panel names, checkpoint names, etc.)
-SUMMARY_EOF
-
-# ---- CLAUDE.md ----
-cat > "${PROJECT_ROOT}/CLAUDE.md" << CLAUDE_EOF
-# ${PROJECT_NAME} — Claude Code Configuration
-
-## Sync Before Work
-
-1. @Mission.md — current todo list and phase status
-2. @Journal.md — recent decisions and dated entries
-
-For repo-wide rules (container, conventions, testing): see repo root CLAUDE.md.
-
----
-
-## Project Context
-
-**Platform:** ${DATA_TYPE}
-**Path:** \`projects/${DATA_TYPE}/${PROJECT_NAME}\`
-
-(Describe scientific objective here.)
-
----
-
-## Running This Project
-
-\`\`\`bash
-# From repo root:
-./scripts/run_container.sh projects/${DATA_TYPE}/${PROJECT_NAME} python scripts/<script>.py
-snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile <target>
-
-# Local conda (no container):
-conda activate ${PROJECT_NAME}
-SC_TOOLS_RUNTIME=none snakemake -d projects/${DATA_TYPE}/${PROJECT_NAME} -s projects/${DATA_TYPE}/${PROJECT_NAME}/Snakefile <target>
-
-# Tests:
-pytest projects/${DATA_TYPE}/${PROJECT_NAME}/tests/ -v
-
-# Create conda env (one-time setup, from repo root):
-#   conda create -n ${PROJECT_NAME} python=3.11 -y && conda activate ${PROJECT_NAME}
-#   uv pip install -e ".[deconvolution]"
-\`\`\`
-
----
-
-## Key Files
-
-| Path | Description |
-|------|-------------|
-| \`results/adata.filtered.h5ad\` | qc_filter phase output |
-| \`results/adata.annotated.h5ad\` | metadata_attach phase output |
-| \`results/adata.normalized.h5ad\` | preprocess phase output |
-| \`results/adata.scored.h5ad\` | scoring phase output (primary analysis input) |
-| \`results/adata.celltyped.h5ad\` | celltype_manual phase output |
-| \`metadata/gene_signatures.json\` | Gene signatures |
-| \`figures/scratch/\` | Throwaway exploratory plots (hook skips) |
-| \`figures/QC/\` | Auto-generated pipeline QC reports |
-| \`figures/exploratory/\` | Analysis in progress |
-| \`figures/insightful/\` | Clear findings, pre-manuscript |
-| \`figures/manuscript/\` | Final publication figures |
-| \`figures/supplementary/\` | Supplementary material |
-CLAUDE_EOF
 
 # ---- config.yaml ----
 cat > "${PROJECT_ROOT}/config.yaml" << CONFIG_EOF
@@ -265,8 +206,10 @@ def load_phase0_manifest():
 PHASE0_MANIFEST = load_phase0_manifest()
 PHASE0_SAMPLES = list(PHASE0_MANIFEST["sample_id"]) if len(PHASE0_MANIFEST) > 0 else []
 
+# Data paths are resolved from registry.db (not a local data/ directory).
+# Override DATA_DIR in config.yaml or query via: sc_tools.registry.get_project(project).data_dir
 rule ingest_raw:
-    input: expand("data/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
+    input: expand(config.get("data_dir", "data") + "/{sample_id}/outs", sample_id=PHASE0_SAMPLES)
 
 # ---- qc_filter: QC + Concatenation ----
 rule adata_qc_filter:
@@ -403,12 +346,12 @@ packages = []  # scripts-only project; no Python packages to install
 PYPROJECT_EOF
 
 echo "Created project: ${PROJECT_ROOT}"
-echo "  dirs:  ${SUBDIRS[*]}"
-echo "  files: Mission.md, Journal.md, journal_summary.md, CLAUDE.md"
+echo "  dirs:  ${SUBDIRS[*]} figures/{scratch,QC,exploratory,insightful,manuscript,supplementary}"
+echo "  files: Plan.md, Journal.md"
 echo "         Snakefile, config.yaml, pyproject.toml"
 echo ""
 echo "Next steps:"
-echo "  1. Edit Mission.md with your scientific objective"
+echo "  1. Edit Plan.md with your scientific objective"
 echo "  2. Add ingestion script: ${PROJECT_ROOT}/scripts/ingest.py"
 echo "  3. Create conda env:"
 echo "       conda create -n ${PROJECT_NAME} python=3.11 -y"

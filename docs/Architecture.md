@@ -15,13 +15,12 @@ This document outlines the directory structure, data flow, and script inventory.
 │
 ├── docs/                   # All documentation
 │   ├── Architecture.md     # System roadmap (this file)
-│   ├── Mission.md          # Toolkit todo list and roadmap; project-specific in projects/<type>/<name>/Mission.md
+│   ├── Plan.md             # Toolkit todo list and roadmap; project-specific in projects/<type>/<name>/Plan.md
 │   ├── Journal.md          # Repo-level decision log; project-specific in projects/<type>/<name>/Journal.md
-│   ├── journal_summary.md  # Short summary of Journal.md; per-project under projects/<type>/<name>/
 │   ├── skills.md           # Mandatory coding and statistical standards
 │   ├── project_setup.md    # Environment and container setup notes
 │   ├── Scratch Pad.md      # Exploratory notes
-│   ├── wiki/               # Obsidian vault (symlinks + wiki-native + .gen.md files)
+│   ├── knowledge/          # Reference data (methods, markers, signatures)
 │   └── ...                 # Sphinx source (conf.py, index.rst, api/, tutorials/)
 │
 ├── sc_tools/               # Reusable Python package (scanpy-style API) — NOT project-specific
@@ -46,7 +45,7 @@ This document outlines the directory structure, data flow, and script inventory.
 │
 ├── projects/               # All project-specific content lives here
 │   ├── create_project.sh   # Create new project: ./projects/create_project.sh <project_name> <data_type>
-│   ├── README.md           # How to create projects and use Mission/Journal
+│   ├── README.md           # How to create projects and use Plan/Journal
 │   ├── visium/
 │   │   └── ggo_visium/     # Example project
 │   │       ├── data/       # Raw sequencing and imaging
@@ -56,9 +55,9 @@ This document outlines the directory structure, data flow, and script inventory.
 │   │       ├── results/    # AnnData (.h5ad), CSVs
 │   │       ├── outputs/    # Intermediate outputs (deconvolution logs, etc.)
 │   │       ├── tests/      # Project integration tests (pytest)
-│   │       ├── Mission.md
+│   │       ├── Plan.md
 │   │       ├── Journal.md
-│   │       └── journal_summary.md
+│   │       └── Plan.md       # Project-specific persistent plan (optional)
 │   ├── visium_hd/
 │   ├── xenium/             # Placeholder — no active project yet (.gitkeep only)
 │   ├── imc/
@@ -205,7 +204,7 @@ Gene signature scoring uses `sc_tools.tl.score_signature` and writes **obsm** (`
 
 **Note:** Robin builds scoring from **preprocess** (normalized adata). ggo_visium builds scoring from **metadata_attach** (annotated adata). Downstream scripts in both projects read the scoring checkpoint.
 
-**Snakemake + containers:** The pipeline uses Snakemake as the workflow engine with Apptainer/Singularity (Linux/HPC, primary) and Docker (macOS/Windows, fallback). Auto-configure via `scripts/run_container.sh`; publish container image(s) to a registry for HPC pull. See Mission.md CI/CD Roadmap.
+**Snakemake + containers:** The pipeline uses Snakemake as the workflow engine with Apptainer/Singularity (Linux/HPC, primary) and Docker (macOS/Windows, fallback). Auto-configure via `scripts/run_container.sh`; publish container image(s) to a registry for HPC pull. See Plan.md CI/CD Roadmap.
 
 ### 2.5 QC Report Workflow (4 date-versioned HTML reports)
 
@@ -395,17 +394,17 @@ Aggregate ROI/patient; downstream on aggregated data.
 ## 4. Storage Layer and Registry
 
 Storage backends, registry schema, BioData hierarchy, Subject/Sample model, and MCP servers
-are documented in full in `docs/registry.md` (symlinked as [[registry]] in the wiki).
+are documented in full in `docs/registry.md`.
 
 Quick reference:
 
 | Topic | Where |
 |-------|-------|
-| URI schemes, storage functions, data placement tiers | [[registry]] §1 |
-| Registry schema tables, SQLite/PG setup | [[registry]] §2 |
-| BioData JTI hierarchy and platform taxonomy | [[registry]] §2 + [[biodata-hierarchy]] |
-| Subject/Sample model, 775-patient cohort schema | [[registry]] §2 + [[clinical-data-schema]] |
-| MCP server tools (`sc-tools`, `sc-registry`) | [[registry]] §3 |
+| URI schemes, storage functions, data placement tiers | `docs/registry.md` §1 |
+| Registry schema tables, SQLite/PG setup | `docs/registry.md` §2 |
+| BioData JTI hierarchy and platform taxonomy | `docs/registry.md` §2 + `docs/knowledge/biodata-hierarchy.md` |
+| Subject/Sample model, 775-patient cohort schema | `docs/registry.md` §2 + `docs/knowledge/clinical-data-schema.md` |
+| MCP server tools (`sc-tools`, `sc-registry`) | `docs/registry.md` §3 |
 
 ---
 
@@ -445,8 +444,7 @@ Scripts should write standard checkpoint names (Section 2.1). Legacy projects ma
 
 | Script | Purpose | Output |
 |--------|---------|--------|
-| `scripts/sync_wiki.py` | Regenerates `*.gen.md` wiki files from registry + pipeline DAG | `docs/wiki/**/*.gen.md` |
-| `scripts/save_plan.py` | Hook called by ExitPlanMode to persist plans | `docs/wiki/plans/YYYY-MM-DD-{slug}.md` |
+| `~/.claude/hooks/save_plan.py` | Hook called by ExitPlanMode to persist plans | Project `Plan.md` |
 | `scripts/validate_checkpoint.py` | CLI wrapper around `sc_tools.validate`; exit 0/1 | Sentinel file or exit code |
 | `scripts/run_qc_reports_all_projects.py` | Batch QC report generation across all registered projects | Per-project HTML reports |
 

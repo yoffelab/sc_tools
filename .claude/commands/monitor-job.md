@@ -21,7 +21,7 @@ Monitor a SLURM job on HPC until completion, then verify outputs.
 
 ### On job completion (when checking results):
 1. Verify outputs exist on brb (check for expected files like `outs/`, `binned_outputs/`, `segmented_outputs/`)
-2. If COMPLETED: update the relevant project Mission.md (mark tasks `[x]`) and Journal.md
+2. If COMPLETED: update the relevant project Plan.md (mark tasks `[x]`) and Journal.md
 3. If FAILED: SSH to check error logs (`_errors` files, SLURM .err logs), report root cause, suggest fix
 4. Update any batch manifests or status files as needed
 
@@ -29,5 +29,5 @@ Monitor a SLURM job on HPC until completion, then verify outputs.
 - **Never block the conversation** waiting for a job. Always use `run_in_background`.
 - Poll interval: 90 seconds (not faster — Lustre is slow)
 - Use `ssh -o ConnectTimeout=10 brb` to avoid SSH hangs
-- After verification, always update Mission.md and Journal.md with results
+- After verification, always update Plan.md and Journal.md with results
 - See skills.md section 18.7 for multi-agent orchestration patterns

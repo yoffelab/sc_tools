@@ -15,7 +15,7 @@ All code in this package should be generic and not project-specific.
 __version__ = "0.1.0"
 
 # Import main modules following scanpy pattern
-from . import bm, ingest, memory, pl, pp, qc, storage, tl, utils, validate
+from . import bm, gr, ingest, memory, pl, pp, qc, storage, tl, utils, validate
 
 # Registry is optional (requires sqlalchemy)
 try:
@@ -28,6 +28,7 @@ __all__ = [
     "pl",
     "tl",
     "qc",
+    "gr",
     "utils",
     "memory",
     "bm",

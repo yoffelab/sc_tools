@@ -61,7 +61,8 @@ def spatial_neighbors(
     # Modality-specific defaults
     modality = adata.uns.get("modality", "")
     is_visium = modality in ("visium", "visium_hd", "visium_hd_cell") or (
-        "spatial" in adata.uns and any(
+        "spatial" in adata.uns
+        and any(
             "tissue_hires_scalef" in (v.get("scalefactors", {}) if isinstance(v, dict) else {})
             for v in adata.uns.get("spatial", {}).values()
             if isinstance(v, dict)
@@ -84,9 +85,7 @@ def spatial_neighbors(
     sq_kwargs.update(kwargs)
 
     # squidpy requires library_key to be categorical
-    if library_key in adata.obs.columns and not hasattr(
-        adata.obs[library_key], "cat"
-    ):
+    if library_key in adata.obs.columns and not hasattr(adata.obs[library_key], "cat"):
         adata.obs[library_key] = adata.obs[library_key].astype("category")
 
     sq.gr.spatial_neighbors(adata, **sq_kwargs)

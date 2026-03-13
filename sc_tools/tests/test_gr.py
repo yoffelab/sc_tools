@@ -65,9 +65,7 @@ def _make_test_adata():
     adata.obs["library_id"] = adata.obs["library_id"].astype(str)
     # Also store the full per-cell library_id from concatenation
     # ad.concat with label sets adata.obs['library_id'] correctly
-    adata.obs["celltype"] = pd.Categorical(
-        adata.obs["celltype"].astype(str), categories=CELLTYPES
-    )
+    adata.obs["celltype"] = pd.Categorical(adata.obs["celltype"].astype(str), categories=CELLTYPES)
     return adata
 
 
@@ -188,9 +186,7 @@ def test_spatial_neighbors_builds_block_diagonal(multi_roi_adata):
             idx_a = roi_indices[roi_a]
             idx_b = roi_indices[roi_b]
             cross_block = conn[idx_a, :][:, idx_b]
-            assert cross_block.sum() == 0, (
-                f"Cross-ROI edges found between {roi_a} and {roi_b}"
-            )
+            assert cross_block.sum() == 0, f"Cross-ROI edges found between {roi_a} and {roi_b}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -312,7 +308,6 @@ def test_interaction_matrix_count_sum(multi_roi_adata):
     assert np.all(count_sum >= 0)
 
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Fix 1: Geary C must raise NotImplementedError
 # ──────────────────────────────────────────────────────────────────────────────
@@ -372,7 +367,11 @@ def test_min_cells_per_type_warns():
     # min_cells_per_type=1000 is larger than any per-type count (100 cells / 5 types = 20 each)
     with pytest.warns(UserWarning, match="min_cells_per_type"):
         # Consume all ROI yields to trigger warnings
-        list(iter_rois(adata, library_key="library_id", cluster_key="celltype", min_cells_per_type=1000))
+        list(
+            iter_rois(
+                adata, library_key="library_id", cluster_key="celltype", min_cells_per_type=1000
+            )
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

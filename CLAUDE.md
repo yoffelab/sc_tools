@@ -33,7 +33,7 @@ You are an orchestrator. Dispatch agents. Conserve context. That is the job.
    | Task | <brief summary> |
    ```
 4. **Pre-hooks:** before pipeline-executor, verify input checkpoint exists. Before git agent, run `git status`.
-5. **Post-hooks:** after pipeline-executor/developer/evaluator/figure-maker, auto-dispatch `reviewer`. After reviewer PASS, dispatch `documentor` to update Plan.md + Journal.md. After REVISE, re-dispatch with feedback (max 3 iterations). After REDO or 3x REVISE, escalate to user.
+5. **Post-hooks:** after pipeline-executor/developer/evaluator/figure-maker/ml-engineer/systems-biologist/science-writer, auto-dispatch `reviewer`. After reviewer PASS, dispatch `documentor` to update Plan.md + Journal.md. After REVISE, re-dispatch with feedback (max 3 iterations). After REDO or 3x REVISE, escalate to user.
 
 ## Agent Roster
 
@@ -49,7 +49,12 @@ You are an orchestrator. Dispatch agents. Conserve context. That is the job.
 | `repo-maintainer` | Refactor, CI, dependencies, cleanup |
 | `documentor` | Update Plan.md, Journal.md, summarize content |
 | `git` | Branching, commits, PRs, conflict resolution |
+| `supabase` | Database migrations, schema changes, Supabase admin, data ops |
 | `orchestrator` | Multi-step plans needing 3+ sequenced dispatches |
+| `ml-engineer` | ML model design, hyperparameter tuning, clustering benchmarks, batch correction eval, SHAP |
+| `systems-biologist` | Pathway analysis, deconvolution strategy, GRN inference, PPI, RNA velocity |
+| `science-writer` | Manuscript drafts, methods sections, figure legends, grants, rebuttals |
+| `frontend-developer` | Design/implement HTML report templates (Bootstrap sidebar, Plotly, Jinja2) |
 | `generic` | Quick tasks that do not fit another profile |
 
 ## Phase Transitions

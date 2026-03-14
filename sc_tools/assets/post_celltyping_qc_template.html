@@ -1,60 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ title }}</title>
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+{% extends "base_report_template.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-         color: #333; background: #f8f9fa; line-height: 1.5; }
-  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-  header { background: #6c3483; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px; }
-  header h1 { font-size: 1.6rem; margin-bottom: 8px; }
-  header .meta { font-size: 0.9rem; opacity: 0.85; }
-  header .meta span { margin-right: 24px; }
   .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-  .card { background: #fff; border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  .card { background: var(--bs-body-bg); border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           flex: 1; min-width: 180px; text-align: center; }
   .card .value { font-size: 1.8rem; font-weight: 700; color: #6c3483; }
-  .card .label { font-size: 0.85rem; color: #666; margin-top: 4px; }
+  .card .label { font-size: 0.85rem; color: var(--bs-secondary-color); margin-top: 4px; }
   .card.best .value { color: #27ae60; }
   .card.info .value { color: #2980b9; }
-  section { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  section h2 { font-size: 1.2rem; color: #6c3483; margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
   .plot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .plot-row.full-width { grid-template-columns: 1fr; }
-  .plot-item img { width: 100%; border: 1px solid #eee; border-radius: 4px; }
-  .plot-item .caption { font-size: 1.0rem; color: #555; margin-top: 4px; text-align: center; }
+  .plot-item img { width: 100%; border: 1px solid var(--bs-border-color); border-radius: 4px; }
+  .plot-item .caption { font-size: 1.0rem; color: var(--bs-secondary-color); margin-top: 4px; text-align: center; }
   .plotly-container { width: 100%; min-height: 400px; margin-bottom: 16px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
-  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
-  .footer { text-align: center; font-size: 0.8rem; color: #999; padding: 16px; }
+  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--bs-border-color); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--bs-border-color); }
   .bio-primary-note {
     background: #f4ecf7; border: 1px solid #9b59b6; border-radius: 6px;
     padding: 12px 16px; margin: 12px 0; font-size: 0.9rem; color: #5b2c6f;
   }
 </style>
-</head>
-<body>
-<div class="container">
+{% endblock %}
 
-<header>
-  <h1>{{ title }}</h1>
-  <div class="meta">
-    <span>Date: {{ date }}</span>
-    <span>Modality: {{ modality }}</span>
-    <span>Samples: {{ n_samples }}</span>
-    <span>Total {{ terms.observations_lower }}: {{ n_spots | int }}</span>
-    {% if n_celltypes %}<span>Cell types: {{ n_celltypes }}</span>{% endif %}
-    {% if selected_method %}<span>Selected integration: {{ selected_method }}</span>{% endif %}
-    <span>Report: Post-celltyping QC</span>
+{% block content %}
+<header style="background: #6c3483; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px;">
+  <h1 style="font-size: 1.6rem; margin-bottom: 8px;">{{ title }}</h1>
+  <div style="font-size: 0.9rem; opacity: 0.85;">
+    <span style="margin-right: 24px;">Date: {{ date }}</span>
+    <span style="margin-right: 24px;">Modality: {{ modality }}</span>
+    <span style="margin-right: 24px;">Samples: {{ n_samples }}</span>
+    <span style="margin-right: 24px;">Total {{ terms.observations_lower }}: {{ n_spots | int }}</span>
+    {% if n_celltypes %}<span style="margin-right: 24px;">Cell types: {{ n_celltypes }}</span>{% endif %}
+    {% if selected_method %}<span style="margin-right: 24px;">Selected integration: {{ selected_method }}</span>{% endif %}
+    <span style="margin-right: 24px;">Report: Post-celltyping QC</span>
   </div>
 </header>
 
+<section id="overview" class="report-section">
+<h2>Celltyping Summary</h2>
 <div class="summary-cards">
   {% if n_celltypes %}
   <div class="card">
@@ -99,10 +86,10 @@
     <div class="label">Samples</div>
   </div>
 </div>
+</section>
 
-<!-- Integration Benchmark — Phase 3 vs Phase 4 -->
 {% if ranking_rows %}
-<section>
+<section id="benchmark" class="report-section">
   <h2>Integration Benchmark - Phase 3 vs Phase 4</h2>
   <div class="bio-primary-note">
     <strong>Bio metrics here use validated cell type labels</strong> - these are the authoritative values.
@@ -163,19 +150,8 @@
 </section>
 {% endif %}
 
-<!-- Radar Chart -->
-{% if integration_plots and integration_plots.integration_radar %}
-<section>
-  <h2>Integration Metrics Radar</h2>
-  <div class="plotly-container">
-    {{ integration_plots.integration_radar }}
-  </div>
-</section>
-{% endif %}
-
-<!-- UMAP Grid -->
 {% if plots.umap_grid %}
-<section>
+<section id="umap" class="report-section">
   <h2>UMAP Embeddings</h2>
   <div class="plot-row full-width">
     <div class="plot-item">
@@ -186,9 +162,8 @@
 </section>
 {% endif %}
 
-<!-- Celltype Composition -->
 {% if plots.celltype_abundance or celltype_table %}
-<section>
+<section id="composition" class="report-section">
   <h2>Celltype Composition</h2>
   {% if celltype_table %}
   <div style="overflow-x: auto; margin-bottom: 16px;">
@@ -223,9 +198,8 @@
 </section>
 {% endif %}
 
-<!-- Celltype Distribution per Sample -->
 {% if plots.cluster_dist %}
-<section>
+<section id="per-sample" class="report-section">
   <h2>Celltype Distribution per Sample</h2>
   <div class="plot-row full-width">
     <div class="plot-item">
@@ -236,9 +210,8 @@
 </section>
 {% endif %}
 
-<!-- Marker Dotplot -->
 {% if plots.marker_dotplot %}
-<section>
+<section id="markers" class="report-section">
   <h2>Marker Expression Dotplot</h2>
   <div class="plot-row full-width">
     <div class="plot-item">
@@ -249,9 +222,26 @@
 </section>
 {% endif %}
 
-<!-- Segmentation Scores -->
+{% if integration_plots and integration_plots.batch_vs_bio %}
+<section id="batch-bio" class="report-section">
+  <h2>Batch Removal vs Bio Conservation</h2>
+  <div class="plotly-container">
+    {{ integration_plots.batch_vs_bio }}
+  </div>
+</section>
+{% endif %}
+
+{% if integration_plots and integration_plots.integration_radar %}
+<section id="radar" class="report-section">
+  <h2>Integration Metrics Radar</h2>
+  <div class="plotly-container">
+    {{ integration_plots.integration_radar }}
+  </div>
+</section>
+{% endif %}
+
 {% if segmentation %}
-<section>
+<section id="segmentation" class="report-section">
   <h2>Segmentation Quality</h2>
   <div style="overflow-x: auto;">
   <table>
@@ -286,21 +276,4 @@
   {% endif %}
 </section>
 {% endif %}
-
-<!-- Batch vs Bio Scatter (supplementary) -->
-{% if integration_plots and integration_plots.batch_vs_bio %}
-<section>
-  <h2>Batch Removal vs Bio Conservation</h2>
-  <div class="plotly-container">
-    {{ integration_plots.batch_vs_bio }}
-  </div>
-</section>
-{% endif %}
-
-<div class="footer">
-  Generated by sc_tools Post-celltyping QC Report &mdash; {{ date }}
-</div>
-
-</div>
-</body>
-</html>
+{% endblock %}

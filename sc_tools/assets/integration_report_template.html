@@ -1,0 +1,102 @@
+{% extends "base_report_template.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: var(--bs-body-bg); border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          flex: 1; min-width: 180px; text-align: center; }
+  .card .value { font-size: 1.8rem; font-weight: 700; color: var(--bs-emphasis-color); }
+  .card .label { font-size: 0.85rem; color: var(--bs-secondary-color); margin-top: 4px; }
+  .card.best .value { color: #27ae60; }
+  .plot-container { margin: 16px 0; }
+  .plot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .plot-row.full-width { grid-template-columns: 1fr; }
+  .plot-item img { width: 100%; border: 1px solid var(--bs-border-color); border-radius: 4px; }
+  .plot-item .caption { font-size: 1.0rem; color: var(--bs-secondary-color); margin-top: 4px; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<header style="background: #2c3e50; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px;">
+  <h1 style="font-size: 1.6rem; margin-bottom: 8px;">{{ title }}</h1>
+  <div style="font-size: 0.9rem; opacity: 0.85;">
+    <span style="margin-right: 24px;">Date: {{ date }}</span>
+    <span style="margin-right: 24px;">Methods compared: {{ n_methods }}</span>
+    <span style="margin-right: 24px;">Batch key: {{ batch_key }}</span>
+    <span style="margin-right: 24px;">Cell type key: {{ celltype_key }}</span>
+  </div>
+</header>
+
+<section id="exec-summary" class="report-section">
+<h2>Executive Summary</h2>
+<div class="summary-cards">
+  <div class="card best">
+    <div class="value">{{ best_method }}</div>
+    <div class="label">Best Method</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ "%.3f" | format(best_overall) }}</div>
+    <div class="label">Overall Score</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ "%.3f" | format(best_batch) }}</div>
+    <div class="label">Batch Removal</div>
+  </div>
+  <div class="card">
+    <div class="value">{{ "%.3f" | format(best_bio) }}</div>
+    <div class="label">Bio Conservation</div>
+  </div>
+</div>
+</section>
+
+{% if batch_bio_table_html %}
+<section id="batch-bio-table" class="report-section">
+  <h2>Batch Removal &times; Bio Conservation</h2>
+  <p class="text-muted small mb-3">
+    Methods ranked by overall score. Batch removal and bio conservation are complementary &mdash;
+    higher is better for both.
+  </p>
+  <div class="table-responsive">
+    {{ batch_bio_table_html | safe }}
+  </div>
+</section>
+{% endif %}
+
+<section id="metrics-heatmap" class="report-section">
+  <h2>Metrics Comparison</h2>
+  <div class="plot-container">{{ plot_comparison_table }}</div>
+</section>
+
+{% if umap_img %}
+<section id="umap-grid" class="report-section">
+  <h2>Embedding UMAP Comparison</h2>
+  <div class="plot-row full-width">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ umap_img }}" alt="UMAP comparison">
+      <div class="caption">UMAP embeddings colored by {{ color_by }}</div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section id="ranking" class="report-section">
+  <h2>Integration Ranking</h2>
+  <div class="plot-container">{{ plot_ranking_bar }}</div>
+</section>
+
+{% if plot_batch_vs_bio %}
+<section id="batch-bio" class="report-section">
+  <h2>Batch Removal vs Bio Conservation</h2>
+  <div class="plot-container">{{ plot_batch_vs_bio }}</div>
+</section>
+{% endif %}
+
+{% if plot_radar %}
+<section id="radar" class="report-section">
+  <h2>Metrics Radar</h2>
+  <div class="plot-container">{{ plot_radar }}</div>
+</section>
+{% endif %}
+{% endblock %}

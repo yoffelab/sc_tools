@@ -1178,3 +1178,161 @@ class TestCelltypeAbundancePlot:
         fig = qc_celltype_abundance(adata, celltype_key="celltype")
         assert fig is not None
         plt.close("all")
+
+
+# ---------------------------------------------------------------------------
+# Task 4 & 5: Jinja2 Environment+FileSystemLoader + base_report_template.html
+# ---------------------------------------------------------------------------
+
+
+class TestRenderTemplateFileSystemLoader:
+    """render_template must use Environment+FileSystemLoader so {% extends %} works."""
+
+    def test_render_template_by_filename(self, tmp_path):
+        """Passing a bare filename resolves from the default assets dir (FileSystemLoader)."""
+        pytest.importorskip("jinja2")
+        from jinja2.exceptions import UndefinedError
+
+        from sc_tools.qc.report_utils import render_template
+
+        # base_report_template.html is a minimal template that renders with title+date.
+        # If FileSystemLoader is NOT used the call raises FileNotFoundError;
+        # with FileSystemLoader it succeeds (or raises UndefinedError for missing vars,
+        # never FileNotFoundError).
+        try:
+            result = render_template(
+                "base_report_template.html",
+                {"title": "Test", "date": "2026-03-14"},
+            )
+            assert isinstance(result, str)
+            assert len(result) > 0
+        except UndefinedError:
+            pass  # template found but vars missing — FileSystemLoader is working
+
+    def test_render_template_path_compat(self, tmp_path):
+        """Passing a full Path object still works (backward compat)."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        # Write a minimal template in tmp_path
+        tpl = tmp_path / "my_template.html"
+        tpl.write_text("Hello {{ name }}")
+        result = render_template(tpl, {"name": "World"})
+        assert result == "Hello World"
+
+    def test_render_template_supports_extends(self, tmp_path):
+        """FileSystemLoader is required for {% extends %} to work."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        base = tmp_path / "base.html"
+        base.write_text("BASE{% block body %}{% endblock %}END")
+        child = tmp_path / "child.html"
+        child.write_text("{% extends 'base.html' %}{% block body %}CHILD{% endblock %}")
+        result = render_template("child.html", {}, assets_dir=tmp_path)
+        assert result == "BASECHILDEnd".replace("End", "END")
+
+    def test_render_template_custom_assets_dir(self, tmp_path):
+        """assets_dir kwarg overrides the default package assets dir."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        tpl = tmp_path / "custom.html"
+        tpl.write_text("VALUE={{ val }}")
+        result = render_template("custom.html", {"val": 42}, assets_dir=tmp_path)
+        assert "42" in result
+
+
+class TestBaseReportTemplate:
+    """base_report_template.html must exist and be a valid Jinja2 base template."""
+
+    def test_base_template_exists(self):
+        from pathlib import Path
+
+        assets = Path(__file__).parent.parent / "assets"
+        assert (assets / "base_report_template.html").exists(), (
+            "base_report_template.html missing from sc_tools/assets/"
+        )
+
+    def test_base_template_has_required_blocks(self):
+        from pathlib import Path
+
+        assets = Path(__file__).parent.parent / "assets"
+        content = (assets / "base_report_template.html").read_text()
+        assert "{% block content %}" in content
+        assert "{% block title %}" in content
+        assert "{% block extra_head %}" in content
+        assert "{% block sidebar_title %}" in content
+
+    def test_base_template_renders_with_empty_sections(self):
+        """Rendering base template directly with sections=[] must not raise."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        result = render_template(
+            "base_report_template.html",
+            {"title": "Test", "date": "2026-03-14", "sections": []},
+        )
+        assert "<!DOCTYPE html>" in result
+        assert "sc_tools" in result
+
+    def test_base_template_renders_with_sections(self):
+        """sections list should populate nav items."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        sections = [{"id": "summary", "label": "Summary"}, {"id": "plots", "label": "Plots"}]
+        result = render_template(
+            "base_report_template.html",
+            {"title": "My Report", "date": "2026-03-14", "sections": sections},
+        )
+        assert 'href="#summary"' in result
+        assert "Plots" in result
+
+    def test_base_template_sections_default_empty_when_undefined(self):
+        """If 'sections' is not passed, template must not crash (defaults to [])."""
+        pytest.importorskip("jinja2")
+        from sc_tools.qc.report_utils import render_template
+
+        # No 'sections' key in context
+        result = render_template(
+            "base_report_template.html",
+            {"title": "No Sections", "date": "2026-03-14"},
+        )
+        assert "<!DOCTYPE html>" in result
+
+    def test_base_template_has_bootstrap_and_plotly_cdns(self):
+        from pathlib import Path
+
+        assets = Path(__file__).parent.parent / "assets"
+        content = (assets / "base_report_template.html").read_text()
+        assert "bootswatch" in content or "flatly" in content
+        assert "bootstrap.bundle.min.js" in content
+        assert "plotly-2.27.0.min.js" in content
+
+
+class TestBmReportUsesSharedRenderTemplate:
+    """bm/report.py must use sc_tools.qc.report_utils.render_template, not its own."""
+
+    def test_bm_report_no_local_render_template(self):
+        import ast
+        from pathlib import Path
+
+        src = (Path(__file__).parent.parent / "bm" / "report.py").read_text()
+        tree = ast.parse(src)
+        func_names = [
+            node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+        ]
+        assert "_render_template" not in func_names, (
+            "bm/report.py still defines _render_template; should use shared render_template"
+        )
+
+    def test_bm_report_imports_shared_render_template(self):
+        import importlib
+
+        bm_report = importlib.import_module("sc_tools.bm.report")
+        # The module must have pulled in render_template from report_utils
+        assert hasattr(bm_report, "render_template") or any(
+            "render_template" in str(getattr(bm_report, attr, ""))
+            for attr in dir(bm_report)
+        ), "bm/report.py does not import render_template from sc_tools.qc.report_utils"

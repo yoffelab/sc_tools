@@ -72,6 +72,7 @@ storage-box = [
 registry = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
+    "psycopg2-binary>=2.9",
 ]
 # MCP servers (Model Context Protocol)
 mcp = [
@@ -193,11 +194,11 @@ include = ["sc_tools*"]
 [tool.setuptools.package-data]
 sc_tools = [
     "data/*.json",
-    "data/*.html",
-    "data/*.yaml",
     "data/imc/benchmark/*.yml",
     "data/marker_db/*.json",
     "data/gating_templates/*.yaml",
+    "assets/*.html",
+    "assets/*.yaml",
 ]
 
 [tool.ruff]

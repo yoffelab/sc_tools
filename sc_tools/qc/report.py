@@ -51,12 +51,12 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-_DATA_DIR = Path(__file__).parent.parent / "data"
-_TEMPLATE_PATH = _DATA_DIR / "qc_report_template.html"
-_PRE_FILTER_TEMPLATE = _DATA_DIR / "pre_filter_qc_template.html"
-_POST_FILTER_TEMPLATE = _DATA_DIR / "post_filter_qc_template.html"
-_POST_INTEGRATION_TEMPLATE = _DATA_DIR / "post_integration_qc_template.html"
-_POST_CELLTYPING_TEMPLATE = _DATA_DIR / "post_celltyping_qc_template.html"
+_ASSETS_DIR = Path(__file__).parent.parent / "assets"
+_TEMPLATE_PATH = "qc_report_template.html"
+_PRE_FILTER_TEMPLATE = "pre_filter_qc_template.html"
+_POST_FILTER_TEMPLATE = "post_filter_qc_template.html"
+_POST_INTEGRATION_TEMPLATE = "post_integration_qc_template.html"
+_POST_CELLTYPING_TEMPLATE = "post_celltyping_qc_template.html"
 
 
 # Keep for backward compat — delegates to fig_to_base64 from report_utils
@@ -188,6 +188,16 @@ def generate_pre_filter_report(
         "seg_plots": seg_plots,
     }
 
+    _PRE_FILTER_SECTIONS = [
+        {"id": "overview",      "label": "Overview"},
+        {"id": "per-sample",    "label": "Per-Sample Table"},
+        {"id": "distributions", "label": "QC Distributions"},
+        {"id": "segmentation",  "label": "Segmentation Quality", "key": "segmentation"},
+    ]
+    context["sections"] = [
+        s for s in _PRE_FILTER_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
+
     html = render_template(_PRE_FILTER_TEMPLATE, context)
     output_path = output_dir / f"pre_filter_qc_{ds}.html"
     output_path.write_text(html)
@@ -314,6 +324,19 @@ def generate_post_filter_report(
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
     }
+
+    _POST_FILTER_SECTIONS = [
+        {"id": "overview",          "label": "Filter Summary"},
+        {"id": "per-sample",        "label": "Per-Sample Table",  "key": "table_rows"},
+        {"id": "comparison",        "label": "Pre vs Post Comparison"},
+        {"id": "feature-selection", "label": "Feature Selection", "key": "has_feature_sel"},
+        {"id": "segmentation",      "label": "Segmentation Quality", "key": "segmentation"},
+    ]
+    _has_feat = bool(context.get("plots", {}).get("hvg") or context.get("plots", {}).get("svg"))
+    context["has_feature_sel"] = _has_feat or None
+    context["sections"] = [
+        s for s in _POST_FILTER_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_POST_FILTER_TEMPLATE, context)
 
@@ -560,6 +583,26 @@ def generate_post_integration_report(
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
     }
+
+    _POST_INT_SECTIONS = [
+        {"id": "overview",      "label": "Integration Summary"},
+        {"id": "metrics",       "label": "Benchmark Ranking",    "key": "ranking_rows"},
+        {"id": "embeddings",    "label": "UMAP Embeddings",      "key": "umap_grid_avail"},
+        {"id": "benchmark",     "label": "Metrics Radar",        "key": "integration_plots"},
+        {"id": "clusters",      "label": "Cluster Distribution", "key": "cluster_dist_avail"},
+        {"id": "batch-bio",     "label": "Batch vs Bio",         "key": "batch_bio_int_avail"},
+        {"id": "per-embedding", "label": "Per-Embedding UMAP",   "key": "embedding_umaps_avail"},
+        {"id": "segmentation",  "label": "Segmentation Quality", "key": "segmentation"},
+    ]
+    context["batch_bio_int_avail"] = (
+        context.get("integration_plots", {}) or {}
+    ).get("batch_vs_bio") or None
+    context["umap_grid_avail"] = context.get("plots", {}).get("umap_grid") or None
+    context["embedding_umaps_avail"] = context.get("plots", {}).get("embedding_umaps") or None
+    context["cluster_dist_avail"] = context.get("plots", {}).get("cluster_dist") or None
+    context["sections"] = [
+        s for s in _POST_INT_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_POST_INTEGRATION_TEMPLATE, context)
 
@@ -931,6 +974,30 @@ def generate_post_celltyping_report(
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
     }
+
+    _POST_CT_SECTIONS = [
+        {"id": "overview",     "label": "Celltyping Summary"},
+        {"id": "benchmark",    "label": "Integration Benchmark", "key": "ranking_rows"},
+        {"id": "umap",         "label": "UMAP",                  "key": "umap_avail"},
+        {"id": "composition",  "label": "Celltype Composition",  "key": "composition_avail"},
+        {"id": "per-sample",   "label": "Per-Sample Distribution", "key": "cluster_dist_ct_avail"},
+        {"id": "markers",      "label": "Marker Expression",     "key": "marker_dotplot_avail"},
+        {"id": "batch-bio",    "label": "Batch vs Bio",          "key": "batch_bio_ct_avail"},
+        {"id": "radar",        "label": "Metrics Radar",         "key": "integration_plots"},
+        {"id": "segmentation", "label": "Segmentation Quality",  "key": "segmentation"},
+    ]
+    context["batch_bio_ct_avail"] = (
+        context.get("integration_plots", {}) or {}
+    ).get("batch_vs_bio") or None
+    context["umap_avail"] = context.get("plots", {}).get("umap_grid") or None
+    context["composition_avail"] = (
+        context.get("plots", {}).get("celltype_abundance") or context.get("celltype_table") or None
+    )
+    context["cluster_dist_ct_avail"] = context.get("plots", {}).get("cluster_dist") or None
+    context["marker_dotplot_avail"] = context.get("plots", {}).get("marker_dotplot") or None
+    context["sections"] = [
+        s for s in _POST_CT_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_POST_CELLTYPING_TEMPLATE, context)
 

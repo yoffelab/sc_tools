@@ -133,15 +133,29 @@ def plotly_to_html(fig) -> str:
     return fig.to_html(full_html=False, include_plotlyjs=False)
 
 
-def render_template(template_path: str | Path, context: dict) -> str:
-    """Render a Jinja2 template with the given context.
+def render_template(
+    template_name: str | Path,
+    context: dict,
+    assets_dir: Path | None = None,
+) -> str:
+    """Render a Jinja2 template by name from the assets directory.
+
+    Uses ``Environment(loader=FileSystemLoader(...))`` so that
+    ``{% extends %}`` and ``{% include %}`` directives work correctly.
 
     Parameters
     ----------
-    template_path
-        Path to the ``.html`` template file.
+    template_name
+        Template filename (e.g. ``"pre_filter_qc_template.html"``) looked up
+        inside *assets_dir*, **or** an absolute/relative ``Path`` object for
+        backward compatibility (the parent becomes *assets_dir* and the stem
+        becomes *template_name*).
     context
         Dict of variables passed to ``Template.render()``.
+    assets_dir
+        Directory containing Jinja2 templates.  Defaults to
+        ``<package_root>/assets/``.  Ignored when *template_name* is a
+        ``Path`` object with a parent directory.
 
     Returns
     -------
@@ -149,14 +163,26 @@ def render_template(template_path: str | Path, context: dict) -> str:
         Rendered HTML string.
     """
     try:
-        from jinja2 import Template
+        from jinja2 import Environment, FileSystemLoader
     except ImportError as e:
         raise ImportError(
             "jinja2 is required for HTML report generation. Install with: pip install jinja2"
         ) from e
 
-    template_text = Path(template_path).read_text()
-    template = Template(template_text)
+    # Backward-compat: if caller passes a Path, extract dir + filename.
+    p = Path(template_name)
+    if p.is_absolute() or (p.parent != Path(".")):
+        # Caller passed a full/relative path — honour it directly.
+        assets_dir = p.parent
+        template_name = p.name
+    else:
+        template_name = str(template_name)
+
+    if assets_dir is None:
+        assets_dir = Path(__file__).parent.parent / "assets"
+
+    env = Environment(loader=FileSystemLoader(str(assets_dir)), autoescape=False)
+    template = env.get_template(template_name)
     return template.render(**context)
 
 

@@ -32,4 +32,16 @@ From data-analysis skill:
 Ranked table: method, primary metric, secondary metrics, runtime, notes.
 Clear recommendation with reasoning.
 
+## Report generation (MANDATORY)
+Always generate an HTML report using `sc_tools.bm.report`. Never write ad-hoc HTML or plain-text summaries instead.
+
+| Benchmark type | Function | Template used |
+|----------------|----------|---------------|
+| Segmentation | `generate_segmentation_report(comparison_df, ...)` | `segmentation_report_template.html` |
+| Integration | `generate_integration_report(comparison_df, adata, ...)` | `integration_report_template.html` |
+| General / IMC | `generate_benchmark_report(results_df, aggregated, ...)` | `benchmark_report_template.html` |
+
+Save the report to `projects/<platform>/<project>/figures/QC/<descriptor>_report.html`.
+Pass the full `comparison_df` or `results_df` — the template handles layout, styling, and Plotly charts.
+
 Repo root: see docs/Architecture.md section 1 for directory layout.

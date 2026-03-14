@@ -1,32 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ title }}</title>
+{% extends "base_report_template.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-         color: #333; background: #f8f9fa; line-height: 1.5; }
-  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-  header { background: #2c3e50; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px; }
-  header h1 { font-size: 1.6rem; margin-bottom: 8px; }
-  header .meta { font-size: 0.9rem; opacity: 0.85; }
-  header .meta span { margin-right: 24px; }
   .summary-cards { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-  .card { background: #fff; border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  .card { background: var(--bs-body-bg); border-radius: 8px; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
           flex: 1; min-width: 180px; text-align: center; }
-  .card .value { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
-  .card .label { font-size: 0.85rem; color: #666; margin-top: 4px; }
+  .card .value { font-size: 1.8rem; font-weight: 700; color: var(--bs-emphasis-color); }
+  .card .label { font-size: 0.85rem; color: var(--bs-secondary-color); margin-top: 4px; }
   .card.pass .value { color: #27ae60; }
   .card.fail .value { color: #e74c3c; }
   .card.info .value { color: #2980b9; }
-  section { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  section h2 { font-size: 1.2rem; color: #2c3e50; margin-bottom: 16px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; }
-  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  th { background: #f1f3f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--bs-border-color); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--bs-border-color); }
   tr.fail-row { background: #fde8e8; }
   tr.pass-row:hover { background: #f0f7f0; }
   tr.fail-row:hover { background: #f8d0d0; }
@@ -36,28 +24,28 @@
                 border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
   .plot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .plot-row.full-width { grid-template-columns: 1fr; }
-  .plot-item img { width: 100%; border: 1px solid #eee; border-radius: 4px; }
-  .plot-item .caption { font-size: 1.0rem; color: #555; margin-top: 4px; text-align: center; }
+  .plot-item img { width: 100%; border: 1px solid var(--bs-border-color); border-radius: 4px; }
+  .plot-item .caption { font-size: 1.0rem; color: var(--bs-secondary-color); margin-top: 4px; text-align: center; }
   .plot-placeholder { display: flex; align-items: center; justify-content: center;
-                      min-height: 200px; background: #f8f9fa; border: 1px dashed #ddd;
-                      border-radius: 4px; color: #999; font-style: italic; }
+                      min-height: 200px; background: var(--bs-tertiary-bg); border: 1px dashed var(--bs-border-color);
+                      border-radius: 4px; color: var(--bs-secondary-color); font-style: italic; }
   .fail-reasons { font-size: 0.8rem; color: #c0392b; }
-  .footer { text-align: center; font-size: 0.8rem; color: #999; padding: 16px; }
 </style>
-</head>
-<body>
-<div class="container">
+{% endblock %}
 
-<header>
-  <h1>{{ title }}</h1>
-  <div class="meta">
-    <span>Date: {{ date }}</span>
-    <span>Modality: {{ modality }}</span>
-    <span>Samples: {{ n_samples }}</span>
-    <span>Report: Post-filter QC</span>
+{% block content %}
+<header style="background: #2c3e50; color: #fff; padding: 24px 32px; margin-bottom: 24px; border-radius: 8px;">
+  <h1 style="font-size: 1.6rem; margin-bottom: 8px;">{{ title }}</h1>
+  <div style="font-size: 0.9rem; opacity: 0.85;">
+    <span style="margin-right: 24px;">Date: {{ date }}</span>
+    <span style="margin-right: 24px;">Modality: {{ modality }}</span>
+    <span style="margin-right: 24px;">Samples: {{ n_samples }}</span>
+    <span style="margin-right: 24px;">Report: Post-filter QC</span>
   </div>
 </header>
 
+<section id="overview" class="report-section">
+<h2>Filter Summary</h2>
 <div class="summary-cards">
   <div class="card">
     <div class="value">{{ n_spots_pre | int }}</div>
@@ -84,10 +72,10 @@
     <div class="label">Samples failed</div>
   </div>
 </div>
+</section>
 
-<!-- Metrics Table -->
 {% if table_rows %}
-<section>
+<section id="per-sample" class="report-section">
   <h2>Per-Sample QC Metrics</h2>
   <div style="overflow-x: auto;">
   <table>
@@ -125,8 +113,7 @@
 </section>
 {% endif %}
 
-<!-- QC Plots -->
-<section>
+<section id="comparison" class="report-section">
   <h2>Pre vs Post Comparison</h2>
 
   <!-- 2x4 Pre vs Post -->
@@ -177,7 +164,7 @@
 
 <!-- HVG and SVG -->
 {% if plots.hvg or plots.svg %}
-<section>
+<section id="feature-selection" class="report-section">
   <h2>Feature Selection</h2>
   <div class="plot-row">
     <div class="plot-item">
@@ -200,9 +187,8 @@
 </section>
 {% endif %}
 
-<!-- Segmentation Scores -->
 {% if segmentation %}
-<section>
+<section id="segmentation" class="report-section">
   <h2>Segmentation Quality</h2>
   <div style="overflow-x: auto;">
   <table>
@@ -237,11 +223,4 @@
   {% endif %}
 </section>
 {% endif %}
-
-<div class="footer">
-  Generated by sc_tools Post-filter QC Report &mdash; {{ date }}
-</div>
-
-</div>
-</body>
-</html>
+{% endblock %}

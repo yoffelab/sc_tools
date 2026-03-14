@@ -1,0 +1,113 @@
+{% extends "base_report_template.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+.card { background: var(--bs-body-bg); border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+.card .value { font-size: 2em; font-weight: bold; color: var(--bs-emphasis-color); }
+.card .label { font-size: 0.9em; color: var(--bs-secondary-color); }
+.plot-section { background: var(--bs-body-bg); border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.plot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--bs-border-color); }
+th { background: #34495e; color: white; }
+tr:nth-child(even) { background: var(--bs-tertiary-bg); }
+img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+<p>Generated: {{ date }}</p>
+
+<section id="exec-summary" class="report-section">
+<h2>Executive Summary</h2>
+<div class="summary-cards">
+    <div class="card">
+        <div class="value">{{ n_rois }}</div>
+        <div class="label">Total ROIs</div>
+    </div>
+    <div class="card">
+        <div class="value">{{ n_datasets }}</div>
+        <div class="label">Datasets</div>
+    </div>
+    <div class="card">
+        <div class="value">{{ n_strategies }}</div>
+        <div class="label">Strategies</div>
+    </div>
+    <div class="card">
+        <div class="value">{{ n_methods }}</div>
+        <div class="label">Methods</div>
+    </div>
+    <div class="card">
+        <div class="value">{{ best_method }}</div>
+        <div class="label">Best Overall Method</div>
+    </div>
+</div>
+</section>
+
+{% if plot_method_ranking %}
+<section id="method-ranking" class="report-section">
+<h2>Method Ranking</h2>
+<div class="plot-section">
+    {{ plot_method_ranking }}
+</div>
+</section>
+{% endif %}
+
+{% if stats_table %}
+<section id="statistics" class="report-section">
+<h2>Statistical Comparisons</h2>
+<div class="plot-section">
+    {{ stats_table }}
+</div>
+</section>
+{% endif %}
+
+{% if plot_dataset_heatmap %}
+<section id="per-dataset" class="report-section">
+<h2>Per-Dataset Performance</h2>
+<div class="plot-section">
+    {{ plot_dataset_heatmap }}
+</div>
+</section>
+{% endif %}
+
+{% if plot_strategy_comparison %}
+<section id="strategy-comparison" class="report-section">
+<h2>Strategy Comparison</h2>
+<div class="plot-section">
+    {{ plot_strategy_comparison }}
+</div>
+</section>
+{% endif %}
+
+{% if plot_tissue_boxplot %}
+<section id="tissue-analysis" class="report-section">
+<h2>Per-Tissue Analysis</h2>
+<div class="plot-section">
+    {{ plot_tissue_boxplot }}
+</div>
+</section>
+{% endif %}
+
+{% if plot_generalization %}
+<section id="generalization" class="report-section">
+<h2>Generalization Across Datasets</h2>
+<div class="plot-section">
+    {{ plot_generalization }}
+</div>
+</section>
+{% endif %}
+
+{% if plot_runtime %}
+<section id="runtime" class="report-section">
+<h2>Runtime Comparison</h2>
+<div class="plot-section">
+    {{ plot_runtime }}
+</div>
+</section>
+{% endif %}
+{% endblock %}

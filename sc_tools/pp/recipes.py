@@ -388,6 +388,23 @@ def _recipe_imc(
 
     scale(adata, max_value=10)
 
+    # scale() produces NaN for zero-variance features; replace with 0 before PCA
+    import warnings as _warnings
+
+    import numpy as _np
+    from scipy.sparse import issparse as _issparse
+
+    _X = adata.X.toarray() if _issparse(adata.X) else adata.X
+    _nan_mask = _np.any(_np.isnan(_X), axis=0)
+    if _nan_mask.any():
+        _warnings.warn(
+            f"_recipe_imc: {_nan_mask.sum()} zero-variance features after scale; replacing NaN with 0.",
+            UserWarning,
+            stacklevel=2,
+        )
+        _X[:, _nan_mask] = 0.0
+        adata.X = _X if not _issparse(adata.X) else __import__("scipy.sparse", fromlist=["csr_matrix"]).csr_matrix(_X)
+
     n_comps = kwargs.get("n_comps", min(20, adata.n_vars - 1))
     pca(adata, n_comps=n_comps, use_highly_variable=False)
 

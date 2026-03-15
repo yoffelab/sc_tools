@@ -27,10 +27,12 @@ from .integrate import (
     run_combat,
     run_cytovi,
     run_harmony,
+    run_resolvi,
     run_scanorama,
     run_scanvi,
     run_scvi,
 )
+from .integration_configs import get_resolvi_ss_config, get_scanvi_config
 from .normalize import (
     arcsinh_transform,
     backup_raw,
@@ -60,6 +62,10 @@ __all__ = [
     "run_bbknn",
     "run_scanorama",
     "run_scanvi",
+    "run_resolvi",
+    # Integration configs
+    "get_scanvi_config",
+    "get_resolvi_ss_config",
     # Dimensionality reduction & clustering
     "pca",
     "neighbors",

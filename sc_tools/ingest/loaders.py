@@ -639,6 +639,181 @@ def load_imc_sample(
     return adata
 
 
+_VALID_PANEL_TIERS = {"1k", "6k", "full_library"}
+
+# Expression file candidates (priority order): CSV then Parquet
+_EXPR_CANDIDATES = ["exprMat_file.csv", "exprMat_file.parquet"]
+# Metadata file candidates
+_META_CANDIDATES = ["metadata_file.csv", "metadata_file.parquet"]
+# Non-gene columns present in AtoMx exports
+_NON_GENE_COLS = {"cell_id", "fov", "slide_ID", "slide_ID_numeric"}
+# Column name candidates for x/y centroid coordinates
+_X_COLS = ["CenterX_local_px", "x_centroid", "CenterX_global_px", "cell_centroid_x"]
+_Y_COLS = ["CenterY_local_px", "y_centroid", "CenterY_global_px", "cell_centroid_y"]
+
+
+def load_cosmx_sample(
+    sample_id: str,
+    cosmx_dir: str | Path,
+    panel_tier: str,
+) -> ad.AnnData:
+    """Load one CosMx sample from an AtoMx flat-file export directory.
+
+    Reads the expression matrix (CSV or Parquet) and cell metadata
+    (CSV or Parquet) produced by the NanoString/Bruker AtoMx platform,
+    and returns a standardized AnnData with required obs/obsm keys.
+
+    The loader supports three panel tiers with different scale
+    characteristics:
+
+    - ``"1k"``  — ~1,000-plex targeted panel
+    - ``"6k"``  — ~6,000-plex targeted panel
+    - ``"full_library"`` — whole-transcriptome (~18k genes); may produce
+      large sparse matrices
+
+    RDS input (from NanoString software) is not supported in this version.
+    If needed, convert RDS to flat CSV/Parquet outside this loader using
+    ``rpy2`` + ``anndata2ri`` and pass the resulting directory here.
+
+    Parameters
+    ----------
+    sample_id
+        Sample identifier stored in ``obs['sample']`` and
+        ``obs['library_id']``.
+    cosmx_dir
+        Path to the AtoMx export directory. Must contain an expression
+        matrix file (``exprMat_file.csv`` or ``exprMat_file.parquet``)
+        and optionally a cell metadata file
+        (``metadata_file.csv`` or ``metadata_file.parquet``) with
+        centroid coordinates.
+    panel_tier
+        One of ``"1k"``, ``"6k"``, or ``"full_library"``. Stored in
+        ``adata.uns['panel_tier']`` for downstream reference.
+
+    Returns
+    -------
+    AnnData satisfying Architecture.md section 2.2 ``ingest_load``
+    requirements:
+
+    - ``obs['sample']``, ``obs['library_id']``, ``obs['raw_data_dir']``
+    - ``obsm['spatial']`` shape ``(n_cells, 2)`` float32 (microns)
+    - ``X`` raw counts, integer-valued, sparse CSR
+    - Single sample only (not concatenated)
+    """
+    import scipy.sparse as sp
+
+    if panel_tier not in _VALID_PANEL_TIERS:
+        raise ValueError(
+            f"panel_tier must be one of {sorted(_VALID_PANEL_TIERS)!r}, got {panel_tier!r}"
+        )
+
+    cosmx_dir = Path(cosmx_dir)
+    if not cosmx_dir.exists():
+        raise FileNotFoundError(
+            f"cosmx_dir not found: {cosmx_dir}. "
+            f"Provide the AtoMx export directory containing exprMat_file.csv."
+        )
+
+    # ------------------------------------------------------------------
+    # Load expression matrix
+    # ------------------------------------------------------------------
+    expr_path = next(
+        (cosmx_dir / name for name in _EXPR_CANDIDATES if (cosmx_dir / name).exists()),
+        None,
+    )
+    if expr_path is None:
+        raise FileNotFoundError(
+            f"No expression matrix file found in {cosmx_dir}. Expected one of: {_EXPR_CANDIDATES}"
+        )
+
+    if expr_path.suffix == ".parquet":
+        expr_df = pd.read_parquet(expr_path)
+    else:
+        expr_df = pd.read_csv(expr_path)
+
+    gene_cols = [c for c in expr_df.columns if c not in _NON_GENE_COLS]
+
+    # Cell identifiers for obs_names
+    if "cell_id" in expr_df.columns:
+        cell_ids = expr_df["cell_id"].astype(str).tolist()
+    else:
+        cell_ids = [str(i) for i in range(len(expr_df))]
+
+    dtype = np.int64 if panel_tier == "full_library" else np.int32
+    counts = expr_df[gene_cols].to_numpy(dtype=dtype)
+    x_csr = sp.csr_matrix(counts)
+
+    adata = ad.AnnData(
+        X=x_csr,
+        obs=pd.DataFrame(index=cell_ids),
+        var=pd.DataFrame(index=gene_cols),
+    )
+    adata.var_names_make_unique()
+
+    # ------------------------------------------------------------------
+    # Load cell metadata / spatial coordinates
+    # ------------------------------------------------------------------
+    meta_path = next(
+        (cosmx_dir / name for name in _META_CANDIDATES if (cosmx_dir / name).exists()),
+        None,
+    )
+
+    spatial = np.zeros((adata.n_obs, 2), dtype=np.float32)
+    coords_loaded = False
+
+    if meta_path is not None:
+        if meta_path.suffix == ".parquet":
+            meta_df = pd.read_parquet(meta_path)
+        else:
+            meta_df = pd.read_csv(meta_path)
+
+        # Align on cell_id if present
+        if "cell_id" in meta_df.columns:
+            meta_df = meta_df.set_index(meta_df["cell_id"].astype(str))
+            common = adata.obs_names.intersection(meta_df.index)
+            if len(common) > 0:
+                meta_df = meta_df.loc[common]
+
+        x_col = next((c for c in _X_COLS if c in meta_df.columns), None)
+        y_col = next((c for c in _Y_COLS if c in meta_df.columns), None)
+
+        meta_df = meta_df.reindex(adata.obs_names)
+        if x_col and y_col and len(meta_df) == adata.n_obs:
+            spatial[:, 0] = meta_df[x_col].to_numpy(dtype=np.float32)
+            spatial[:, 1] = meta_df[y_col].to_numpy(dtype=np.float32)
+            coords_loaded = True
+
+    if not coords_loaded:
+        logger.warning(
+            "load_cosmx_sample: spatial coordinates not found for %s; "
+            "obsm['spatial'] will be zero-filled",
+            sample_id,
+        )
+
+    adata.obsm["spatial"] = spatial
+
+    # ------------------------------------------------------------------
+    # Standard obs metadata
+    # ------------------------------------------------------------------
+    adata.obs["sample"] = sample_id
+    adata.obs["library_id"] = sample_id
+    adata.obs["raw_data_dir"] = str(cosmx_dir)
+
+    # ------------------------------------------------------------------
+    # uns metadata
+    # ------------------------------------------------------------------
+    adata.uns["panel_tier"] = panel_tier
+
+    logger.info(
+        "Loaded CosMx sample %s (%s): %d cells x %d genes",
+        sample_id,
+        panel_tier,
+        adata.n_obs,
+        adata.n_vars,
+    )
+    return adata
+
+
 def load_he_image(
     he_path: str | Path,
     library_id: str,

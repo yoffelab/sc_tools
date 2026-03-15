@@ -1,6 +1,6 @@
-"""Data and job registry for sc_tools projects.
+"""Data registry for sc_tools projects.
 
-Tracks datasets (AnnData checkpoints), SLURM jobs, and agent tasks across
+Tracks data objects (AnnData checkpoints, images, etc.) and patients across
 all active projects.  Uses **SQLite** by default (zero-config) with optional
 **PostgreSQL** support via the ``SC_TOOLS_REGISTRY_URL`` environment variable.
 
@@ -11,16 +11,14 @@ Quick start
     from sc_tools.registry import Registry
 
     reg = Registry()
-    reg.add_project("ggo_visium", platform="visium", data_type="visium",
-                    domain="spatial_transcriptomics", imaging_modality="sequencing_based")
-    ds_id = reg.register_dataset(
+    reg.add_project("ggo_visium", platform="visium",
+                    domain="spatial_transcriptomics")
+    ds_id = reg.register_data(
         "ggo_visium", phase="qc_filter",
         uri="sftp://brb//athena/.../adata.raw.h5ad",
         fmt="h5ad",
         file_role="primary",
     )
-    reg.upsert_phase("ggo_visium", "qc_filter", status="complete",
-                     primary_dataset_id=ds_id, n_obs=50000, n_samples=8)
 
 CLI
 ---
@@ -34,18 +32,8 @@ Environment
     Optional SQLAlchemy-compatible DB URL.  Defaults to
     ``sqlite:///~/.sc_tools/registry.db``.
 
-Technology taxonomy
--------------------
-domain:
-    ``spatial_transcriptomics`` | ``spatial_proteomics`` | ``imaging`` |
-    ``single_cell`` | ``bulk``
-
-imaging_modality:
-    ``brightfield`` | ``fluorescence`` | ``multiplexed_fluorescence`` |
-    ``probe_based`` | ``mass_spec_imaging`` | ``sequencing_based``
-
-Phase slugs (new names → old codes)
-------------------------------------
+Phase slugs
+-----------
     ingest_raw       p0a
     ingest_load      p0b
     qc_filter        p1
@@ -102,6 +90,20 @@ def _utcnow() -> str:
     return datetime.now(tz=timezone.utc).isoformat()  # noqa: UP017
 
 
+_URI_SCHEMES = ("sftp://", "s3://", "gs://", "az://", "http://", "https://", "phase://")
+
+
+def _validate_uri(uri: str) -> str:
+    """Ensure URI is an absolute path or has a recognized scheme."""
+    if any(uri.startswith(s) for s in _URI_SCHEMES):
+        return uri
+    if os.path.isabs(uri):
+        return uri
+    raise ValueError(
+        f"URI must be an absolute path or use a scheme ({', '.join(_URI_SCHEMES)}). Got: {uri!r}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # ORM models — built lazily to avoid top-level SQLAlchemy import errors
 # ---------------------------------------------------------------------------
@@ -110,22 +112,24 @@ def _utcnow() -> str:
 def _build_models(Base: Any) -> tuple:
     """Return ORM model classes.
 
-    Returns a 16-tuple:
-        Project, Dataset, SlurmJob, AgentTask, ProjectPhase, DataSource,
-        ProjectDataSource, Subject, Sample, SubjectProjectLink, BioData,
-        BioImage, RNASeqData, SpatialSeqData, EpigenomicsData, GenomeSeqData
+    Returns a 6-tuple:
+        Project, Data, Patient, DataSource, ProjectDataSource, PatientDataMap
     """
     from sqlalchemy import (
-        Boolean,
         Column,
         Float,
         ForeignKey,
         Integer,
         String,
         Text,
-        UniqueConstraint,
     )
-    from sqlalchemy.orm import relationship
+    from sqlalchemy.orm import mapped_column, relationship
+
+    # Use JSONB on PostgreSQL, JSON on SQLite
+    try:
+        from sqlalchemy.dialects.postgresql import JSONB as JSONType
+    except ImportError:
+        from sqlalchemy import JSON as JSONType
 
     class Project(Base):
         __tablename__ = "projects"
@@ -133,147 +137,70 @@ def _build_models(Base: Any) -> tuple:
         id = Column(Integer, primary_key=True, autoincrement=True)
         name = Column(String, unique=True, nullable=False)
         platform = Column(String)
-        data_type = Column(String)
-        # Technology taxonomy (added in migration 0002)
-        domain = Column(
-            String
-        )  # spatial_transcriptomics | spatial_proteomics | imaging | single_cell | bulk
-        imaging_modality = Column(
-            String
-        )  # brightfield | fluorescence | multiplexed_fluorescence | probe_based | mass_spec_imaging | sequencing_based
-        # Visibility / access control (added in migration 0003)
-        project_type = Column(String, default="internal")  # internal | external
-        visibility = Column(String, default="private")  # private | public
-        phases_complete = Column(
-            Text, default="[]"
-        )  # JSON array (legacy; use project_phases table)
+        domain = Column(String)
         status = Column(String, default="active")
         created_at = Column(String, default=_utcnow)
 
-        datasets = relationship("Dataset", back_populates="project", cascade="all, delete-orphan")
-        jobs = relationship("SlurmJob", back_populates="project", cascade="all, delete-orphan")
-        tasks = relationship("AgentTask", back_populates="project", cascade="all, delete-orphan")
-        phases = relationship(
-            "ProjectPhase", back_populates="project", cascade="all, delete-orphan"
+        data = relationship("Data", back_populates="project", cascade="all, delete-orphan")
+        data_source_links = relationship(
+            "ProjectDataSource", back_populates="project", cascade="all, delete-orphan"
         )
 
-    class Dataset(Base):
-        __tablename__ = "datasets"
+    class Data(Base):
+        __tablename__ = "data_processing_phase"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
-        project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-        sample_id = Column(String)
-        phase = Column(String)  # slug: qc_filter, scoring, celltype_manual, etc.
+        project_id = Column(
+            Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        )
+        phase = Column(String)
+        status = Column(String, default="pending")
         uri = Column(Text, nullable=False)
-        format = Column(String)  # h5ad, zarr, tiff, tsv
-        size_mb = Column(Float)
-        md5 = Column(String)
-        status = Column(String, default="pending")  # pending, ready, archived, error
-        # Extended metadata (added in migration 0002)
-        file_role = Column(
-            String, default="primary"
-        )  # primary | supplementary | entry_point | spatialdata | image | metadata
-        validated = Column(Boolean, default=False)
+        format = Column(String)
+        platform = Column(String)
+        category = Column(String)
+        file_role = Column(String, default="primary")
         n_obs = Column(Integer)
         n_vars = Column(Integer)
-        # Forward-link to BioData (migration 0005)
-        bio_data_id = Column(Integer, ForeignKey("bio_data.id", ondelete="SET NULL"), nullable=True)
+        size_mb = Column(Float)
+        meta = Column("metadata", JSONType, default=dict)
         created_at = Column(String, default=_utcnow)
         updated_at = Column(String, default=_utcnow)
 
-        project = relationship("Project", back_populates="datasets")
+        project = relationship("Project", back_populates="data")
+        patient_links = relationship("PatientDataMap", back_populates="data", cascade="all, delete-orphan")
 
-    class SlurmJob(Base):
-        __tablename__ = "slurm_jobs"
-
-        id = Column(Integer, primary_key=True, autoincrement=True)
-        project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-        sample_id = Column(String)
-        phase = Column(String)
-        cluster = Column(String)  # brb, cayuga
-        slurm_job_id = Column(String)
-        status = Column(String, default="submitted")  # submitted, running, completed, failed
-        submitted_at = Column(String)
-        finished_at = Column(String)
-        log_uri = Column(Text)
-        error_msg = Column(Text)
-
-        project = relationship("Project", back_populates="jobs")
-
-    class AgentTask(Base):
-        __tablename__ = "agent_tasks"
+    class Patient(Base):
+        __tablename__ = "patients"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
-        task_type = Column(String)
-        project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-        status = Column(String, default="queued")  # queued, running, completed, failed
-        inputs_json = Column(Text)
-        outputs_json = Column(Text)
-        error = Column(Text)
-        started_at = Column(String)
-        finished_at = Column(String)
-
-        project = relationship("Project", back_populates="tasks")
-
-    class ProjectPhase(Base):
-        """Per-phase pipeline status row.
-
-        Composite primary key ``(project_id, phase)``.  Upserted (not inserted)
-        on each status update.  Use :meth:`Registry.upsert_phase` to write.
-        """
-
-        __tablename__ = "project_phases"
-
-        project_id = Column(
-            Integer, ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
-        )
-        phase = Column(String, primary_key=True)  # slug, e.g. "qc_filter"
-        status = Column(
-            String, default="not_started"
-        )  # not_started | in_progress | complete | failed | skipped
-        entry_phase = Column(Boolean, default=False)  # True = where the pipeline was loaded from
-        primary_dataset_id = Column(
-            Integer, ForeignKey("datasets.id"), nullable=True
-        )  # FK → datasets
-        n_obs = Column(Integer)  # total cells/spots at this phase
-        n_vars = Column(Integer)  # genes/proteins at this phase
-        n_samples = Column(Integer)  # number of samples at this phase
-        notes = Column(Text)  # free-text notes
+        patient_id = Column(String, unique=True, nullable=False)
+        meta = Column("metadata", JSONType, default=dict)
         created_at = Column(String, default=_utcnow)
-        updated_at = Column(String, default=_utcnow)
 
-        project = relationship("Project", back_populates="phases")
+        data_links = relationship("PatientDataMap", back_populates="patient", cascade="all, delete-orphan")
 
     class DataSource(Base):
-        """A raw data source — HPC directory, public dataset, or external repository.
+        """A raw data source -- HPC directory, public dataset, or external repository."""
 
-        Distinct from :class:`Project` (lab work) and :class:`Dataset` (processed
-        checkpoints). Projects reference DataSources via the
-        :class:`ProjectDataSource` join table.
-        """
-
-        __tablename__ = "data_sources"
+        __tablename__ = "data_inventory"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
         name = Column(String, unique=True, nullable=False)
         description = Column(Text)
-        uri = Column(Text, nullable=False)  # HPC path, URL, GEO accession, DOI, etc.
-        platform = Column(String)  # cosmx, xenium, imc, visium_hd, scrna, ...
-        domain = Column(String)  # spatial_transcriptomics | spatial_proteomics | ...
-        imaging_modality = Column(String)  # sequencing_based | probe_based | ...
-        source_type = Column(
-            String
-        )  # hpc_lab | hpc_collaborator | public_10x | public_geo | public_zenodo | public_portal
-        organism = Column(String)  # human | mouse | ...
-        tissue = Column(String)  # colon | brain | ...
-        disease = Column(String)  # IBD | breast_cancer | ...
+        uri = Column(Text, nullable=False)
+        platform = Column(String)
+        domain = Column(String)
+        imaging_modality = Column(String)
+        source_type = Column(String)
+        organism = Column(String)
+        tissue = Column(String)
+        disease = Column(String)
         n_samples = Column(Integer)
         n_cells = Column(Integer)
-        publication = Column(String)  # DOI or citation string
-        access_notes = Column(Text)  # e.g. "cayuga:/athena/project-saha/; contact jip2007"
-        status = Column(
-            String, default="available"
-        )  # available | restricted | pending_download | archived
+        publication = Column(String)
+        access_notes = Column(Text)
+        status = Column(String, default="available")
         created_at = Column(String, default=_utcnow)
 
         project_links = relationship(
@@ -283,229 +210,46 @@ def _build_models(Base: Any) -> tuple:
     class ProjectDataSource(Base):
         """Many-to-many join between Projects and DataSources."""
 
-        __tablename__ = "project_data_sources"
+        __tablename__ = "data_project_map"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
-        project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-        data_source_id = Column(
-            Integer, ForeignKey("data_sources.id", ondelete="CASCADE"), nullable=False
+        project_id = Column(
+            Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
         )
-        role = Column(String, default="input")  # input | reference | supplementary
+        data_source_id = Column(
+            Integer, ForeignKey("data_inventory.id", ondelete="CASCADE"), nullable=False
+        )
+        role = Column(String, default="input")
         notes = Column(Text)
 
         project = relationship("Project", back_populates="data_source_links")
         data_source = relationship("DataSource", back_populates="project_links")
 
-    # Wire back-ref on Project
-    Project.data_source_links = relationship(
-        "ProjectDataSource", back_populates="project", cascade="all, delete-orphan"
-    )
+    class PatientDataMap(Base):
+        """Many-to-many join between Patients and Data."""
 
-    # ------------------------------------------------------------------
-    # BioData hierarchy (migration 0005)
-    # ------------------------------------------------------------------
-
-    class Subject(Base):
-        """Cross-project de-identified subject/patient record."""
-
-        __tablename__ = "subjects"
+        __tablename__ = "patient_data_map"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
-        subject_id = Column(String, unique=True, nullable=False)
-        organism = Column(String, default="human")
-        # Standardized clinical columns
-        sex = Column(String)  # M, F, unknown
-        age_at_collection = Column(Float)
-        diagnosis = Column(String)
-        diagnosis_code = Column(String)  # ICD-10 or OncoTree
-        disease_stage = Column(String)
-        treatment_status = Column(String)  # treatment_naive | on_treatment | post_treatment
-        tissue_of_origin = Column(String)
-        cause_of_death = Column(String)
-        survival_days = Column(Float)
-        vital_status = Column(String)  # alive | deceased | unknown
-        # Flexible overflow
-        clinical_metadata_json = Column(Text)
-        created_at = Column(String, default=_utcnow)
-
-        samples = relationship("Sample", back_populates="subject", cascade="all, delete-orphan")
-        project_links = relationship(
-            "SubjectProjectLink", back_populates="subject", cascade="all, delete-orphan"
+        patient_id = Column(
+            Integer, ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
         )
-
-    class Sample(Base):
-        """Physical specimen linking a subject to data within a project."""
-
-        __tablename__ = "samples"
-
-        id = Column(Integer, primary_key=True, autoincrement=True)
-        sample_id = Column(String, nullable=False)
-        subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True)
-        project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
-        tissue = Column(String)
-        tissue_region = Column(String)
-        collection_date = Column(String)
-        fixation_method = Column(String)  # FFPE | fresh_frozen | OCT | PFA
-        sample_type = Column(String)  # biopsy | resection | TMA | organoid | xenograft
-        batch = Column(String)
-        notes = Column(Text)
-        created_at = Column(String, default=_utcnow)
-
-        subject = relationship("Subject", back_populates="samples")
-        project = relationship("Project")
-
-    class SubjectProjectLink(Base):
-        """Many-to-many join between Subjects and Projects."""
-
-        __tablename__ = "subject_project_links"
-
-        id = Column(Integer, primary_key=True, autoincrement=True)
-        subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
-        project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-        role = Column(String, default="enrolled")  # enrolled | reference | control
+        data_id = Column(
+            Integer, ForeignKey("data_processing_phase.id", ondelete="CASCADE"), nullable=False
+        )
+        role = Column(String, default="source")
         notes = Column(Text)
 
-        __table_args__ = (UniqueConstraint("subject_id", "project_id", name="uq_subject_project"),)
-
-        subject = relationship("Subject", back_populates="project_links")
-        project = relationship("Project")
-
-    class BioData(Base):
-        """Joined Table Inheritance base for typed biological data objects."""
-
-        __tablename__ = "bio_data"
-
-        id = Column(Integer, primary_key=True, autoincrement=True)
-        type = Column(String, nullable=False)  # JTI discriminator
-        project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-        subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True)
-        sample_id = Column(Integer, ForeignKey("samples.id", ondelete="SET NULL"), nullable=True)
-        # Classification
-        category = Column(String)
-        subcategory = Column(String)
-        platform = Column(String)
-        modality = Column(String)
-        measurement = Column(String)
-        resolution = Column(String)
-        spatial = Column(Boolean)
-        # Data tracking (replaces Dataset for new data)
-        uri = Column(Text, nullable=False)
-        format = Column(String)
-        status = Column(String, default="pending")
-        file_role = Column(String, default="primary")
-        validated = Column(Boolean, default=False)
-        n_obs = Column(Integer)
-        n_vars = Column(Integer)
-        phase = Column(String)
-        size_mb = Column(Float)
-        md5 = Column(String)
-        # Provenance
-        legacy_dataset_id = Column(
-            Integer, ForeignKey("datasets.id", ondelete="SET NULL"), nullable=True
-        )
-        created_at = Column(String, default=_utcnow)
-        updated_at = Column(String, default=_utcnow)
-
-        project = relationship("Project")
-
-        __mapper_args__ = {
-            "polymorphic_on": type,
-            "polymorphic_identity": "base",
-        }
-
-    class BioImage(BioData):
-        """Image-specific BioData (IMC, CODEX, H&E, IF, etc.)."""
-
-        __tablename__ = "bio_images"
-
-        id = Column(Integer, ForeignKey("bio_data.id", ondelete="CASCADE"), primary_key=True)
-        image_type = Column(String)  # he, fluorescence, multiplexed, brightfield, phase_contrast
-        n_channels = Column(Integer)
-        pixel_size_um = Column(Float)
-        width_px = Column(Integer)
-        height_px = Column(Integer)
-        staining_protocol = Column(String)  # H&E, IHC, IF, CODEX, IMC
-        channel_names_json = Column(Text)  # JSON list of channel/marker names
-
-        __mapper_args__ = {"polymorphic_identity": "image"}
-
-    class RNASeqData(BioData):
-        """RNA-seq-specific BioData (bulk and single-cell)."""
-
-        __tablename__ = "rnaseq_data"
-
-        id = Column(Integer, ForeignKey("bio_data.id", ondelete="CASCADE"), primary_key=True)
-        library_type = Column(String)  # bulk | single_cell
-        sequencing_platform = Column(String)  # illumina_novaseq, bgi_dnbseq, etc.
-        chemistry = Column(String)  # chromium_v3, evercode_v3, etc.
-        read_length = Column(Integer)
-        n_reads = Column(Integer)
-        reference_genome = Column(String)  # GRCh38, GRCm39, etc.
-        gene_annotation = Column(String)  # gencode_v44, ensembl_110, etc.
-
-        __mapper_args__ = {"polymorphic_identity": "rnaseq"}
-
-    class SpatialSeqData(BioData):
-        """Spatial sequencing-specific BioData (Visium, Xenium, CosMx, etc.)."""
-
-        __tablename__ = "spatial_seq_data"
-
-        id = Column(Integer, ForeignKey("bio_data.id", ondelete="CASCADE"), primary_key=True)
-        spatial_resolution = Column(String)  # spot | single_cell
-        panel_size = Column(Integer)  # number of targeted genes
-        bin_size_um = Column(Float)  # for Visium HD bin-level
-        fov_count = Column(Integer)  # for CosMx
-        coordinate_system = Column(String)  # pixel | micron
-        tissue_area_mm2 = Column(Float)
-        sequencing_platform = Column(String)
-
-        __mapper_args__ = {"polymorphic_identity": "spatial_seq"}
-
-    class EpigenomicsData(BioData):
-        """Epigenomics-specific BioData (ATAC-seq, ChIP-seq, CUT&Tag, etc.)."""
-
-        __tablename__ = "epigenomics_data"
-
-        id = Column(Integer, ForeignKey("bio_data.id", ondelete="CASCADE"), primary_key=True)
-        assay_type = Column(String)  # atac_seq, chip_seq, cut_and_tag, methylation, etc.
-        target_protein = Column(String)  # for ChIP/CUT&Tag
-        n_peaks = Column(Integer)
-        n_fragments = Column(Integer)
-        genome_coverage = Column(Float)
-
-        __mapper_args__ = {"polymorphic_identity": "epigenomics"}
-
-    class GenomeSeqData(BioData):
-        """Genome sequencing-specific BioData (WGS, WES, targeted panels)."""
-
-        __tablename__ = "genome_seq_data"
-
-        id = Column(Integer, ForeignKey("bio_data.id", ondelete="CASCADE"), primary_key=True)
-        sequencing_type = Column(String)  # wgs | wes | targeted_panel | amplicon
-        panel_name = Column(String)
-        coverage_mean = Column(Float)
-        reference_genome = Column(String)  # GRCh38, etc.
-        sequencing_platform = Column(String)  # illumina_novaseq, ont_promethion, etc.
-
-        __mapper_args__ = {"polymorphic_identity": "genome_seq"}
+        patient = relationship("Patient", back_populates="data_links")
+        data = relationship("Data", back_populates="patient_links")
 
     return (
         Project,
-        Dataset,
-        SlurmJob,
-        AgentTask,
-        ProjectPhase,
+        Data,
+        Patient,
         DataSource,
         ProjectDataSource,
-        Subject,
-        Sample,
-        SubjectProjectLink,
-        BioData,
-        BioImage,
-        RNASeqData,
-        SpatialSeqData,
-        EpigenomicsData,
-        GenomeSeqData,
+        PatientDataMap,
     )
 
 
@@ -534,21 +278,11 @@ class Registry:
         self._Base = Base
         (
             self._Project,
-            self._Dataset,
-            self._SlurmJob,
-            self._AgentTask,
-            self._ProjectPhase,
+            self._Data,
+            self._Patient,
             self._DataSource,
             self._ProjectDataSource,
-            self._Subject,
-            self._Sample,
-            self._SubjectProjectLink,
-            self._BioData,
-            self._BioImage,
-            self._RNASeqData,
-            self._SpatialSeqData,
-            self._EpigenomicsData,
-            self._GenomeSeqData,
+            self._PatientDataMap,
         ) = _build_models(Base)
 
         url = db_url or _get_db_url()
@@ -569,37 +303,17 @@ class Registry:
         self,
         name: str,
         platform: str | None = None,
-        data_type: str | None = None,
+        data_type: str | None = None,  # kept for backward compat, ignored
         *,
         domain: str | None = None,
-        imaging_modality: str | None = None,
-        project_type: str = "internal",
-        visibility: str = "private",
+        imaging_modality: str | None = None,  # ignored (column dropped)
+        project_type: str = "internal",  # ignored (column dropped)
+        visibility: str = "private",  # ignored (column dropped)
     ) -> int:
         """Register a new project. Returns project id.
 
         If a project with the same name exists its id is returned without
         creating a duplicate.
-
-        Parameters
-        ----------
-        name:
-            Unique project name (e.g. ``"ggo_visium"``).
-        platform:
-            Technology platform string (e.g. ``"visium"``, ``"imc"``).
-        data_type:
-            Data type (may match platform for single-modality projects).
-        domain:
-            High-level domain: ``spatial_transcriptomics`` |
-            ``spatial_proteomics`` | ``imaging`` | ``single_cell`` | ``bulk``.
-        imaging_modality:
-            Imaging modality: ``brightfield`` | ``fluorescence`` |
-            ``multiplexed_fluorescence`` | ``probe_based`` |
-            ``mass_spec_imaging`` | ``sequencing_based``.
-        project_type:
-            ``"internal"`` (lab-led) or ``"external"`` (collaboration / contract).
-        visibility:
-            ``"private"`` (restricted access) or ``"public"`` (shareable / published).
         """
         with self._session() as sess:
             existing = sess.query(self._Project).filter_by(name=name).first()
@@ -609,11 +323,7 @@ class Registry:
             proj = self._Project(
                 name=name,
                 platform=platform,
-                data_type=data_type,
                 domain=domain,
-                imaging_modality=imaging_modality,
-                project_type=project_type,
-                visibility=visibility,
             )
             sess.add(proj)
             sess.commit()
@@ -632,23 +342,145 @@ class Registry:
         with self._session() as sess:
             return [self._to_dict(r) for r in sess.query(self._Project).all()]
 
+    def delete_project(self, name: str) -> bool:
+        """Delete a project and all its cascade rows. Returns True if deleted."""
+        with self._session() as sess:
+            proj = sess.query(self._Project).filter_by(name=name).first()
+            if proj is None:
+                return False
+            sess.delete(proj)
+            sess.commit()
+            logger.info("Deleted project '%s'", name)
+            return True
+
     def mark_phase_complete(self, project_name: str, phase: str) -> None:
-        """Append *phase* to the project's completed-phases list and upsert project_phases."""
+        """Mark a pipeline phase as complete.
+
+        Updates all ``data`` rows for this project+phase to status='ready'.
+        """
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
                 raise ValueError(f"Project '{project_name}' not found in registry")
-            phases: list[str] = json.loads(proj.phases_complete or "[]")
-            if phase not in phases:
-                phases.append(phase)
-                proj.phases_complete = json.dumps(phases)
-                sess.commit()
-        # Also update the project_phases table
-        self.upsert_phase(project_name, phase, status="complete")
+            rows = (
+                sess.query(self._Data)
+                .filter_by(project_id=proj.id, phase=phase)
+                .all()
+            )
+            now = _utcnow()
+            for r in rows:
+                r.status = "ready"
+                r.updated_at = now
+            sess.commit()
 
     # ------------------------------------------------------------------
-    # Datasets
+    # Data (replaces datasets + bio_data)
     # ------------------------------------------------------------------
+
+    def register_data(
+        self,
+        project_name: str,
+        phase: str,
+        uri: str,
+        *,
+        fmt: str | None = "h5ad",
+        platform: str | None = None,
+        category: str | None = None,
+        status: str = "ready",
+        file_role: str = "primary",
+        n_obs: int | None = None,
+        n_vars: int | None = None,
+        size_mb: float | None = None,
+        patient_id: str | None = None,
+        metadata: dict | None = None,
+        sample_id: str | None = None,  # backward compat, ignored
+    ) -> int:
+        """Register a data object. Returns data id.
+
+        Parameters
+        ----------
+        project_name:
+            Project name (must already exist).
+        phase:
+            Phase slug (e.g. ``"qc_filter"``, ``"scoring"``).
+        uri:
+            Path or URI to the data file.
+        fmt:
+            File format: ``"h5ad"`` (default), ``"zarr"``, ``"tiff"``, ``"tsv"``.
+        platform:
+            Platform slug. If None, inferred from project.
+        category:
+            Data category. If None, inferred from platform.
+        file_role:
+            Role: ``"primary"`` | ``"supplementary"`` | ``"entry_point"`` etc.
+        patient_id:
+            De-identified patient ID string (optional). Must already exist.
+        metadata:
+            Arbitrary JSONB metadata dict.
+        """
+        _validate_uri(uri)
+        with self._session() as sess:
+            proj = sess.query(self._Project).filter_by(name=project_name).first()
+            if proj is None:
+                raise ValueError(f"Project '{project_name}' not found. Call add_project() first.")
+
+            # Infer platform/category from project if not provided
+            if platform is None:
+                platform = proj.platform
+            if category is None:
+                category = "spatial_seq"  # default
+                try:
+                    from sc_tools.biodata import platform_for_project
+
+                    pspec = platform_for_project(platform) if platform else None
+                    if pspec:
+                        category = pspec.biodata_type
+                except (ImportError, KeyError):
+                    pass
+
+            # Auto-fill format from URI extension
+            if fmt is None and uri:
+                ext = uri.rsplit(".", 1)[-1].lower() if "." in uri else ""
+                if ext in ("h5ad", "zarr", "tiff", "tsv", "fastq", "bam", "bed", "csv"):
+                    fmt = ext
+
+            now = _utcnow()
+            obj = self._Data(
+                project_id=proj.id,
+                phase=phase,
+                status=status,
+                uri=uri,
+                format=fmt,
+                platform=platform,
+                category=category,
+                file_role=file_role,
+                n_obs=n_obs,
+                n_vars=n_vars,
+                size_mb=size_mb,
+                meta=metadata or {},
+                created_at=now,
+                updated_at=now,
+            )
+            sess.add(obj)
+            sess.flush()
+
+            # Link patient via join table if provided
+            if patient_id is not None:
+                pat = sess.query(self._Patient).filter_by(patient_id=patient_id).first()
+                if pat is not None:
+                    link = self._PatientDataMap(patient_id=pat.id, data_id=obj.id)
+                    sess.add(link)
+
+            sess.commit()
+            sess.refresh(obj)
+            logger.info(
+                "Registered data id=%d for project '%s' phase=%s at %s",
+                obj.id,
+                project_name,
+                phase,
+                uri,
+            )
+            return obj.id
 
     def register_dataset(
         self,
@@ -666,96 +498,68 @@ class Registry:
         n_obs: int | None = None,
         n_vars: int | None = None,
     ) -> int:
-        """Register an AnnData checkpoint. Returns dataset id.
-
-        .. deprecated::
-            Use :meth:`register_biodata` for new data. This method creates
-            a legacy ``datasets`` row. In a future release it will internally
-            create a BioData row instead.
-
-        Parameters
-        ----------
-        project_name:
-            Project name (must already exist).
-        phase:
-            Phase slug (e.g. ``"qc_filter"``, ``"scoring"``).
-        uri:
-            Path or URI to the checkpoint file.
-        sample_id:
-            Optional sample identifier (for per-sample ingest_load checkpoints).
-        fmt:
-            File format: ``"h5ad"`` (default), ``"zarr"``, ``"tiff"``, ``"tsv"``.
-        file_role:
-            Role of this file: ``"primary"`` | ``"supplementary"`` |
-            ``"entry_point"`` | ``"spatialdata"`` | ``"image"`` | ``"metadata"``.
-        validated:
-            True if ``validate_checkpoint()`` has passed for this file.
-        n_obs:
-            Number of cells/spots in this dataset (for reporting).
-        n_vars:
-            Number of genes/proteins in this dataset (for reporting).
-        """
-        import warnings
-
-        warnings.warn(
-            "register_dataset() is deprecated; use register_biodata() for new data. "
-            "register_dataset() will internally create BioData rows in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
+        """Backward-compatible alias for :meth:`register_data`."""
+        meta: dict[str, Any] = {}
+        if md5:
+            meta["md5"] = md5
+        if validated:
+            meta["validated"] = True
+        return self.register_data(
+            project_name=project_name,
+            phase=phase,
+            uri=uri,
+            fmt=fmt,
+            status=status,
+            file_role=file_role,
+            n_obs=n_obs,
+            n_vars=n_vars,
+            size_mb=size_mb,
+            metadata=meta if meta else None,
         )
-        with self._session() as sess:
-            proj = sess.query(self._Project).filter_by(name=project_name).first()
-            if proj is None:
-                raise ValueError(f"Project '{project_name}' not found. Call add_project() first.")
-            ds = self._Dataset(
-                project_id=proj.id,
-                sample_id=sample_id,
-                phase=phase,
-                uri=uri,
-                format=fmt,
-                size_mb=size_mb,
-                md5=md5,
-                status=status,
-                file_role=file_role,
-                validated=validated,
-                n_obs=n_obs,
-                n_vars=n_vars,
-            )
-            sess.add(ds)
-            sess.commit()
-            sess.refresh(ds)
-            ds_id = ds.id
-            proj_platform = proj.platform
-            logger.info("Registered dataset %s/%s at %s (id=%d)", project_name, phase, uri, ds_id)
 
-        # Phase B dual-write: also create a BioData row
-        try:
-            from sc_tools.biodata import platform_for_project
+    def register_biodata(
+        self,
+        project_name: str,
+        category: str,
+        platform: str,
+        uri: str,
+        *,
+        fmt: str | None = None,
+        status: str = "pending",
+        file_role: str = "primary",
+        phase: str | None = None,
+        n_obs: int | None = None,
+        n_vars: int | None = None,
+        size_mb: float | None = None,
+        md5: str | None = None,
+        subject_id: str | None = None,
+        sample_db_id: int | None = None,
+        **type_kwargs: Any,
+    ) -> int:
+        """Backward-compatible alias for :meth:`register_data`.
 
-            pspec = platform_for_project(proj_platform) if proj_platform else None
-            inferred_category = pspec.biodata_type if pspec else "spatial_seq"
-            bio_id = self.register_biodata(
-                project_name=project_name,
-                category=inferred_category,
-                platform=proj_platform or "unknown",
-                uri=uri,
-                fmt=fmt,
-                phase=phase,
-                file_role=file_role,
-                n_obs=n_obs,
-                n_vars=n_vars,
-                status=status,
-            )
-            # Link forward: dataset -> biodata
-            with self._session() as sess:
-                ds_row = sess.get(self._Dataset, ds_id)
-                if ds_row is not None:
-                    ds_row.bio_data_id = bio_id
-                    sess.commit()
-        except Exception:
-            logger.warning("Dual-write to BioData failed for dataset %d", ds_id)
-
-        return ds_id
+        Accepts the old BioData-style arguments and routes to register_data.
+        """
+        meta: dict[str, Any] = {}
+        if md5:
+            meta["md5"] = md5
+        if type_kwargs:
+            meta.update(type_kwargs)
+        return self.register_data(
+            project_name=project_name,
+            phase=phase or "unknown",
+            uri=uri,
+            fmt=fmt,
+            platform=platform,
+            category=category,
+            status=status,
+            file_role=file_role,
+            n_obs=n_obs,
+            n_vars=n_vars,
+            size_mb=size_mb,
+            patient_id=subject_id,
+            metadata=meta if meta else None,
+        )
 
     def get_dataset_uri(
         self,
@@ -763,18 +567,13 @@ class Registry:
         phase: str,
         sample_id: str | None = None,
     ) -> str | None:
-        """Return the URI for a checkpoint (most recently registered).
-
-        Returns None if no matching dataset is found.
-        """
+        """Return the URI for a checkpoint (most recently registered)."""
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
                 return None
-            q = sess.query(self._Dataset).filter_by(project_id=proj.id, phase=phase)
-            if sample_id is not None:
-                q = q.filter_by(sample_id=sample_id)
-            row = q.order_by(self._Dataset.id.desc()).first()
+            q = sess.query(self._Data).filter_by(project_id=proj.id, phase=phase)
+            row = q.order_by(self._Data.id.desc()).first()
             return row.uri if row else None
 
     def list_datasets(
@@ -782,9 +581,9 @@ class Registry:
         project_name: str | None = None,
         phase: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List datasets, optionally filtered by project and/or phase."""
+        """List data entries, optionally filtered by project and/or phase."""
         with self._session() as sess:
-            q = sess.query(self._Dataset)
+            q = sess.query(self._Data)
             if project_name is not None:
                 proj = sess.query(self._Project).filter_by(name=project_name).first()
                 if proj:
@@ -796,27 +595,17 @@ class Registry:
             return [self._to_dict(r) for r in q.all()]
 
     def update_dataset_status(self, dataset_id: int, status: str) -> None:
-        """Update dataset status (pending, ready, archived, error)."""
+        """Update data row status."""
         with self._session() as sess:
-            ds = sess.get(self._Dataset, dataset_id)
-            if ds is None:
-                raise ValueError(f"Dataset id={dataset_id} not found")
-            ds.status = status
-            ds.updated_at = _utcnow()
-            sess.commit()
-
-    def mark_dataset_validated(self, dataset_id: int) -> None:
-        """Set ``datasets.validated = True`` for the given dataset id."""
-        with self._session() as sess:
-            ds = sess.get(self._Dataset, dataset_id)
-            if ds is None:
-                raise ValueError(f"Dataset id={dataset_id} not found")
-            ds.validated = True
-            ds.updated_at = _utcnow()
+            row = sess.get(self._Data, dataset_id)
+            if row is None:
+                raise ValueError(f"Data id={dataset_id} not found")
+            row.status = status
+            row.updated_at = _utcnow()
             sess.commit()
 
     # ------------------------------------------------------------------
-    # Project phases
+    # Phase queries (derived from data table)
     # ------------------------------------------------------------------
 
     def upsert_phase(
@@ -832,30 +621,11 @@ class Registry:
         n_samples: int | None = None,
         notes: str | None = None,
     ) -> None:
-        """Insert or update a ``project_phases`` row (upsert on composite PK).
+        """Create or update a data row for phase tracking.
 
-        Parameters
-        ----------
-        project_name:
-            Project name (must already exist).
-        phase:
-            Phase slug (e.g. ``"qc_filter"``).
-        status:
-            Pipeline status: ``"not_started"`` | ``"in_progress"`` |
-            ``"complete"`` | ``"failed"`` | ``"skipped"``.
-        entry_phase:
-            True if this is the phase at which the pipeline was loaded
-            (e.g. collaborator provided a pre-celltyped AnnData).
-        primary_dataset_id:
-            FK to ``datasets.id`` for the primary checkpoint of this phase.
-        n_obs:
-            Total cells/spots at this phase.
-        n_vars:
-            Genes/proteins at this phase.
-        n_samples:
-            Number of samples at this phase.
-        notes:
-            Free-text notes (e.g. ``"9-method benchmark; Z-score+Harmony selected"``).
+        For backward compatibility with the old project_phases table.
+        Creates a metadata-only data row if no data row exists for this
+        project+phase, or updates the metadata of the most recent one.
         """
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
@@ -863,66 +633,124 @@ class Registry:
                 raise ValueError(f"Project '{project_name}' not found in registry")
 
             existing = (
-                sess.query(self._ProjectPhase).filter_by(project_id=proj.id, phase=phase).first()
+                sess.query(self._Data)
+                .filter_by(project_id=proj.id, phase=phase)
+                .order_by(self._Data.id.desc())
+                .first()
             )
             now = _utcnow()
-            if existing is None:
-                row = self._ProjectPhase(
-                    project_id=proj.id,
-                    phase=phase,
-                    status=status,
-                    entry_phase=entry_phase,
-                    primary_dataset_id=primary_dataset_id,
-                    n_obs=n_obs,
-                    n_vars=n_vars,
-                    n_samples=n_samples,
-                    notes=notes,
-                    created_at=now,
-                    updated_at=now,
-                )
-                sess.add(row)
-            else:
+            if existing is not None:
                 existing.status = status
                 existing.updated_at = now
-                if entry_phase:
-                    existing.entry_phase = entry_phase
-                if primary_dataset_id is not None:
-                    existing.primary_dataset_id = primary_dataset_id
+                meta = dict(existing.meta or {})
                 if n_obs is not None:
                     existing.n_obs = n_obs
                 if n_vars is not None:
                     existing.n_vars = n_vars
                 if n_samples is not None:
-                    existing.n_samples = n_samples
+                    meta["n_samples"] = n_samples
                 if notes is not None:
-                    existing.notes = notes
+                    meta["notes"] = notes
+                if entry_phase:
+                    meta["entry_phase"] = True
+                if primary_dataset_id is not None:
+                    meta["primary_dataset_id"] = primary_dataset_id
+                existing.meta = meta
+            else:
+                meta: dict[str, Any] = {}
+                if n_samples is not None:
+                    meta["n_samples"] = n_samples
+                if notes is not None:
+                    meta["notes"] = notes
+                if entry_phase:
+                    meta["entry_phase"] = True
+                if primary_dataset_id is not None:
+                    meta["primary_dataset_id"] = primary_dataset_id
+                row = self._Data(
+                    project_id=proj.id,
+                    phase=phase,
+                    status=status,
+                    uri=f"phase://{project_name}/{phase}",
+                    file_role="phase_marker",
+                    n_obs=n_obs,
+                    n_vars=n_vars,
+                    platform=proj.platform,
+                    meta=meta,
+                    created_at=now,
+                    updated_at=now,
+                )
+                sess.add(row)
             sess.commit()
 
     def get_phase(self, project_name: str, phase: str) -> dict[str, Any] | None:
-        """Return the ``project_phases`` row for ``(project, phase)`` as dict, or None."""
+        """Return phase info derived from data table."""
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
                 return None
-            row = sess.query(self._ProjectPhase).filter_by(project_id=proj.id, phase=phase).first()
-            return self._to_dict(row) if row else None
+            row = (
+                sess.query(self._Data)
+                .filter_by(project_id=proj.id, phase=phase)
+                .order_by(self._Data.id.desc())
+                .first()
+            )
+            if row is None:
+                return None
+            meta = row.meta or {}
+            return {
+                "phase": phase,
+                "status": row.status,
+                "entry_phase": meta.get("entry_phase", False),
+                "n_obs": row.n_obs,
+                "n_vars": row.n_vars,
+                "n_samples": meta.get("n_samples"),
+                "primary_dataset_id": meta.get("primary_dataset_id"),
+                "notes": meta.get("notes"),
+                "updated_at": row.updated_at,
+            }
 
     def list_phases(self, project_name: str) -> list[dict[str, Any]]:
-        """Return all ``project_phases`` rows for a project, ordered by phase slug."""
+        """Return phase summaries for a project, derived from data table."""
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
                 return []
-            rows = (
-                sess.query(self._ProjectPhase)
+            from sqlalchemy import func
+
+            # Get distinct phases with their latest status
+            subq = (
+                sess.query(
+                    self._Data.phase,
+                    func.max(self._Data.id).label("max_id"),
+                )
                 .filter_by(project_id=proj.id)
-                .order_by(self._ProjectPhase.phase)
+                .filter(self._Data.phase.isnot(None))
+                .group_by(self._Data.phase)
+                .subquery()
+            )
+            rows = (
+                sess.query(self._Data)
+                .join(subq, self._Data.id == subq.c.max_id)
+                .order_by(self._Data.phase)
                 .all()
             )
-            return [self._to_dict(r) for r in rows]
+            result = []
+            for r in rows:
+                rmeta = r.meta or {}
+                result.append(
+                    {
+                        "phase": r.phase,
+                        "status": r.status,
+                        "n_obs": r.n_obs,
+                        "n_vars": r.n_vars,
+                        "n_samples": rmeta.get("n_samples"),
+                        "updated_at": r.updated_at,
+                    }
+                )
+            return result
 
     # ------------------------------------------------------------------
-    # Data sources
+    # Data sources (UNCHANGED)
     # ------------------------------------------------------------------
 
     def register_data_source(
@@ -944,24 +772,8 @@ class Registry:
         access_notes: str | None = None,
         status: str = "available",
     ) -> int:
-        """Register a data source (HPC directory, public dataset, external repo).
-
-        Returns the data source id. Idempotent: if a source with the same
-        ``name`` already exists, its id is returned without creating a duplicate.
-
-        Parameters
-        ----------
-        name:
-            Unique identifier (e.g. ``"saha_ibd_cosmx"``).
-        uri:
-            Primary location — HPC path (``"cayuga:/athena/project-saha/data_IBD"``),
-            URL, GEO accession, DOI, etc.
-        source_type:
-            ``"hpc_lab"`` | ``"hpc_collaborator"`` | ``"public_10x"`` |
-            ``"public_geo"`` | ``"public_zenodo"`` | ``"public_portal"``.
-        status:
-            ``"available"`` | ``"restricted"`` | ``"pending_download"`` | ``"archived"``.
-        """
+        """Register a data source. Returns data source id. Idempotent."""
+        _validate_uri(uri)
         with self._session() as sess:
             existing = sess.query(self._DataSource).filter_by(name=name).first()
             if existing:
@@ -1024,15 +836,7 @@ class Registry:
         role: str = "input",
         notes: str | None = None,
     ) -> int:
-        """Link a project to a data source. Returns link id.
-
-        Parameters
-        ----------
-        role:
-            ``"input"`` (primary data used in this project) |
-            ``"reference"`` (used as reference, e.g. scRNA ref for deconvolution) |
-            ``"supplementary"`` (additional context).
-        """
+        """Link a project to a data source. Returns link id. Idempotent."""
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
@@ -1040,7 +844,6 @@ class Registry:
             src = sess.query(self._DataSource).filter_by(name=data_source_name).first()
             if src is None:
                 raise ValueError(f"DataSource '{data_source_name}' not found.")
-            # Idempotent — skip if link already exists
             existing = (
                 sess.query(self._ProjectDataSource)
                 .filter_by(project_id=proj.id, data_source_id=src.id)
@@ -1058,7 +861,7 @@ class Registry:
             sess.commit()
             sess.refresh(link)
             logger.info(
-                "Linked project '%s' → data source '%s' (role=%s)",
+                "Linked project '%s' -> data source '%s' (role=%s)",
                 project_name,
                 data_source_name,
                 role,
@@ -1082,137 +885,47 @@ class Registry:
                     result.append(d)
             return result
 
-    def delete_project(self, name: str) -> bool:
-        """Delete a project and all its cascade rows. Returns True if deleted."""
-        with self._session() as sess:
-            proj = sess.query(self._Project).filter_by(name=name).first()
-            if proj is None:
-                return False
-            sess.delete(proj)
-            sess.commit()
-            logger.info("Deleted project '%s'", name)
-            return True
-
     # ------------------------------------------------------------------
-    # SLURM jobs
+    # Patients (replaces subjects + samples)
     # ------------------------------------------------------------------
 
-    def register_job(
+    def add_patient(
         self,
-        project_name: str,
-        sample_id: str | None,
-        phase: str,
-        cluster: str,
-        slurm_job_id: str,
+        patient_id: str,
+        metadata: dict | None = None,
+        **clinical_kwargs: Any,
     ) -> int:
-        """Record a submitted SLURM job. Returns job id."""
+        """Register a patient. Returns patient DB id.
+
+        Idempotent: if a patient with the same ``patient_id`` exists, its
+        DB id is returned without creating a duplicate.
+
+        Parameters
+        ----------
+        patient_id:
+            Unique de-identified identifier (e.g. ``"PT001"``).
+        metadata:
+            JSONB metadata dict with clinical info (organism, sex, diagnosis, etc.).
+        **clinical_kwargs:
+            Individual clinical fields merged into metadata dict.
+        """
+        combined_meta = dict(metadata or {})
+        combined_meta.update(clinical_kwargs)
+
         with self._session() as sess:
-            proj = sess.query(self._Project).filter_by(name=project_name).first()
-            if proj is None:
-                raise ValueError(f"Project '{project_name}' not found.")
-            job = self._SlurmJob(
-                project_id=proj.id,
-                sample_id=sample_id,
-                phase=phase,
-                cluster=cluster,
-                slurm_job_id=slurm_job_id,
-                status="submitted",
-                submitted_at=_utcnow(),
+            existing = sess.query(self._Patient).filter_by(patient_id=patient_id).first()
+            if existing:
+                logger.info("Patient '%s' already registered (id=%d)", patient_id, existing.id)
+                return existing.id
+            pat = self._Patient(
+                patient_id=patient_id,
+                meta=combined_meta,
             )
-            sess.add(job)
+            sess.add(pat)
             sess.commit()
-            sess.refresh(job)
-            logger.info("Registered SLURM job %s on %s (id=%d)", slurm_job_id, cluster, job.id)
-            return job.id
-
-    def update_job_status(
-        self,
-        slurm_job_id: str,
-        status: str,
-        *,
-        error: str | None = None,
-        log_uri: str | None = None,
-    ) -> None:
-        """Update status for a SLURM job identified by its slurm_job_id."""
-        with self._session() as sess:
-            job = sess.query(self._SlurmJob).filter_by(slurm_job_id=slurm_job_id).first()
-            if job is None:
-                raise ValueError(f"SLURM job '{slurm_job_id}' not found in registry")
-            job.status = status
-            if status in ("completed", "failed"):
-                job.finished_at = _utcnow()
-            if error is not None:
-                job.error_msg = error
-            if log_uri is not None:
-                job.log_uri = log_uri
-            sess.commit()
-
-    def list_active_jobs(self) -> list[dict[str, Any]]:
-        """Return all jobs with status submitted or running."""
-        with self._session() as sess:
-            rows = (
-                sess.query(self._SlurmJob)
-                .filter(self._SlurmJob.status.in_(["submitted", "running"]))
-                .all()
-            )
-            return [self._to_dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Agent tasks
-    # ------------------------------------------------------------------
-
-    def start_task(
-        self,
-        task_type: str,
-        project_name: str,
-        inputs: dict[str, Any] | None = None,
-    ) -> int:
-        """Record the start of an agent task. Returns task id."""
-        with self._session() as sess:
-            proj = sess.query(self._Project).filter_by(name=project_name).first()
-            if proj is None:
-                raise ValueError(f"Project '{project_name}' not found.")
-            task = self._AgentTask(
-                task_type=task_type,
-                project_id=proj.id,
-                status="running",
-                inputs_json=json.dumps(inputs or {}),
-                started_at=_utcnow(),
-            )
-            sess.add(task)
-            sess.commit()
-            sess.refresh(task)
-            return task.id
-
-    def finish_task(
-        self,
-        task_id: int,
-        *,
-        outputs: dict[str, Any] | None = None,
-        error: str | None = None,
-    ) -> None:
-        """Mark an agent task as completed or failed."""
-        with self._session() as sess:
-            task = sess.get(self._AgentTask, task_id)
-            if task is None:
-                raise ValueError(f"AgentTask id={task_id} not found")
-            task.status = "failed" if error else "completed"
-            task.finished_at = _utcnow()
-            if outputs is not None:
-                task.outputs_json = json.dumps(outputs)
-            if error is not None:
-                task.error = error
-            sess.commit()
-
-    def list_running_tasks(self) -> list[dict[str, Any]]:
-        """Return all running agent tasks."""
-        with self._session() as sess:
-            rows = sess.query(self._AgentTask).filter_by(status="running").all()
-            return [self._to_dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Subjects
-    # ------------------------------------------------------------------
+            sess.refresh(pat)
+            logger.info("Registered patient '%s' (id=%d)", patient_id, pat.id)
+            return pat.id
 
     def add_subject(
         self,
@@ -1220,59 +933,43 @@ class Registry:
         organism: str = "human",
         **clinical_kwargs: Any,
     ) -> int:
-        """Register a de-identified subject. Returns subject DB id.
+        """Backward-compatible alias for :meth:`add_patient`.
 
-        Idempotent: if a subject with the same ``subject_id`` exists, its
-        DB id is returned without creating a duplicate.
-
-        Parameters
-        ----------
-        subject_id:
-            Unique de-identified identifier (e.g. ``"PT001"``).
-        organism:
-            ``"human"`` (default), ``"mouse"``, ``"rat"``, etc.
-        **clinical_kwargs:
-            Any standardized clinical column (``sex``, ``age_at_collection``,
-            ``diagnosis``, ``diagnosis_code``, ``disease_stage``,
-            ``treatment_status``, ``tissue_of_origin``, ``cause_of_death``,
-            ``survival_days``, ``vital_status``) or ``clinical_metadata_json``
-            (JSON string for overflow fields).
+        Maps subject_id -> patient_id and packs clinical columns into metadata.
         """
-        _standard_cols = {
-            "sex",
-            "age_at_collection",
-            "diagnosis",
-            "diagnosis_code",
-            "disease_stage",
-            "treatment_status",
-            "tissue_of_origin",
-            "cause_of_death",
-            "survival_days",
-            "vital_status",
-            "clinical_metadata_json",
-        }
-        with self._session() as sess:
-            existing = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
-            if existing:
-                logger.info("Subject '%s' already registered (id=%d)", subject_id, existing.id)
-                return existing.id
-            kwargs_filtered = {k: v for k, v in clinical_kwargs.items() if k in _standard_cols}
-            subj = self._Subject(
-                subject_id=subject_id,
-                organism=organism,
-                **kwargs_filtered,
-            )
-            sess.add(subj)
-            sess.commit()
-            sess.refresh(subj)
-            logger.info("Registered subject '%s' (id=%d)", subject_id, subj.id)
-            return subj.id
+        meta = {"organism": organism}
+        meta.update(clinical_kwargs)
+        return self.add_patient(subject_id, metadata=meta)
 
-    def get_subject(self, subject_id: str) -> dict[str, Any] | None:
-        """Return subject dict by de-identified ID, or None."""
+    def get_patient(self, patient_id: str) -> dict[str, Any] | None:
+        """Return patient dict by de-identified ID, or None."""
         with self._session() as sess:
-            row = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
+            row = sess.query(self._Patient).filter_by(patient_id=patient_id).first()
             return self._to_dict(row) if row else None
+
+    # Backward compat alias
+    def get_subject(self, subject_id: str) -> dict[str, Any] | None:
+        """Backward-compatible alias for :meth:`get_patient`."""
+        return self.get_patient(subject_id)
+
+    def list_patients(
+        self,
+        diagnosis: str | None = None,
+        tissue: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return patients, optionally filtered by metadata fields."""
+        with self._session() as sess:
+            q = sess.query(self._Patient)
+            # Filter using JSONB operators on PostgreSQL
+            if diagnosis is not None:
+                q = q.filter(
+                    self._Patient.meta["diagnosis"].astext.ilike(f"%{diagnosis}%")
+                )
+            if tissue is not None:
+                q = q.filter(
+                    self._Patient.meta["tissue_of_origin"].astext.ilike(f"%{tissue}%")
+                )
+            return [self._to_dict(r) for r in q.order_by(self._Patient.patient_id).all()]
 
     def list_subjects(
         self,
@@ -1280,339 +977,49 @@ class Registry:
         diagnosis: str | None = None,
         tissue: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Return subjects, optionally filtered."""
+        """Backward-compatible alias for :meth:`list_patients`.
+
+        The project_name filter now checks for patients that have data in that project.
+        """
         with self._session() as sess:
-            q = sess.query(self._Subject)
+            q = sess.query(self._Patient)
             if project_name is not None:
                 proj = sess.query(self._Project).filter_by(name=project_name).first()
                 if proj is None:
                     return []
-                link_subquery = (
-                    sess.query(self._SubjectProjectLink.subject_id)
-                    .filter_by(project_id=proj.id)
+                # Find patients linked to data in this project via join table
+                patient_ids_subq = (
+                    sess.query(self._PatientDataMap.patient_id)
+                    .join(self._Data, self._PatientDataMap.data_id == self._Data.id)
+                    .filter(self._Data.project_id == proj.id)
+                    .distinct()
                     .scalar_subquery()
                 )
-                q = q.filter(self._Subject.id.in_(link_subquery))
+                q = q.filter(self._Patient.id.in_(patient_ids_subq))
             if diagnosis is not None:
-                q = q.filter(self._Subject.diagnosis.ilike(f"%{diagnosis}%"))
-            if tissue is not None:
-                q = q.filter(self._Subject.tissue_of_origin.ilike(f"%{tissue}%"))
-            return [self._to_dict(r) for r in q.order_by(self._Subject.subject_id).all()]
-
-    def link_subject_to_project(
-        self,
-        subject_id: str,
-        project_name: str,
-        role: str = "enrolled",
-    ) -> int:
-        """Link a subject to a project. Returns link DB id.
-
-        Idempotent: returns existing link id if already linked.
-        """
-        with self._session() as sess:
-            subj = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
-            if subj is None:
-                raise ValueError(f"Subject '{subject_id}' not found in registry")
-            proj = sess.query(self._Project).filter_by(name=project_name).first()
-            if proj is None:
-                raise ValueError(f"Project '{project_name}' not found in registry")
-            existing = (
-                sess.query(self._SubjectProjectLink)
-                .filter_by(subject_id=subj.id, project_id=proj.id)
-                .first()
-            )
-            if existing:
-                return existing.id
-            link = self._SubjectProjectLink(
-                subject_id=subj.id,
-                project_id=proj.id,
-                role=role,
-            )
-            sess.add(link)
-            sess.commit()
-            sess.refresh(link)
-            return link.id
-
-    # ------------------------------------------------------------------
-    # Samples
-    # ------------------------------------------------------------------
-
-    def add_sample(
-        self,
-        sample_id: str,
-        subject_id: str | None = None,
-        project_name: str | None = None,
-        *,
-        tissue: str | None = None,
-        tissue_region: str | None = None,
-        collection_date: str | None = None,
-        fixation_method: str | None = None,
-        sample_type: str | None = None,
-        batch: str | None = None,
-        notes: str | None = None,
-    ) -> int:
-        """Register a sample. Returns sample DB id.
-
-        Parameters
-        ----------
-        sample_id:
-            Sample identifier (e.g. ``"S001_A1"``).
-        subject_id:
-            De-identified subject ID (optional). Must already exist.
-        project_name:
-            Project name (optional). Must already exist.
-        """
-        with self._session() as sess:
-            subj_db_id = None
-            if subject_id is not None:
-                subj = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
-                if subj is None:
-                    raise ValueError(f"Subject '{subject_id}' not found in registry")
-                subj_db_id = subj.id
-            proj_db_id = None
-            if project_name is not None:
-                proj = sess.query(self._Project).filter_by(name=project_name).first()
-                if proj is None:
-                    raise ValueError(f"Project '{project_name}' not found in registry")
-                proj_db_id = proj.id
-            sample = self._Sample(
-                sample_id=sample_id,
-                subject_id=subj_db_id,
-                project_id=proj_db_id,
-                tissue=tissue,
-                tissue_region=tissue_region,
-                collection_date=collection_date,
-                fixation_method=fixation_method,
-                sample_type=sample_type,
-                batch=batch,
-                notes=notes,
-            )
-            sess.add(sample)
-            sess.commit()
-            sess.refresh(sample)
-            logger.info("Registered sample '%s' (id=%d)", sample_id, sample.id)
-            return sample.id
-
-    def get_sample(
-        self,
-        sample_id: str,
-        project_name: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Return sample dict by sample_id, optionally scoped to project."""
-        with self._session() as sess:
-            q = sess.query(self._Sample).filter_by(sample_id=sample_id)
-            if project_name is not None:
-                proj = sess.query(self._Project).filter_by(name=project_name).first()
-                if proj is None:
-                    return None
-                q = q.filter_by(project_id=proj.id)
-            row = q.first()
-            return self._to_dict(row) if row else None
-
-    def list_samples(
-        self,
-        project_name: str | None = None,
-        subject_id: str | None = None,
-        batch: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Return samples, optionally filtered."""
-        with self._session() as sess:
-            q = sess.query(self._Sample)
-            if project_name is not None:
-                proj = sess.query(self._Project).filter_by(name=project_name).first()
-                if proj is None:
-                    return []
-                q = q.filter_by(project_id=proj.id)
-            if subject_id is not None:
-                subj = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
-                if subj is None:
-                    return []
-                q = q.filter_by(subject_id=subj.id)
-            if batch is not None:
-                q = q.filter_by(batch=batch)
-            return [self._to_dict(r) for r in q.order_by(self._Sample.sample_id).all()]
-
-    # ------------------------------------------------------------------
-    # BioData (polymorphic)
-    # ------------------------------------------------------------------
-
-    _BIODATA_TYPE_MAP: dict[str, str] = {
-        "image": "_BioImage",
-        "rnaseq": "_RNASeqData",
-        "spatial_seq": "_SpatialSeqData",
-        "epigenomics": "_EpigenomicsData",
-        "genome_seq": "_GenomeSeqData",
-    }
-
-    def register_biodata(
-        self,
-        project_name: str,
-        category: str,
-        platform: str,
-        uri: str,
-        *,
-        subcategory: str | None = None,
-        measurement: str | None = None,
-        resolution: str | None = None,
-        spatial: bool | None = None,
-        fmt: str | None = None,
-        status: str = "pending",
-        file_role: str = "primary",
-        validated: bool = False,
-        n_obs: int | None = None,
-        n_vars: int | None = None,
-        phase: str | None = None,
-        size_mb: float | None = None,
-        md5: str | None = None,
-        subject_id: str | None = None,
-        sample_db_id: int | None = None,
-        **type_kwargs: Any,
-    ) -> int:
-        """Register a typed BioData object. Returns bio_data id.
-
-        The ``category`` determines the JTI subtype: ``"image"`` creates a
-        :class:`BioImage`, ``"spatial_seq"`` creates :class:`SpatialSeqData`,
-        etc. Extra ``**type_kwargs`` are passed to the subtype constructor
-        (e.g. ``image_type="multiplexed"`` for BioImage).
-
-        If ``platform`` is in ``KNOWN_PLATFORMS``, defaults for ``subcategory``,
-        ``measurement``, ``resolution``, ``spatial`` are auto-filled (but
-        explicit values take precedence).
-        """
-        # Auto-fill from platform registry
-        modality: str | None = None
-        pspec = None
-        try:
-            from sc_tools.biodata import get_platform
-
-            pspec = get_platform(platform)
-            if subcategory is None:
-                subcategory = pspec.subcategory
-            if measurement is None:
-                measurement = pspec.measurement
-            if resolution is None:
-                resolution = pspec.resolution
-            if spatial is None:
-                spatial = pspec.spatial
-            if category is None:
-                category = pspec.category
-            modality = pspec.modality or None
-            # Auto-fill child columns from PlatformSpec.defaults
-            if pspec.defaults:
-                for k, v in pspec.defaults.items():
-                    if k not in type_kwargs:
-                        type_kwargs[k] = v
-        except (KeyError, ImportError):
-            pass
-
-        # Auto-fill format from URI extension
-        if fmt is None and uri:
-            ext = uri.rsplit(".", 1)[-1].lower() if "." in uri else ""
-            if ext in ("h5ad", "zarr", "tiff", "tsv", "fastq", "bam", "bed", "csv"):
-                fmt = ext
-
-        # Determine model class
-        model_attr = self._BIODATA_TYPE_MAP.get(category)
-        if model_attr is None:
-            raise ValueError(
-                f"Unknown BioData category '{category}'. "
-                f"Must be one of: {list(self._BIODATA_TYPE_MAP.keys())}"
-            )
-        ModelClass = getattr(self, model_attr)
-
-        # Resolve FKs
-        with self._session() as sess:
-            proj = sess.query(self._Project).filter_by(name=project_name).first()
-            if proj is None:
-                raise ValueError(f"Project '{project_name}' not found. Call add_project() first.")
-            subj_db_id = None
-            if subject_id is not None:
-                subj = sess.query(self._Subject).filter_by(subject_id=subject_id).first()
-                if subj is not None:
-                    subj_db_id = subj.id
-
-            # Filter type_kwargs to only valid columns for the model
-            valid_cols = {c.name for c in ModelClass.__table__.columns} - {
-                "id",
-                "type",
-                "project_id",
-                "subject_id",
-                "sample_id",
-                "category",
-                "subcategory",
-                "platform",
-                "modality",
-                "measurement",
-                "resolution",
-                "spatial",
-                "uri",
-                "format",
-                "status",
-                "file_role",
-                "validated",
-                "n_obs",
-                "n_vars",
-                "phase",
-                "size_mb",
-                "md5",
-                "legacy_dataset_id",
-                "created_at",
-                "updated_at",
-            }
-            filtered_kwargs = {k: v for k, v in type_kwargs.items() if k in valid_cols}
-            unknown_kwargs = set(type_kwargs.keys()) - valid_cols
-            if unknown_kwargs:
-                logger.warning(
-                    "register_biodata: ignoring unknown kwargs for %s: %s. "
-                    "Valid type-specific columns: %s",
-                    category,
-                    unknown_kwargs,
-                    valid_cols,
+                q = q.filter(
+                    self._Patient.meta["diagnosis"].astext.ilike(f"%{diagnosis}%")
                 )
+            if tissue is not None:
+                q = q.filter(
+                    self._Patient.meta["tissue_of_origin"].astext.ilike(f"%{tissue}%")
+                )
+            results = []
+            for r in q.order_by(self._Patient.patient_id).all():
+                d = self._to_dict(r)
+                # Flatten metadata for backward compat
+                meta = d.get("meta") or {}
+                d["subject_id"] = d["patient_id"]
+                d["organism"] = meta.get("organism")
+                d["sex"] = meta.get("sex")
+                d["diagnosis"] = meta.get("diagnosis")
+                d["tissue_of_origin"] = meta.get("tissue_of_origin")
+                results.append(d)
+            return results
 
-            obj = ModelClass(
-                project_id=proj.id,
-                subject_id=subj_db_id,
-                sample_id=sample_db_id,
-                category=category,
-                subcategory=subcategory,
-                platform=platform,
-                modality=modality,
-                measurement=measurement,
-                resolution=resolution,
-                spatial=spatial,
-                uri=uri,
-                format=fmt,
-                status=status,
-                file_role=file_role,
-                validated=validated,
-                n_obs=n_obs,
-                n_vars=n_vars,
-                phase=phase,
-                size_mb=size_mb,
-                md5=md5,
-                **filtered_kwargs,
-            )
-            sess.add(obj)
-            sess.commit()
-            sess.refresh(obj)
-            logger.info(
-                "Registered BioData[%s] id=%d for project '%s' at %s",
-                category,
-                obj.id,
-                project_name,
-                uri,
-            )
-            return obj.id
-
-    def get_biodata(self, biodata_id: int) -> dict[str, Any] | None:
-        """Return a BioData dict (with type-specific columns) by id."""
-        with self._session() as sess:
-            row = sess.get(self._BioData, biodata_id)
-            if row is None:
-                return None
-            # _to_dict via mapper.column_attrs gets all inherited columns
-            return self._to_dict(row)
+    # ------------------------------------------------------------------
+    # BioData queries (backward compat)
+    # ------------------------------------------------------------------
 
     def list_biodata(
         self,
@@ -1622,26 +1029,40 @@ class Registry:
         sample_db_id: int | None = None,
         phase: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List BioData objects, optionally filtered."""
+        """List data objects. Backward-compatible alias for list_datasets."""
         with self._session() as sess:
-            q = sess.query(self._BioData)
+            q = sess.query(self._Data)
             if project_name is not None:
                 proj = sess.query(self._Project).filter_by(name=project_name).first()
                 if proj is None:
                     return []
                 q = q.filter_by(project_id=proj.id)
             if category is not None:
-                q = q.filter_by(type=category)
+                q = q.filter_by(category=category)
             if platform is not None:
                 q = q.filter_by(platform=platform)
-            if sample_db_id is not None:
-                q = q.filter_by(sample_id=sample_db_id)
             if phase is not None:
                 q = q.filter_by(phase=phase)
-            return [self._to_dict(r) for r in q.order_by(self._BioData.id).all()]
+            results = []
+            for r in q.order_by(self._Data.id).all():
+                d = self._to_dict(r)
+                # Provide backward-compat 'type' field from meta or category
+                meta = d.get("meta") or {}
+                d["type"] = meta.get("type", d.get("category", "unknown"))
+                d["modality"] = meta.get("modality")
+                results.append(d)
+            return results
+
+    def get_biodata(self, biodata_id: int) -> dict[str, Any] | None:
+        """Return a data dict by id."""
+        with self._session() as sess:
+            row = sess.get(self._Data, biodata_id)
+            if row is None:
+                return None
+            return self._to_dict(row)
 
     def project_data_summary(self, project_name: str) -> dict[str, Any]:
-        """Return counts of BioData objects grouped by category, modality, and platform."""
+        """Return counts of data objects grouped by category and platform."""
         with self._session() as sess:
             proj = sess.query(self._Project).filter_by(name=project_name).first()
             if proj is None:
@@ -1652,14 +1073,15 @@ class Registry:
                     "by_modality": {},
                     "by_platform": {},
                 }
-            rows = sess.query(self._BioData).filter_by(project_id=proj.id).all()
+            rows = sess.query(self._Data).filter_by(project_id=proj.id).all()
             by_cat: dict[str, int] = {}
             by_mod: dict[str, int] = {}
             by_plat: dict[str, int] = {}
             for r in rows:
-                cat = r.type or "unknown"
+                cat = r.category or "unknown"
                 by_cat[cat] = by_cat.get(cat, 0) + 1
-                mod = r.modality or "unknown"
+                rmeta = r.meta or {}
+                mod = rmeta.get("modality", "unknown")
                 by_mod[mod] = by_mod.get(mod, 0) + 1
                 plat = r.platform or "unknown"
                 by_plat[plat] = by_plat.get(plat, 0) + 1
@@ -1672,93 +1094,6 @@ class Registry:
             }
 
     # ------------------------------------------------------------------
-    # Migration: datasets -> biodata
-    # ------------------------------------------------------------------
-
-    def migrate_datasets_to_biodata(self) -> int:
-        """Migrate existing Dataset rows to BioData. Returns count migrated.
-
-        Infers BioData subtype from project platform, file format, and file_role.
-        Sets ``legacy_dataset_id`` on the new BioData row and ``bio_data_id`` on
-        the Dataset row for bidirectional linking.
-        """
-        count = 0
-        with self._session() as sess:
-            datasets = sess.query(self._Dataset).all()
-            for ds in datasets:
-                # Skip if already migrated
-                if getattr(ds, "bio_data_id", None) is not None:
-                    continue
-                proj = sess.get(self._Project, ds.project_id)
-                proj_platform = proj.platform if proj else None
-
-                # Infer subtype using platform registry when available
-                image_type = None
-                try:
-                    from sc_tools.biodata import platform_for_project
-
-                    pspec = platform_for_project(proj_platform) if proj_platform else None
-                except ImportError:
-                    pspec = None
-
-                # Image files (tiff/image role) are always BioImage
-                if ds.format == "tiff" or ds.file_role == "image":
-                    ModelClass = self._BioImage
-                    category = "image"
-                    measurement = "protein" if proj_platform in ("imc", "mibi") else "morphology"
-                    image_type = "multiplexed" if proj_platform in ("imc", "mibi") else None
-                elif pspec is not None:
-                    # Use platform registry to classify
-                    type_map = {
-                        "spatial_seq": self._SpatialSeqData,
-                        "image": self._BioImage,
-                        "rnaseq": self._RNASeqData,
-                        "epigenomics": self._EpigenomicsData,
-                        "genome_seq": self._GenomeSeqData,
-                    }
-                    ModelClass = type_map.get(pspec.biodata_type, self._SpatialSeqData)
-                    category = pspec.biodata_type
-                    measurement = pspec.measurement
-                    if category == "image":
-                        image_type = "multiplexed" if pspec.subcategory == "multiplexed" else None
-                else:
-                    # Unknown platform — default to SpatialSeqData (most existing data)
-                    ModelClass = self._SpatialSeqData
-                    category = "spatial_seq"
-                    measurement = "rna"
-
-                kwargs: dict[str, Any] = {
-                    "project_id": ds.project_id,
-                    "category": category,
-                    "platform": proj_platform,
-                    "measurement": measurement,
-                    "uri": ds.uri,
-                    "format": ds.format,
-                    "status": ds.status,
-                    "file_role": ds.file_role or "primary",
-                    "validated": ds.validated or False,
-                    "n_obs": ds.n_obs,
-                    "n_vars": ds.n_vars,
-                    "phase": ds.phase,
-                    "size_mb": ds.size_mb,
-                    "md5": ds.md5,
-                    "legacy_dataset_id": ds.id,
-                }
-                if image_type and ModelClass == self._BioImage:
-                    kwargs["image_type"] = image_type
-
-                obj = ModelClass(**kwargs)
-                sess.add(obj)
-                sess.flush()
-                # Forward-link
-                ds.bio_data_id = obj.id
-                count += 1
-
-            sess.commit()
-        logger.info("Migrated %d datasets to BioData", count)
-        return count
-
-    # ------------------------------------------------------------------
     # Status summary
     # ------------------------------------------------------------------
 
@@ -1766,37 +1101,40 @@ class Registry:
         """Return a high-level summary of current registry state."""
         with self._session() as sess:
             n_projects = sess.query(self._Project).count()
-            n_datasets = sess.query(self._Dataset).count()
-            n_subjects = sess.query(self._Subject).count()
-            n_samples = sess.query(self._Sample).count()
-            n_biodata = sess.query(self._BioData).count()
-            active_jobs = (
-                sess.query(self._SlurmJob)
-                .filter(self._SlurmJob.status.in_(["submitted", "running"]))
-                .count()
-            )
-            running_tasks = sess.query(self._AgentTask).filter_by(status="running").count()
+            n_data = sess.query(self._Data).count()
+            n_patients = sess.query(self._Patient).count()
             projects = [p.name for p in sess.query(self._Project).filter_by(status="active").all()]
+
             # Per-project phase summary
             phase_summary: dict[str, dict[str, int]] = {}
             for proj_name in projects:
                 proj = sess.query(self._Project).filter_by(name=proj_name).first()
                 if proj is None:
                     continue
-                rows = sess.query(self._ProjectPhase).filter_by(project_id=proj.id).all()
-                counts: dict[str, int] = {}
-                for r in rows:
-                    counts[r.status] = counts.get(r.status, 0) + 1
+                from sqlalchemy import func
+
+                phase_counts = (
+                    sess.query(self._Data.status, func.count())
+                    .filter_by(project_id=proj.id)
+                    .filter(self._Data.phase.isnot(None))
+                    .group_by(self._Data.status)
+                    .all()
+                )
+                counts = {status: count for status, count in phase_counts}
                 if counts:
                     phase_summary[proj_name] = counts
+
         return {
             "n_projects": n_projects,
-            "n_datasets": n_datasets,
-            "n_subjects": n_subjects,
-            "n_samples": n_samples,
-            "n_biodata": n_biodata,
-            "active_slurm_jobs": active_jobs,
-            "running_agent_tasks": running_tasks,
+            "n_datasets": n_data,
+            "n_data": n_data,
+            "n_patients": n_patients,
+            # Backward-compat keys
+            "n_subjects": n_patients,
+            "n_samples": 0,
+            "n_biodata": n_data,
+            "active_slurm_jobs": 0,
+            "running_agent_tasks": 0,
             "active_projects": projects,
             "phase_summary": phase_summary,
         }
@@ -1807,12 +1145,7 @@ class Registry:
 
     @staticmethod
     def _to_dict(row: Any) -> dict[str, Any]:
-        """Convert an ORM row to a dict.
-
-        Uses ``mapper.column_attrs`` instead of ``__table__.columns`` so
-        that Joined Table Inheritance (JTI) subclasses include all columns
-        from both parent and child tables.
-        """
+        """Convert an ORM row to a dict."""
         from sqlalchemy import inspect as sa_inspect
 
         mapper = sa_inspect(type(row))
@@ -1831,26 +1164,16 @@ def _cli_status() -> None:
     print("\nsc_tools Registry Status")
     print("=" * 40)
     print(f"  Projects          : {s['n_projects']}")
-    print(f"  Datasets          : {s['n_datasets']}")
-    print(f"  Subjects          : {s['n_subjects']}")
-    print(f"  Samples           : {s['n_samples']}")
-    print(f"  BioData objects   : {s['n_biodata']}")
-    print(f"  Active SLURM jobs : {s['active_slurm_jobs']}")
-    print(f"  Running tasks     : {s['running_agent_tasks']}")
+    print(f"  Data objects      : {s['n_data']}")
+    print(f"  Patients          : {s['n_patients']}")
     if s["active_projects"]:
         print("\n  Active projects:")
         for proj_name in s["active_projects"]:
-            phases_done: list[str] = []
-            proj = reg.get_project(proj_name)
-            if proj:
-                phases_done = json.loads(proj.get("phases_complete") or "[]")
-            label = f" [phases: {', '.join(phases_done)}]" if phases_done else ""
-            print(f"    - {proj_name}{label}")
-            # Per-phase status
+            print(f"    - {proj_name}")
             phase_summary = s.get("phase_summary", {}).get(proj_name, {})
             if phase_summary:
                 parts = ", ".join(f"{k}={v}" for k, v in sorted(phase_summary.items()))
-                print(f"      phases: {parts}")
+                print(f"      data status: {parts}")
             datasets = reg.list_datasets(project_name=proj_name)
             for ds in datasets[-5:]:
                 role = ds.get("file_role", "primary")

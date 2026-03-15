@@ -25,6 +25,7 @@ __all__ = [
     "run_bbknn",
     "run_scanorama",
     "run_scanvi",
+    "run_resolvi",
     "run_imc_phenotyping",
 ]
 
@@ -522,6 +523,119 @@ def run_scanvi(
 
     adata.obsm["X_scANVI"] = scanvi_model.get_latent_representation()
     logger.info("scANVI latent stored in obsm['X_scANVI'] (shape=%s)", adata.obsm["X_scANVI"].shape)
+
+
+def run_resolvi(
+    adata: AnnData,
+    batch_key: str = "library_id",
+    layer: str | None = None,
+    n_latent: int = 10,
+    n_hidden: int = 32,
+    n_layers: int = 2,
+    max_epochs: int = 400,
+    use_gpu: str | bool = "auto",
+    **kwargs: Any,
+) -> Any:
+    """Run resolVI spatial-aware batch integration.
+
+    resolVI is a spatial-aware VAE (scvi-tools ``scvi.external.RESOLVI``) that
+    uses cell coordinates (``obsm['X_spatial']``) as a prior alongside gene
+    expression for batch correction. Stores the latent representation in
+    ``adata.obsm['X_resolvi']`` and parameters in ``adata.uns['resolvi_params']``.
+
+    Requires ``scvi-tools >= 1.1``: ``pip install sc-tools[deconvolution]``
+
+    Parameters
+    ----------
+    adata
+        Annotated data with raw counts in ``X`` (unnormalized) and spatial
+        coordinates in ``obsm['spatial']`` or ``obsm['X_spatial']``.
+        Modified in place.
+    batch_key
+        Column in ``adata.obs`` for batch correction.
+    layer
+        Layer in ``adata.layers`` to use as input. ``None`` uses ``X``.
+    n_latent
+        Dimensionality of the latent space (default 10; resolVI default).
+    n_hidden
+        Number of units per hidden layer (default 32; resolVI default).
+    n_layers
+        Number of hidden layers.
+    max_epochs
+        Maximum training epochs.
+    use_gpu
+        ``"auto"`` (default), ``True``, or ``False``.
+    **kwargs
+        Passed to ``RESOLVI()``.
+
+    Returns
+    -------
+    The trained ``RESOLVI`` model.
+    """
+    try:
+        from scvi.external import RESOLVI
+    except ImportError:
+        raise ImportError(
+            "scvi-tools is required for resolVI integration. Install with:\n"
+            "  pip install sc-tools[deconvolution]"
+        ) from None
+
+    gpu = _detect_gpu(use_gpu)
+    logger.info(
+        "resolVI (batch_key='%s', n_latent=%d, max_epochs=%d, gpu=%s)",
+        batch_key,
+        n_latent,
+        max_epochs,
+        gpu,
+    )
+
+    # resolVI requires obsm['X_spatial']; copy from 'spatial' if absent
+    if "X_spatial" not in adata.obsm:
+        if "spatial" in adata.obsm:
+            import numpy as np
+
+            adata.obsm["X_spatial"] = np.asarray(adata.obsm["spatial"], dtype="float32")
+            logger.info("Copied obsm['spatial'] -> obsm['X_spatial'] for resolVI")
+        else:
+            raise ValueError(
+                "resolVI requires spatial coordinates. "
+                "Provide 'spatial' or 'X_spatial' in adata.obsm."
+            )
+
+    RESOLVI.setup_anndata(
+        adata,
+        batch_key=batch_key,
+        layer=layer,
+    )
+
+    model = RESOLVI(
+        adata,
+        n_latent=n_latent,
+        n_hidden=n_hidden,
+        n_layers=n_layers,
+        **kwargs,
+    )
+
+    train_kwargs: dict[str, Any] = {"max_epochs": max_epochs}
+    if gpu:
+        train_kwargs["accelerator"] = "gpu"
+
+    model.train(**train_kwargs)
+
+    adata.obsm["X_resolvi"] = model.get_latent_representation()
+    adata.uns["resolvi_params"] = {
+        "batch_key": batch_key,
+        "n_latent": n_latent,
+        "n_hidden": n_hidden,
+        "n_layers": n_layers,
+        "max_epochs": max_epochs,
+        "layer": layer,
+    }
+    logger.info(
+        "resolVI latent stored in obsm['X_resolvi'] (shape=%s)", adata.obsm["X_resolvi"].shape
+    )
+
+    return model
 
 
 def run_imc_phenotyping(

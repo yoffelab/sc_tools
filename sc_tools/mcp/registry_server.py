@@ -1,25 +1,21 @@
 """MCP server: sc-registry bookkeeping.
 
 Exposes the sc_tools registry as callable MCP tools so Claude Code can
-query project state, checkpoint locations, SLURM jobs, and agent tasks.
+query project state, checkpoint locations, and data objects.
 
 Tools
 -----
-    registry_status      -- high-level summary (projects, jobs, tasks, phase counts)
-    list_datasets        -- all checkpoints for a project with URIs
+    registry_status      -- high-level summary (projects, data, patients)
+    list_datasets        -- all checkpoints for a project (queries data table)
     get_checkpoint_uri   -- "where is adata.normalized.h5ad for ggo_visium?"
-    register_dataset     -- add a new checkpoint to the registry
-    list_slurm_jobs      -- running/recent SLURM jobs with statuses
-    list_agent_tasks     -- running agent task log
+    register_dataset     -- add a new checkpoint (routes to data table)
     mark_phase_complete  -- mark a pipeline phase as complete for a project
     get_phase_status     -- status and checkpoint details for a specific phase
     set_phase_status     -- update the pipeline status for a phase
-    add_subject          -- register a de-identified subject
-    list_subjects        -- query subjects
-    add_sample           -- register a sample
-    list_samples         -- query samples
-    register_biodata     -- register a typed BioData object
-    list_biodata         -- query BioData objects
+    add_subject          -- register a de-identified patient (backward compat)
+    list_subjects        -- query patients (backward compat)
+    register_biodata     -- register a data object (backward compat)
+    list_biodata         -- query data objects (backward compat)
     project_data_summary -- counts by category/platform
 
 Start the server::
@@ -62,8 +58,7 @@ def _registry():
 def registry_status() -> str:
     """Return a high-level status summary of the sc_tools registry.
 
-    Shows total projects, datasets, active SLURM jobs, running agent tasks,
-    the list of active project names, and per-project phase completion counts.
+    Shows total projects, data objects, patients, and per-project status.
 
     Returns
     -------
@@ -77,25 +72,17 @@ def registry_status() -> str:
             "sc_tools Registry Status",
             "=" * 40,
             f"  Projects          : {s['n_projects']}",
-            f"  Datasets          : {s['n_datasets']}",
-            f"  Subjects          : {s['n_subjects']}",
-            f"  Samples           : {s['n_samples']}",
-            f"  BioData objects   : {s['n_biodata']}",
-            f"  Active SLURM jobs : {s['active_slurm_jobs']}",
-            f"  Running tasks     : {s['running_agent_tasks']}",
+            f"  Data objects      : {s['n_data']}",
+            f"  Patients          : {s['n_patients']}",
         ]
         if s["active_projects"]:
             lines.append("\n  Active projects:")
             for name in s["active_projects"]:
-                proj = reg.get_project(name)
-                phases = json.loads(proj.get("phases_complete") or "[]") if proj else []
-                label = f" [phases complete: {', '.join(phases)}]" if phases else ""
-                lines.append(f"    - {name}{label}")
-                # Per-phase summary from project_phases table
+                lines.append(f"    - {name}")
                 phase_summary = s.get("phase_summary", {}).get(name, {})
                 if phase_summary:
                     parts = ", ".join(f"{k}={v}" for k, v in sorted(phase_summary.items()))
-                    lines.append(f"      phase counts: {parts}")
+                    lines.append(f"      data status: {parts}")
         return "\n".join(lines)
     except Exception as exc:
         return f"ERROR: {exc}"
@@ -137,12 +124,11 @@ def list_datasets(project_name: str, phase: str = "") -> str:
         lines = [f"Datasets for '{project_name}'" + (f" phase={phase}" if phase else "") + ":"]
         for ds in datasets:
             role = ds.get("file_role", "primary")
-            validated = ds.get("validated", False)
             n_obs = ds.get("n_obs")
             obs_str = f" n_obs={n_obs}" if n_obs else ""
             lines.append(
                 f"  id={ds['id']} phase={ds['phase']} role={role} "
-                f"status={ds['status']} validated={validated}{obs_str}\n"
+                f"status={ds['status']}{obs_str}\n"
                 f"    uri: {ds['uri']}"
             )
         return "\n".join(lines)
@@ -261,90 +247,47 @@ def register_dataset(
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_slurm_jobs
+# Tool: list_slurm_jobs (deprecated)
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
 def list_slurm_jobs(active_only: bool = True) -> str:
-    """List SLURM jobs tracked in the registry.
+    """SLURM jobs table has been removed (migration 0008).
 
     Parameters
     ----------
     active_only
-        If True (default), only show submitted/running jobs.
-        If False, show all jobs.
+        Ignored (table no longer exists).
 
     Returns
     -------
     str
-        Formatted job list.
+        Notice that the table has been removed.
     """
-    try:
-        reg = _registry()
-        if active_only:
-            jobs = reg.list_active_jobs()
-        else:
-            with reg._session() as sess:
-                jobs = [reg._to_dict(r) for r in sess.query(reg._SlurmJob).all()]
-        if not jobs:
-            return "No SLURM jobs found."
-        lines = ["SLURM jobs:"]
-        for j in jobs:
-            lines.append(
-                f"  id={j['id']} slurm_id={j['slurm_job_id']} "
-                f"cluster={j['cluster']} phase={j['phase']} "
-                f"status={j['status']}"
-            )
-            if j.get("sample_id"):
-                lines[-1] += f" sample={j['sample_id']}"
-            if j.get("error_msg"):
-                lines.append(f"    error: {j['error_msg']}")
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
+    return "SLURM jobs table has been removed (migration 0008). No jobs to display."
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_agent_tasks
+# Tool: list_agent_tasks (deprecated)
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
 def list_agent_tasks(running_only: bool = True) -> str:
-    """List agent tasks tracked in the registry.
+    """Agent tasks table has been removed.
 
     Parameters
     ----------
     running_only
-        If True (default), only show running tasks.
-        If False, show all tasks.
+        Ignored (table no longer exists).
 
     Returns
     -------
     str
-        Formatted task list.
+        Notice that the table has been removed.
     """
-    try:
-        reg = _registry()
-        if running_only:
-            tasks = reg.list_running_tasks()
-        else:
-            with reg._session() as sess:
-                tasks = [reg._to_dict(r) for r in sess.query(reg._AgentTask).all()]
-        if not tasks:
-            return "No agent tasks found."
-        lines = ["Agent tasks:"]
-        for t in tasks:
-            lines.append(
-                f"  id={t['id']} type={t['task_type']} "
-                f"status={t['status']} started={t.get('started_at', '')}"
-            )
-            if t.get("error"):
-                lines.append(f"    error: {t['error']}")
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
+    return "Agent tasks table has been removed (migration 0007). No tasks to display."
 
 
 # ---------------------------------------------------------------------------
@@ -373,18 +316,9 @@ def add_project(
         Unique project name (e.g. ggo_visium, robin, lymph_dlbcl).
     platform
         Technology platform string (e.g. visium, imc, xenium).
-    data_type
-        Data type (may match platform for single-modality projects).
     domain
         High-level domain: spatial_transcriptomics | spatial_proteomics |
         imaging | single_cell | bulk.
-    imaging_modality
-        Imaging modality: brightfield | fluorescence | multiplexed_fluorescence |
-        probe_based | mass_spec_imaging | sequencing_based.
-    project_type
-        internal (lab-led, default) or external (collaboration / contract).
-    visibility
-        private (restricted access, default) or public (shareable / published).
 
     Returns
     -------
@@ -396,11 +330,7 @@ def add_project(
         proj_id = reg.add_project(
             name,
             platform=platform or None,
-            data_type=data_type or None,
             domain=domain or None,
-            imaging_modality=imaging_modality or None,
-            project_type=project_type,
-            visibility=visibility,
         )
         return f"Project '{name}' registered (id={proj_id})."
     except Exception as exc:
@@ -450,7 +380,7 @@ def get_available_next_phases(project_name: str) -> str:
             "  Available next:",
         ]
         if not available:
-            lines.append("    (none — all phases complete or blocked)")
+            lines.append("    (none -- all phases complete or blocked)")
         else:
             for slug in available:
                 spec = dag[slug]
@@ -479,10 +409,6 @@ def get_available_next_phases(project_name: str) -> str:
 def record_provenance(project_name: str, phase: str, env_snapshot_json: str) -> str:
     """Store a runtime environment snapshot alongside a pipeline phase record.
 
-    Call this after environment_info() to link the compute environment to
-    the phase that produced a checkpoint.  The snapshot is stored in the
-    notes field of the project_phases row.
-
     Parameters
     ----------
     project_name
@@ -506,7 +432,7 @@ def record_provenance(project_name: str, phase: str, env_snapshot_json: str) -> 
 
 
 # ---------------------------------------------------------------------------
-# Tool: update_slurm_job_status
+# Tool: update_slurm_job_status (deprecated)
 # ---------------------------------------------------------------------------
 
 
@@ -517,35 +443,21 @@ def update_slurm_job_status(
     error: str = "",
     log_uri: str = "",
 ) -> str:
-    """Update the status of a tracked SLURM job.
+    """SLURM jobs table has been removed (migration 0008).
 
     Parameters
     ----------
     slurm_job_id
-        The SLURM job ID string (as returned by sbatch, e.g. "12345678").
+        Ignored.
     status
-        New status: submitted | running | completed | failed.
-    error
-        Optional error message (for failed jobs).
-    log_uri
-        Optional URI to the job log file.
+        Ignored.
 
     Returns
     -------
     str
-        Confirmation message.
+        Notice that the table has been removed.
     """
-    try:
-        reg = _registry()
-        reg.update_job_status(
-            slurm_job_id,
-            status,
-            error=error or None,
-            log_uri=log_uri or None,
-        )
-        return f"SLURM job {slurm_job_id} status updated to '{status}'."
-    except Exception as exc:
-        return f"ERROR: {exc}"
+    return "SLURM jobs table has been removed (migration 0008). Cannot update."
 
 
 # ---------------------------------------------------------------------------
@@ -557,8 +469,7 @@ def update_slurm_job_status(
 def mark_phase_complete(project_name: str, phase: str) -> str:
     """Mark a pipeline phase as complete for a project.
 
-    Updates both the legacy ``phases_complete`` JSON list and the
-    ``project_phases`` table.
+    Updates data rows for this project+phase to status='ready'.
 
     Parameters
     ----------
@@ -647,7 +558,7 @@ def set_phase_status(
 ) -> str:
     """Update the pipeline status for a phase.
 
-    Creates the row if it does not exist (upsert).
+    Creates a data row if none exists for this phase (upsert).
 
     Parameters
     ----------
@@ -720,17 +631,12 @@ def register_data_source(
 ) -> str:
     """Register a raw data source in the catalog.
 
-    Data sources are distinct from projects (lab work) and datasets (processed
-    checkpoints). They represent raw input data: HPC directories, public dataset
-    portals, GEO accessions, Zenodo records, etc.
-
     Parameters
     ----------
     name
         Unique identifier (e.g. saha_ibd_cosmx, 10x_visium_human_breast).
     uri
-        Primary location: HPC path (cayuga:/athena/project-saha/data_IBD),
-        URL, GEO accession, DOI, etc.
+        Primary location: HPC path, URL, GEO accession, DOI, etc.
     source_type
         hpc_lab | hpc_collaborator | public_10x | public_geo |
         public_zenodo | public_portal.
@@ -859,7 +765,7 @@ def link_project_data_source(
             project_name, data_source_name, role=role, notes=notes or None
         )
         return (
-            f"Linked project '{project_name}' → data source '{data_source_name}' "
+            f"Linked project '{project_name}' -> data source '{data_source_name}' "
             f"(role={role}, link_id={link_id})."
         )
     except Exception as exc:
@@ -867,7 +773,7 @@ def link_project_data_source(
 
 
 # ---------------------------------------------------------------------------
-# Tool: add_subject
+# Tool: add_subject (backward compat -> add_patient)
 # ---------------------------------------------------------------------------
 
 
@@ -885,10 +791,9 @@ def add_subject(
     vital_status: str = "",
     survival_days: float = 0,
 ) -> str:
-    """Register a de-identified subject in the registry.
+    """Register a de-identified patient in the registry.
 
-    Subjects are cross-project and can be linked to multiple projects.
-    No PHI (names, DOB, MRNs) should be stored.
+    Patients are cross-project. No PHI (names, DOB, MRNs) should be stored.
 
     Parameters
     ----------
@@ -904,11 +809,11 @@ def add_subject(
     Returns
     -------
     str
-        Confirmation with assigned subject DB id.
+        Confirmation with assigned patient DB id.
     """
     try:
         reg = _registry()
-        kwargs: dict = {}
+        kwargs: dict = {"organism": organism}
         if sex:
             kwargs["sex"] = sex
         if age_at_collection:
@@ -927,14 +832,14 @@ def add_subject(
             kwargs["vital_status"] = vital_status
         if survival_days:
             kwargs["survival_days"] = survival_days
-        sid = reg.add_subject(subject_id, organism=organism, **kwargs)
-        return f"Subject '{subject_id}' registered (id={sid})."
+        sid = reg.add_patient(subject_id, metadata=kwargs)
+        return f"Patient '{subject_id}' registered (id={sid})."
     except Exception as exc:
         return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_subjects
+# Tool: list_subjects (backward compat -> list_patients)
 # ---------------------------------------------------------------------------
 
 
@@ -944,7 +849,7 @@ def list_subjects(
     diagnosis: str = "",
     tissue: str = "",
 ) -> str:
-    """List subjects in the registry, with optional filters.
+    """List patients in the registry, with optional filters.
 
     Parameters
     ----------
@@ -958,7 +863,7 @@ def list_subjects(
     Returns
     -------
     str
-        Formatted list of subjects.
+        Formatted list of patients.
     """
     try:
         reg = _registry()
@@ -968,10 +873,10 @@ def list_subjects(
             tissue=tissue or None,
         )
         if not subjects:
-            return "No subjects found matching the given filters."
-        lines = [f"Subjects ({len(subjects)} total):"]
+            return "No patients found matching the given filters."
+        lines = [f"Patients ({len(subjects)} total):"]
         for s in subjects:
-            parts = [f"  {s['subject_id']}"]
+            parts = [f"  {s['patient_id']}"]
             if s.get("organism"):
                 parts.append(f"organism={s['organism']}")
             if s.get("sex"):
@@ -987,7 +892,7 @@ def list_subjects(
 
 
 # ---------------------------------------------------------------------------
-# Tool: add_sample
+# Tool: add_sample (deprecated)
 # ---------------------------------------------------------------------------
 
 
@@ -1003,60 +908,24 @@ def add_sample(
     batch: str = "",
     notes: str = "",
 ) -> str:
-    """Register a sample in the registry.
+    """Samples table has been merged into patients (migration 0008).
 
-    Samples link subjects to physical specimens within projects.
-
-    Parameters
-    ----------
-    sample_id
-        Sample identifier (e.g. S001_A1).
-    subject_id
-        De-identified subject ID (optional, must already exist).
-    project_name
-        Project name (optional, must already exist).
-    tissue
-        Tissue type (e.g. colon, lymph_node, lung).
-    fixation_method
-        FFPE, fresh_frozen, OCT, PFA.
-    sample_type
-        biopsy, resection, TMA, organoid, xenograft.
-    batch
-        Experimental batch identifier.
+    Sample info is now stored in patients.metadata JSONB.
 
     Returns
     -------
     str
-        Confirmation with assigned sample DB id.
+        Deprecation notice.
     """
-    try:
-        reg = _registry()
-        kwargs: dict = {}
-        if tissue:
-            kwargs["tissue"] = tissue
-        if tissue_region:
-            kwargs["tissue_region"] = tissue_region
-        if fixation_method:
-            kwargs["fixation_method"] = fixation_method
-        if sample_type:
-            kwargs["sample_type"] = sample_type
-        if batch:
-            kwargs["batch"] = batch
-        if notes:
-            kwargs["notes"] = notes
-        sid = reg.add_sample(
-            sample_id,
-            subject_id=subject_id or None,
-            project_name=project_name or None,
-            **kwargs,
-        )
-        return f"Sample '{sample_id}' registered (id={sid})."
-    except Exception as exc:
-        return f"ERROR: {exc}"
+    return (
+        "Samples table has been removed (migration 0008). "
+        "Sample info is now stored in patients.metadata JSONB. "
+        "Use add_subject to register a patient with sample metadata."
+    )
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_samples
+# Tool: list_samples (deprecated)
 # ---------------------------------------------------------------------------
 
 
@@ -1066,48 +935,21 @@ def list_samples(
     subject_id: str = "",
     batch: str = "",
 ) -> str:
-    """List samples in the registry, with optional filters.
-
-    Parameters
-    ----------
-    project_name
-        Filter by project name.
-    subject_id
-        Filter by subject de-identified ID.
-    batch
-        Filter by batch identifier.
+    """Samples table has been merged into patients (migration 0008).
 
     Returns
     -------
     str
-        Formatted list of samples.
+        Deprecation notice.
     """
-    try:
-        reg = _registry()
-        samples = reg.list_samples(
-            project_name=project_name or None,
-            subject_id=subject_id or None,
-            batch=batch or None,
-        )
-        if not samples:
-            return "No samples found matching the given filters."
-        lines = [f"Samples ({len(samples)} total):"]
-        for s in samples:
-            parts = [f"  id={s['id']} {s['sample_id']}"]
-            if s.get("tissue"):
-                parts.append(f"tissue={s['tissue']}")
-            if s.get("batch"):
-                parts.append(f"batch={s['batch']}")
-            if s.get("fixation_method"):
-                parts.append(f"fix={s['fixation_method']}")
-            lines.append(" ".join(parts))
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
+    return (
+        "Samples table has been removed (migration 0008). "
+        "Sample info is now in patients.metadata JSONB."
+    )
 
 
 # ---------------------------------------------------------------------------
-# Tool: register_biodata
+# Tool: register_biodata (backward compat -> register_data)
 # ---------------------------------------------------------------------------
 
 
@@ -1124,18 +966,14 @@ def register_biodata(
     n_obs: int = 0,
     n_vars: int = 0,
 ) -> str:
-    """Register a typed BioData object in the registry.
-
-    The category determines the data type: spatial_seq, image, rnaseq,
-    epigenomics, or genome_seq. Default field values are auto-filled from
-    the platform registry when available.
+    """Register a data object in the registry.
 
     Parameters
     ----------
     project_name
         Project name (must already exist).
     category
-        BioData type: spatial_seq | image | rnaseq | epigenomics | genome_seq.
+        Data category: spatial_seq | image | rnaseq | epigenomics | genome_seq.
     platform
         Platform slug (e.g. visium, imc, xenium, chromium_3p).
     uri
@@ -1148,29 +986,29 @@ def register_biodata(
     Returns
     -------
     str
-        Confirmation with assigned BioData id.
+        Confirmation with assigned data id.
     """
     try:
         reg = _registry()
-        bd_id = reg.register_biodata(
+        bd_id = reg.register_data(
             project_name,
-            category,
-            platform,
-            uri,
+            phase=phase or "unknown",
+            uri=uri,
             fmt=fmt or None,
+            platform=platform,
+            category=category,
             status=status,
             file_role=file_role,
-            phase=phase or None,
             n_obs=n_obs or None,
             n_vars=n_vars or None,
         )
-        return f"BioData[{category}] registered (id={bd_id}) for '{project_name}' at {uri}"
+        return f"Data[{category}] registered (id={bd_id}) for '{project_name}' at {uri}"
     except Exception as exc:
         return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_biodata
+# Tool: list_biodata (backward compat -> list_datasets)
 # ---------------------------------------------------------------------------
 
 
@@ -1181,7 +1019,7 @@ def list_biodata(
     platform: str = "",
     modality: str = "",
 ) -> str:
-    """List BioData objects in the registry, with optional filters.
+    """List data objects in the registry, with optional filters.
 
     Parameters
     ----------
@@ -1192,12 +1030,12 @@ def list_biodata(
     platform
         Filter by platform slug (e.g. visium, imc).
     modality
-        Filter by modality string (e.g. "Spatial Proteomics - Mass Spec").
+        Filter by modality string.
 
     Returns
     -------
     str
-        Formatted list of BioData objects.
+        Formatted list of data objects.
     """
     try:
         reg = _registry()
@@ -1209,14 +1047,15 @@ def list_biodata(
         if modality:
             items = [bd for bd in items if bd.get("modality") == modality]
         if not items:
-            return "No BioData objects found matching the given filters."
-        lines = [f"BioData objects ({len(items)} total):"]
+            return "No data objects found matching the given filters."
+        lines = [f"Data objects ({len(items)} total):"]
         for bd in items:
             role = bd.get("file_role", "primary")
             mod = bd.get("modality", "")
             mod_str = f" modality={mod}" if mod else ""
             lines.append(
-                f"  id={bd['id']} type={bd['type']} platform={bd.get('platform', '')} "
+                f"  id={bd['id']} category={bd.get('category', '')} "
+                f"platform={bd.get('platform', '')} "
                 f"role={role} status={bd.get('status', '')}{mod_str}"
             )
             lines.append(f"    uri: {bd['uri']}")
@@ -1233,10 +1072,6 @@ def list_biodata(
 @mcp.tool()
 def list_modalities(biodata_type: str = "") -> str:
     """List all known BioData modalities from the platform registry.
-
-    The modality tier sits between BioDataType (5 JTI types) and platform slug,
-    grouping related platforms (e.g. "Spatial Proteomics - Mass Spec" groups
-    imc, mibi, maldi_ims).
 
     Parameters
     ----------
@@ -1276,7 +1111,7 @@ def list_modalities(biodata_type: str = "") -> str:
 
 @mcp.tool()
 def project_data_summary(project_name: str) -> str:
-    """Return a summary of BioData objects for a project, grouped by category and platform.
+    """Return a summary of data objects for a project, grouped by category and platform.
 
     Parameters
     ----------
@@ -1293,7 +1128,7 @@ def project_data_summary(project_name: str) -> str:
         summary = reg.project_data_summary(project_name)
         lines = [
             f"Data summary for '{project_name}':",
-            f"  Total BioData objects: {summary['total']}",
+            f"  Total data objects: {summary['total']}",
         ]
         if summary["by_category"]:
             lines.append("  By category:")

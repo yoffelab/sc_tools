@@ -6,9 +6,11 @@ sc_tools.qc: Quality control utilities for spatial and single-cell omics.
 - plots: qc_2x2_grid, qc_spatial_multipage, cross-sample comparison plots
 - sample_qc: per-sample metrics, pass/fail classification, spot filtering
 - report: HTML QC report generation
+- doublet: Solo-based doublet scoring for single-cell resolution modalities
 """
 
-from . import metrics, plots, report, sample_qc, spatial
+from . import doublet, metrics, plots, report, sample_qc, spatial
+from .doublet import score_doublets_solo
 from .metrics import (
     calculate_qc_metrics,
     filter_cells,
@@ -52,6 +54,8 @@ __all__ = [
     "plots",
     "sample_qc",
     "report",
+    "doublet",
+    "score_doublets_solo",
     "calculate_qc_metrics",
     "filter_cells",
     "filter_genes",

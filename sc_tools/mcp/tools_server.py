@@ -639,6 +639,151 @@ def environment_info() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Tool: run_full_phase
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def run_full_phase(
+    project_path: str,
+    phase_slug: str,
+    dry_run: bool = False,
+) -> dict:
+    """Prepare and return the Snakemake command for a full pipeline phase.
+
+    Does not execute the command -- returns it as a string for the agent to
+    run via Bash after reviewing.  Validates that the project directory exists
+    and that all prerequisite checkpoint files are present before returning.
+
+    Parameters
+    ----------
+    project_path
+        Absolute path to the project directory (must contain a Snakefile).
+    phase_slug
+        Pipeline phase identifier, e.g. qc_filter, metadata_attach, preprocess,
+        scoring, celltype_manual, biology, meta_analysis, ingest_raw, ingest_load.
+    dry_run
+        If True, return a description of what would be run without changing
+        any files.  If False (default), return the ready-to-run command string.
+
+    Returns
+    -------
+    dict
+        Keys: phase, status, command, inputs, outputs, missing, message.
+        status is one of: ready, missing_inputs, error.
+    """
+    from pathlib import Path
+
+    from sc_tools.pipeline import get_phase, get_phase_checkpoint
+
+    # ------------------------------------------------------------------
+    # 1. Validate project directory
+    # ------------------------------------------------------------------
+    proj = Path(project_path)
+    if not proj.exists():
+        return {
+            "phase": phase_slug,
+            "status": "error",
+            "command": "",
+            "inputs": [],
+            "outputs": [],
+            "missing": [],
+            "message": f"Project path does not exist: {project_path}",
+        }
+    if not proj.is_dir():
+        return {
+            "phase": phase_slug,
+            "status": "error",
+            "command": "",
+            "inputs": [],
+            "outputs": [],
+            "missing": [],
+            "message": f"Project path is not a directory: {project_path}",
+        }
+
+    # ------------------------------------------------------------------
+    # 2. Validate phase slug
+    # ------------------------------------------------------------------
+    try:
+        spec = get_phase(phase_slug)
+    except KeyError as exc:
+        return {
+            "phase": phase_slug,
+            "status": "error",
+            "command": "",
+            "inputs": [],
+            "outputs": [],
+            "missing": [],
+            "message": f"Unknown phase slug '{phase_slug}': {exc}",
+        }
+
+    # ------------------------------------------------------------------
+    # 3. Determine input checkpoints (checkpoints of depends_on phases)
+    # ------------------------------------------------------------------
+    inputs: list[str] = []
+    for dep_slug in spec.depends_on:
+        try:
+            dep_checkpoint = get_phase_checkpoint(dep_slug)
+        except KeyError:
+            dep_checkpoint = None
+        if dep_checkpoint is not None:
+            inputs.append(dep_checkpoint)
+
+    # ------------------------------------------------------------------
+    # 4. Check that input checkpoints exist on disk
+    # ------------------------------------------------------------------
+    missing: list[str] = []
+    for rel_path in inputs:
+        abs_path = proj / rel_path
+        if not abs_path.exists():
+            missing.append(rel_path)
+
+    # ------------------------------------------------------------------
+    # 5. Determine output checkpoint(s) for this phase
+    # ------------------------------------------------------------------
+    try:
+        phase_checkpoint = get_phase_checkpoint(phase_slug)
+        outputs: list[str] = [phase_checkpoint] if phase_checkpoint is not None else []
+    except KeyError:
+        outputs = []
+        # placeholder phase (e.g. ingest_load/{sample_id}) — outputs not resolvable without sample_id
+
+    # ------------------------------------------------------------------
+    # 6. Locate Snakefile
+    # ------------------------------------------------------------------
+    snakefile = proj / "Snakefile"
+    snakefile_path = str(snakefile)
+
+    # ------------------------------------------------------------------
+    # 7. Build Snakemake command
+    # ------------------------------------------------------------------
+    command = f"snakemake -d {project_path} -s {snakefile_path} {phase_slug}"
+    if dry_run:
+        command += " --dry-run"
+
+    # ------------------------------------------------------------------
+    # 8. Return structured result
+    # ------------------------------------------------------------------
+    status = "missing_inputs" if missing else "ready"
+    if dry_run:
+        message = "Dry run: command not executed."
+    elif not missing:
+        message = f"Phase {phase_slug} is ready to run."
+    else:
+        message = f"Missing prerequisite checkpoints: {missing}"
+
+    return {
+        "phase": phase_slug,
+        "status": status,
+        "command": command,
+        "inputs": inputs,
+        "outputs": outputs,
+        "missing": missing,
+        "message": message,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

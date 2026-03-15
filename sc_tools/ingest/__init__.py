@@ -18,6 +18,7 @@ from .config import collect_all_batches, load_batch_manifest, validate_manifest
 from .imc import IMCPanelMapper, build_imc_composite
 from .loaders import (
     concat_samples,
+    load_cosmx_sample,
     load_he_image,
     load_imc_sample,
     load_visium_hd_cell_sample,
@@ -48,6 +49,7 @@ __all__ = [
     "load_visium_hd_sample",
     "load_visium_hd_cell_sample",
     "load_xenium_sample",
+    "load_cosmx_sample",
     "load_imc_sample",
     "load_he_image",
     "concat_samples",

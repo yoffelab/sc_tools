@@ -7,6 +7,8 @@ Coordinates from different ROIs must not mix.
 
 from __future__ import annotations
 
+import warnings
+
 import anndata as ad
 import numpy as np
 
@@ -31,8 +33,11 @@ def co_occurrence(
     """
     Run sq.gr.co_occurrence per ROI only (never on full concatenated adata).
 
-    Results stored in adata.uns['gr']['co_occurrence']['per_roi'] and
-    aggregated occ_mean, occ_std, occ_z in 'aggregated'.
+    Per-ROI results are stored in adata.uns['gr']['co_occurrence']['per_roi'].
+    Descriptive cross-ROI statistics (occ_mean, occ_std, occ_z) are also
+    computed and stored in 'aggregated'. These are purely descriptive summaries
+    across ROIs — co-occurrence scores are distance-dependent and spatially
+    bounded, so p-value combination across ROIs is not performed.
 
     Parameters
     ----------
@@ -71,8 +76,13 @@ def co_occurrence(
             cat_lists.append(cats)
             if interval_ref is None:
                 interval_ref = interval
-        except Exception as e:
-            per_roi[roi_id] = {"error": str(e)}
+        except Exception as exc:
+            warnings.warn(
+                f"ROI '{roi_id}': co_occurrence failed: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+            per_roi[roi_id] = {"error": str(exc)}
 
     # Aggregate if we have results
     if occ_arrays:

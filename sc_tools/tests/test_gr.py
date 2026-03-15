@@ -5,6 +5,8 @@ Fixture: 3 ROIs, 100 cells each, 5 cell types (ROI 3 missing one cell type),
 50 genes, raw integer counts, obsm['spatial'] set to random 2D coordinates per ROI.
 """
 
+import os
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -392,3 +394,125 @@ def test_spatial_neighbors_params_no_duplicates(multi_roi_adata):
     # The params dict must not contain the sq_kwargs sub-dict (i.e., no nested dict)
     for v in params.values():
         assert not isinstance(v, dict), "params must be flat — no nested dicts"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Real-data integration tests: ggo_visium (Visium, 8 library_ids)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_GGO_VISIUM_PATH = (
+    "/Users/junbumkim/Documents/sc_tools/projects/visium/ggo_visium/results/adata.annotated.p2.h5ad"
+)
+_GGO_VISIUM_AVAILABLE = os.path.exists(_GGO_VISIUM_PATH)
+
+# Sample 400 cells from each of the first 3 library_ids so tests stay fast
+# while still exercising multi-ROI logic on real data.
+_N_PER_ROI = 400
+_N_ROIS_REAL = 3
+
+
+def _load_ggo_visium_subset() -> ad.AnnData:
+    """
+    Load a balanced multi-ROI subset of ggo_visium for integration testing.
+
+    Samples _N_PER_ROI cells from each of the first _N_ROIS_REAL library_ids.
+    Returns an in-memory AnnData with library_id (str), pathologist_annotation
+    (categorical), and obsm['spatial'].
+    """
+    full = ad.read_h5ad(_GGO_VISIUM_PATH, backed="r")
+    rng = np.random.default_rng(0)
+    all_lib_ids = full.obs["library_id"].unique().tolist()
+    selected_libs = all_lib_ids[:_N_ROIS_REAL]
+
+    parts = []
+    for lib_id in selected_libs:
+        mask = (full.obs["library_id"] == lib_id).values
+        indices = np.where(mask)[0]
+        chosen = rng.choice(indices, size=min(_N_PER_ROI, len(indices)), replace=False)
+        chosen_sorted = np.sort(chosen)
+        parts.append(full[chosen_sorted].to_memory())
+
+    adata = ad.concat(parts, join="outer")
+    adata.obs["library_id"] = adata.obs["library_id"].astype(str)
+    adata.obs["pathologist_annotation"] = pd.Categorical(
+        adata.obs["pathologist_annotation"].astype(str)
+    )
+    return adata
+
+
+@pytest.mark.skipif(not _GGO_VISIUM_AVAILABLE, reason="ggo_visium h5ad not found locally")
+class TestRealDataGgoVisium:
+    """Integration tests using a real Visium multi-sample dataset (ggo_visium)."""
+
+    @pytest.fixture(scope="class")
+    def ggo_adata(self):
+        return _load_ggo_visium_subset()
+
+    def test_spatial_neighbors_visium(self, ggo_adata):
+        """spatial_neighbors on real Visium data must produce a block-diagonal graph."""
+        from sc_tools.gr import spatial_neighbors
+
+        spatial_neighbors(ggo_adata, library_key="library_id")
+        conn = ggo_adata.obsp["spatial_connectivities"]
+        roi_ids = ggo_adata.obs["library_id"].values
+        unique_rois = list(dict.fromkeys(roi_ids))
+
+        roi_indices = {r: (roi_ids == r).nonzero()[0] for r in unique_rois}
+        for i, roi_a in enumerate(unique_rois):
+            for roi_b in unique_rois[i + 1 :]:
+                cross = conn[roi_indices[roi_a], :][:, roi_indices[roi_b]]
+                assert cross.sum() == 0, (
+                    f"Cross-ROI edges found between {roi_a} and {roi_b} on real data"
+                )
+
+    def test_nhood_enrichment_real(self, ggo_adata):
+        """nhood_enrichment on real Visium data must produce aggregated zscore_mean."""
+        from sc_tools.gr import nhood_enrichment, spatial_neighbors
+
+        spatial_neighbors(ggo_adata, library_key="library_id")
+        nhood_enrichment(
+            ggo_adata,
+            cluster_key="pathologist_annotation",
+            library_key="library_id",
+            n_perms=50,
+        )
+        agg = ggo_adata.uns["gr"]["nhood_enrichment"]["aggregated"]
+        assert agg, "aggregated must not be empty"
+        cats = agg["cats"]
+        n = len(cats)
+        assert agg["zscore_mean"].shape == (n, n), "zscore_mean shape mismatch"
+        assert agg["pval_stouffer"].shape == (n, n), "pval_stouffer shape mismatch"
+        assert agg["pval_fdr_bh"].shape == (n, n), "pval_fdr_bh shape mismatch"
+
+    def test_interaction_matrix_real(self, ggo_adata):
+        """interaction_matrix on real Visium data must produce non-negative count_sum."""
+        from sc_tools.gr import interaction_matrix, spatial_neighbors
+
+        spatial_neighbors(ggo_adata, library_key="library_id")
+        interaction_matrix(
+            ggo_adata,
+            cluster_key="pathologist_annotation",
+            library_key="library_id",
+        )
+        im = ggo_adata.uns["gr"]["interaction_matrix"]
+        assert "count_sum" in im, "count_sum missing"
+        cats = im["cats"]
+        n = len(cats)
+        assert im["count_sum"].shape == (n, n), "count_sum shape mismatch"
+        assert np.all(im["count_sum"] >= 0), "count_sum must be non-negative"
+
+    def test_centrality_scores_real(self, ggo_adata):
+        """centrality_scores on real Visium data must return a mean DataFrame."""
+        from sc_tools.gr import centrality_scores, spatial_neighbors
+
+        spatial_neighbors(ggo_adata, library_key="library_id")
+        centrality_scores(
+            ggo_adata,
+            cluster_key="pathologist_annotation",
+            library_key="library_id",
+        )
+        cs = ggo_adata.uns["gr"]["centrality_scores"]
+        assert "mean" in cs, "mean key missing from centrality_scores"
+        mean_df = cs["mean"]
+        assert isinstance(mean_df, pd.DataFrame), "mean must be a DataFrame"
+        assert len(mean_df) > 0, "mean DataFrame must not be empty"

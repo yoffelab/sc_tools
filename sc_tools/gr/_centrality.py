@@ -4,6 +4,8 @@ sc_tools.gr._centrality — centrality_scores per-ROI wrapper.
 
 from __future__ import annotations
 
+import warnings
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -48,7 +50,7 @@ def centrality_scores(
 
     per_roi_dfs: list[pd.DataFrame] = []
 
-    for _roi_id, roi in iter_rois(adata, library_key=library_key, cluster_key=cluster_key):
+    for roi_id, roi in iter_rois(adata, library_key=library_key, cluster_key=cluster_key):
         try:
             sq.gr.centrality_scores(roi, cluster_key=cluster_key, **kwargs)
             cs_key = f"{cluster_key}_centrality_scores"
@@ -56,8 +58,12 @@ def centrality_scores(
             if not isinstance(cs_df, pd.DataFrame):
                 continue
             per_roi_dfs.append(cs_df)
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"ROI '{roi_id}': centrality_scores failed: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
 
     if not per_roi_dfs:
         adata.uns.setdefault("gr", {})["centrality_scores"] = {}

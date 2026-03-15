@@ -6,6 +6,8 @@ CRITICAL: ripley must NEVER run on full concatenated adata.
 
 from __future__ import annotations
 
+import warnings
+
 import anndata as ad
 import numpy as np
 
@@ -32,7 +34,12 @@ def ripley(
     Run sq.gr.ripley per ROI only (never on full concatenated adata).
 
     Always calls cat.remove_unused_categories() before each run.
-    P-values combined with Stouffer method and BH-corrected.
+    Per-ROI results are stored in adata.uns['gr']['ripley']['per_roi'].
+    Where squidpy returns per-cluster p-values, these are combined across ROIs
+    with the Stouffer method and BH-corrected, stored in 'combined'. Ripley
+    statistics themselves are not averaged across ROIs because they are
+    spatially bounded and distance-dependent; the p-value combination is the
+    appropriate cross-ROI summary.
 
     Parameters
     ----------
@@ -68,8 +75,13 @@ def ripley(
                 for c_idx, cluster in enumerate(clusters):
                     pvals = pvalues[c_idx]
                     per_cluster_pvals.setdefault(cluster, []).append(pvals)
-        except Exception as e:
-            per_roi[roi_id] = {"error": str(e)}
+        except Exception as exc:
+            warnings.warn(
+                f"ROI '{roi_id}': ripley failed: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+            per_roi[roi_id] = {"error": str(exc)}
 
     # Combine p-values per cluster x distance bin
     combined: dict = {}

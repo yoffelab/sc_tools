@@ -4,6 +4,8 @@ sc_tools.gr._autocorr — spatial_autocorr per-ROI wrapper.
 
 from __future__ import annotations
 
+import warnings
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -67,7 +69,7 @@ def spatial_autocorr(
     per_roi_results: list[pd.DataFrame] = []
     per_roi_n_cells: list[int] = []
 
-    for _roi_id, roi in iter_rois(adata, library_key=library_key):
+    for roi_id, roi in iter_rois(adata, library_key=library_key):
         try:
             sq.gr.spatial_autocorr(
                 roi,
@@ -81,8 +83,12 @@ def spatial_autocorr(
             result_df = roi.uns[key]
             per_roi_results.append(result_df)
             per_roi_n_cells.append(roi.n_obs)
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"ROI '{roi_id}': spatial_autocorr failed: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
 
     if not per_roi_results:
         adata.uns.setdefault("gr", {})["spatial_autocorr"] = {}

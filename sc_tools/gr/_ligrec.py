@@ -4,6 +4,8 @@ sc_tools.gr._ligrec — ligrec per-ROI wrapper.
 
 from __future__ import annotations
 
+import warnings
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -54,8 +56,6 @@ def ligrec(
         raise ImportError("squidpy is required for sc_tools.gr.ligrec")
 
     if interactions is None:
-        import warnings
-
         warnings.warn(
             "interactions=None: squidpy will attempt to download OmniPath. "
             "Pass interactions=<DataFrame> to avoid network dependency.",
@@ -66,7 +66,7 @@ def ligrec(
     per_roi_means: list[pd.DataFrame] = []
     per_roi_pvals: list[pd.DataFrame] = []
 
-    for _roi_id, roi in iter_rois(adata, library_key=library_key, cluster_key=cluster_key):
+    for roi_id, roi in iter_rois(adata, library_key=library_key, cluster_key=cluster_key):
         try:
             sq_kwargs: dict = {"cluster_key": cluster_key, "n_perms": n_perms}
             if interactions is not None:
@@ -80,8 +80,12 @@ def ligrec(
             pvals_df = lr["pvalues"]
             per_roi_means.append(means_df)
             per_roi_pvals.append(pvals_df)
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.warn(
+                f"ROI '{roi_id}': ligrec failed: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
 
     if not per_roi_means:
         adata.uns.setdefault("gr", {})["ligrec"] = {}

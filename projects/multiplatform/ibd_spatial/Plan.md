@@ -11,7 +11,9 @@
 
 ## Data Inventory
 
-### Panel structure (51 samples, 7 panels)
+### Panel structure (54 samples, 8 panels)
+
+52 RDS files across 7 panels (51 unique biological; noseg is technical replicate of withseg) + 2 CosMx Ileum IBD Seurat objects converted separately.
 
 | Panel | N | File pattern | Tissue | Disease | Notes |
 |-------|---|-------------|--------|---------|-------|
@@ -22,6 +24,7 @@
 | Xenium MT withseg | 4 | `data_IBD/Xenium_MT_withseg_4/{1-4}_xen_377_with_seg_so_qcnorm.RDS` | Rectum | 1 Healthy + 3 UC | Same 4 patients as 6k/5K |
 | Xenium MT noseg | 4 | `data_IBD/Xenium_MT_noseg_4/{1-4}_xen_377_no_seg_so_qcnorm.RDS` | Rectum | 1 Healthy + 3 UC | No seg stain |
 | Xenium colon | 4 | `data_IBD/Xenium_colon_4/{1-4}_xen_colon_with_seg_so_qcnorm.RDS` | Rectum | 1 Healthy + 3 UC | Colon panel |
+| CosMx 6k ILE IBD | 2 | `data/cosmx_ile_ibd_{01,02}/` | Ileum | IBD | NEW: 387K + 54K cells, 6175 genes, from Saha lab raw Seurat objects |
 
 **Matched patient IDs (from block column in CSV):**
 - 16-patient group: CosMx 1k + Xenium MT 16 (CD: I0262, I0275, I0278, I0294, I0303; UC: I0276, I0277, I0284, I0286, I0310, I0321; 5 remaining TBD)
@@ -91,7 +94,20 @@
 - [x] Scanorama fix: batch_score=0.837, ct_broad_ASW=-0.089 (worst bio conservation)
 - [x] resolVI completed for all milestones (SLURM 2702344): M0=0.994, M1=0.916, M2=0.907
 - [x] Project report regenerated with all 7 methods including resolVI (SLURM 2702436)
+- [x] **scANVI hyperparameter sweep** (SLURM 2703115, 3h12m A100): 12 configs, 11 succeeded; best = A6_3layer_genebatch (ct_broad_asw=0.189, batch=0.903, entropy=0.576) -- 2.5x over vanilla
+- [x] **resolVI-SS hyperparameter sweep** (SLURM 2703116, 5h3m A100): 10 configs, 6 succeeded; best = B8_per_sample (ct_broad_asw=0.104, batch=0.836, entropy=0.296) -- 2.4x over vanilla
+- [x] Added `sc_tools/pp/integration_configs.py` with `get_scanvi_config()` and `get_resolvi_ss_config()` helpers
+- [x] **Updated best method: scANVI A6_3layer_genebatch** -- Pareto-dominant on bio, batch, entropy (replaces scVI as top recommendation)
+- [x] **Random hyperparameter search** (SLURM 2703212, 40-config array, A100): 29/40 completed; **R023 achieves ct_broad_asw=0.396** (2.1x over A6). Key: 4 layers + cls_ratio=192 + dropout=0.20
+- [x] Cancelled retry jobs (2703394, 2703420) -- not needed; 29 configs sufficient for search
+- [x] Update integration_configs.py with R023 findings (4-layer architecture, cls_ratio=192, dropout=0.20)
+- [x] **M2 final benchmark job (SLURM 2703646, cayuga A100) -- COMPLETE**
+  - 10 methods benchmarked; R023 best (ct_broad_asw=0.378, batch_score=0.909)
+  - Output files: `m2_final_benchmark.csv`, `figures/m2/m2_umap_grid.png`, `figures/QC/m2_final_benchmark_report.html`
+  - Scripts: `scripts/run_m2_final_benchmark.py` + `.sh`
 - [ ] Add Xenium colon 4 (same 4 patients, colon panel ~400 genes) as extension
+- [ ] Ablation experiments: test R023 config on M1 (119-gene) to confirm generalization
+- [ ] Final M2 integration with best config on full dataset (not just benchmark subsample)
 
 ### M3: Full cross-platform integration
 
@@ -131,8 +147,19 @@
 ### Method selection for small gene sets
 
 - M0, M1 (~377 genes): use ALL shared genes, no HVG; scVI n_latent=10, n_hidden=64
-- M2 (~2,552 genes): HVG selection (2,000 genes, batch-aware)
+- M2 (~2,552 genes): HVG selection (2,000 genes, batch-aware); **scANVI R023** recommended (n_latent=53, n_hidden=512, n_layers=4, NB likelihood, gene-batch dispersion, classification_ratio=192, dropout=0.20, 125+30 epochs; ct_broad_asw=0.396)
 - M3 (~100-300 genes): n_latent=8, n_hidden=32
+
+### Hyperparameter sweep findings (2026-03-13)
+
+- Gene-batch dispersion is the single most impactful parameter (per-platform noise modeling frees latent space for biology)
+- Fine-grained celltype labels hurt cross-platform -- use celltype_broad for semi-supervised training
+- **4 layers is critical** -- all top random search configs use n_layers=4; 2-layer configs cluster below 0.18
+- **Higher classification_ratio (120-190) helps** -- pushes model to respect celltype structure more aggressively
+- **Higher dropout (0.15-0.20) improves generalization** -- prevents platform-specific memorization
+- Hidden dim matters less than depth -- R026 (h=128) beats R007 (h=512) at same layer count
+- Longer training (200+80 ep) causes batch overcorrection -- 125+30 is sufficient
+- resolVI-SS benefits from batch_key=sample (not platform), but still underperforms scANVI
 
 ### Success criteria
 

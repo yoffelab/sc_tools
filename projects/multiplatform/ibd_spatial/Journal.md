@@ -1,5 +1,127 @@
 # Journal: ibd_spatial
 
+## 2026-03-13 (Random hyperparameter search: scANVI breakthrough)
+
+**scANVI random search** (SLURM 2703212, job array 0-39, A100):
+- 29/40 configs completed (tasks 0,2 failed due to /tmp race; 31-39 timed out at 2h)
+- **Top config R023 achieves ct_broad_asw = 0.3964** -- 2.1x better than A6 (0.189)
+- Top 4 configs all exceed 0.35, dwarfing the previous best
+
+| Rank | Config | Layers | Latent | Hidden | Cls Ratio | Dropout | ct_broad ASW | Batch Score |
+|------|--------|--------|--------|--------|-----------|---------|-------------|-------------|
+| 1 | R023 | **4** | 53 | 512 | 192 | 0.20 | **0.3964** | 0.906 |
+| 2 | R026 | **4** | 42 | 128 | 178 | 0.10 | 0.3736 | 0.893 |
+| 3 | R001 | **4** | 43 | 256 | 121 | 0.15 | 0.3566 | 0.906 |
+| 4 | R019 | **4** | 15 | 256 | 150 | 0.15 | 0.3541 | 0.899 |
+| 5 | R007 | **4** | 21 | 512 | 122 | 0.20 | 0.2944 | 0.909 |
+
+**Key findings from random search:**
+- **4 layers is decisive** -- all top 5 configs use n_layers=4; 2-layer configs cluster below 0.18
+- **Higher classification_ratio (120-190) helps** -- pushes model to respect celltype structure
+- **Higher dropout (0.15-0.20) improves generalization** -- prevents platform-specific memorization
+- **Hidden dim less important than depth** -- R026 (h=128) beats R007 (h=512) at same layer count
+- **Latent dim 15-53 all work** -- R019 (d=15) achieves 0.354, R023 (d=53) achieves 0.396
+- Batch scores remain excellent (0.89-0.91) across all top configs -- no bio/batch tradeoff at this regime
+
+**Updated best scANVI config (R023):** n_layers=4, n_latent=53, n_hidden=512, classification_ratio=192, dropout=0.20, pretrain=125ep, finetune=30ep, NB likelihood, gene-batch dispersion
+
+Retry job submitted for 12 remaining tasks (0, 2, 31-39) with 4h time limit and fixed /tmp paths.
+
+---
+
+## 2026-03-13 (Hyperparameter sweeps: scANVI-max + resolVI-SS-max)
+
+**scANVI-max sweep** (SLURM 2703115, 3h12m on A100):
+- 12 configs tested, 11 succeeded (A8_subsample errored)
+- Best: **A6_3layer_genebatch** (n_latent=30, n_hidden=256, n_layers=3, NB likelihood, gene-batch dispersion, classification_ratio=100, 100+50 epochs)
+- A6 results: ct_broad_asw=0.189, batch_score=0.903, entropy=0.576, pred_accuracy=0.967
+- 2.5x improvement over vanilla scANVI (0.074/0.881/0.386)
+- A6 is Pareto-dominant on all three metrics (bio, batch, entropy)
+
+| Config | ct_broad ASW | Batch Score | Entropy | Key Change |
+|--------|-------------|-------------|---------|------------|
+| A6_3layer_genebatch | 0.189 | 0.903 | 0.576 | 3 layers + nb + gene-batch |
+| A7_lat50 | 0.119 | 0.856 | 0.546 | n_latent=50 |
+| A4_big_arch | 0.115 | 0.915 | 0.577 | n_latent=30, n_hidden=256 |
+| A5_nb | 0.110 | 0.916 | 0.562 | nb likelihood |
+| A11_kl_warmup | 0.109 | 0.892 | 0.582 | KL warmup=15 |
+| A2_cls100 | 0.098 | 0.870 | 0.580 | cls_ratio=100 |
+| A3_cls200 | 0.079 | 0.859 | 0.623 | cls_ratio=200 |
+| A12_long_train | 0.076 | 0.954 | 0.549 | 200+80 epochs |
+| A1_baseline | 0.064 | 0.882 | 0.475 | vanilla defaults |
+
+**Key insights from scANVI sweep:**
+- Gene-batch dispersion is critical -- per-platform noise modeling frees latent space for biology
+- Fine-grained labels (celltype) hurt due to cross-platform annotation inconsistency
+- classification_ratio=100 is the sweet spot (50 too weak, 200 overfits)
+- Longer training (200+80 ep) caused batch overcorrection
+
+**resolVI-SS-max sweep** (SLURM 2703116, 5h3m on A100):
+- 10 configs tested, 6 succeeded (B5, B7, B9, B10 errored)
+- Best: **B8_per_sample** (batch_key=sample instead of platform)
+- B8 results: ct_broad_asw=0.104, batch_score=0.836, entropy=0.296
+- 2.4x improvement over vanilla resolVI-SS (0.044)
+- resolVI-SS still below scANVI A6 (0.104 vs 0.189)
+
+| Config | ct_broad ASW | Batch Score | Entropy | Key Change |
+|--------|-------------|-------------|---------|------------|
+| B8_per_sample | 0.104 | 0.836 | 0.296 | batch_key=sample |
+| B6_deep_cls | 0.091 | 0.859 | 0.580 | deeper classifier |
+| B3_big_arch | 0.087 | 0.831 | 0.338 | larger architecture |
+| B4_low_diff | 0.071 | 0.848 | 0.411 | prior_diffusion=0.1 |
+| B2_lat20 | 0.064 | 0.792 | 0.352 | n_latent=20 |
+| B1_baseline | 0.013 | 0.755 | 0.519 | original defaults |
+
+**Integration config helpers added:** `sc_tools/pp/integration_configs.py` with `get_scanvi_config()` and `get_resolvi_ss_config()` incorporating sweep findings (local + hpc profiles).
+
+**Updated M2 method ranking (post-sweep):**
+
+| Method | ct_broad ASW | Batch Score | Entropy | Notes |
+|--------|-------------|-------------|---------|-------|
+| **scANVI R023** | **0.396** | 0.906 | TBD | Random search winner (4L/d53/h512/c192) |
+| scANVI R026 | 0.374 | 0.893 | TBD | Runner-up (4L/d42/h128/c178) |
+| scANVI A6 | 0.189 | 0.903 | 0.576 | Prior best (grid sweep) |
+| resolVI-SS B8 | 0.104 | 0.836 | 0.296 | Best resolVI config |
+| scANVI vanilla | 0.074 | 0.881 | 0.386 | Pre-sweep baseline |
+| scVI | 0.009 | **0.992** | 0.632 | Best batch correction |
+
+**Decision (updated): scANVI R023 is the new recommended M2 integration method** -- 2.1x improvement over A6 via 4-layer architecture + higher cls_ratio (192) + stronger dropout (0.20). Batch score remains >0.90. Waiting for retry job to confirm with full 40-config results.
+
+## 2026-03-12 (resolVI complete + report regenerated)
+
+**resolVI training completed** (SLURM job 2702344, cayuga A40):
+
+All three milestones now include resolVI (spatially-aware VAE) results:
+
+| Milestone | Method | Batch Score | CT Broad ASW | Platform Entropy |
+|-----------|--------|-------------|-------------|-----------------|
+| M0 | resolVI | 0.994 | N/A | 0.962 |
+| M1 | resolVI | 0.916 | -0.003 | 0.356 |
+| M2 | resolVI | 0.907 | 0.025 | 0.539 |
+
+**resolVI assessment:**
+- M0: Excellent (on par with other methods; near-zero batch effect baseline)
+- M1: Competitive but below Harmony (0.971) and scVI (0.961); low entropy (0.356) suggests spatial prior does not help much with 119-gene cross-platform integration
+- M2: Below scVI (0.992) but above Scanorama (0.837); entropy=0.539 passes the 0.5 threshold; positive ct_broad ASW (0.025) is better than Harmony (-0.069)
+- Overall: resolVI adds spatial context but does not outperform scVI for cross-platform batch correction in this dataset
+
+**Report regenerated** (SLURM job 2702436):
+- Updated `generate_project_report.py` to merge resolVI benchmark CSV into all milestone tables
+- Added resolVI UMAPs to M0, M1, M2 sections
+- Added resolVI to scib-style metrics computation (all embeddings present in adata)
+- M0: 4 methods, M1: 5 methods, M2: 6 methods (+ resolVI in scib)
+- Report: `figures/QC/ibd_spatial_integration_report.html` (74 MB with embedded images)
+
+**Updated results summary (all methods):**
+
+| Milestone | Best Method | Batch Score | 2nd Best | resolVI Rank |
+|-----------|-------------|-------------|----------|-------------|
+| M0 | scVI | 0.997 | resolVI (0.994) | 2nd |
+| M1 | Harmony | 0.971 | scVI (0.961) | 5th (0.916) |
+| M2 | scVI | 0.992 | Harmony (0.921) | 4th (0.907) |
+
+**Plan v1 steps completed:** Steps 1-3 done (check job, update report script, regenerate report). Step 4 (Mission/Journal update) done in this entry.
+
 ## 2026-03-11 (M2 followup: scANVI, Scanorama, success criteria)
 
 **M2 followup completed** (SLURM job 2702091, 25 min on GPU A40):

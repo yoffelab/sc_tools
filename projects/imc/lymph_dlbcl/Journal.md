@@ -9,6 +9,33 @@ This journal documents **project-specific** technical and analytical decisions. 
 
 ## Log Entries
 
+### [2026-03-13] — Fig 5 (CosMx) and Supp 7 (RNA-protein) complete
+
+**Action:** Implemented full CosMx analysis pipeline (Steps 1-4 from plan) and generated all figure panels.
+
+**Step 1 — RDS to h5ad conversion:**
+- RNA object (1.1GB RDS): 464,797 cells x 1,000 genes, 2 tissues (CTMA121 148K, CTMA100 316K), clusters a-j. Converted to `cosmx_rna.h5ad` (990MB) with clean metadata (cluster, sample, spatial coords).
+- PRT object (4.8GB RDS): 687,520 cells x 67 protein markers, 15 cell types from `final_cell_type`. Converting to `cosmx_prt.h5ad`.
+
+**Step 2 — RNA cluster annotation:**
+- Scored 10 clusters (a-j) against 10 lineage marker gene sets. Available markers: 3-8 per lineage from 1000-plex panel.
+- Assignments: f,i → B cell (32%), a,d → DC (19%), j → CD8 T (18%), g,e → Plasma cell (16%), b → Fibroblast (6%), h → Neutrophil (5%), c → Endothelial (4%).
+- Note: No Macrophage or CD4 T cell clusters identified. Cluster c (Endothelial) has low z-score (0.25) — may be mixed. Missing cell types may reflect DLBCL TME composition or 1000-plex panel limitations.
+
+**Step 3 — Fig 5 panels (5 PDFs):**
+- 5b UMAP: 241,471 non-B cells colored by 5 cell types. Computed UMAP from scratch (no precomputed embedding in h5ad).
+- 5c Dotplot: 24 lineage markers x 7 cell types, standard_scale per gene.
+- 5d Spatial: CTMA121 sample, x_slide_mm/y_slide_mm scatter, 97K non-B cells.
+- 5e Pathways: 6 pathways (TNFa/NFkB, JAK/STAT, TGFb, VEGF, Hypoxia, IFNg) x 7 cell types, z-scored heatmap.
+- 5f Receptor-ligand: 4 pairs found in data (PD1-PDL1, LAG3-FGL1, CD28-CD86, ICOS-ICOSL), interaction score heatmap by source cell type.
+
+**Step 4 — Supp Fig 7 (2 PDFs):**
+- 7 overlapping markers between IMC protein panel (49 var_names like CD3-mem) and CosMx RNA (gene symbols). Mapped: CD68, CD163, PDPN→PECAM1, Ki67→MKI67, FOXP3, GZMB, NCAM1.
+- Only 3 common cell types after normalization (B cell, CD8 T cell, NESC) — limited by IMC cell type vocabulary mismatch with CosMx annotation.
+- Per-marker scatter + correlation bar chart generated.
+
+**Key limitation:** Cell type overlap between IMC and CosMx is low (3 types) because IMC uses fine-grained Seurat subtypes (T0, M1, etc.) while CosMx uses broad categories (DC, Neutrophil, etc.). Future improvement: better cross-platform cell type harmonization.
+
 ### [2026-03-09] — Visual QA pass: all non-blocked figures PASS; 4 bug fixes
 
 **QA results:**

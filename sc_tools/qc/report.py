@@ -593,13 +593,9 @@ def generate_post_integration_report(
         {"id": "embeddings",    "label": "UMAP Embeddings",      "key": "umap_grid_avail"},
         {"id": "benchmark",     "label": "Metrics Radar",        "key": "integration_plots"},
         {"id": "clusters",      "label": "Cluster Distribution", "key": "cluster_dist_avail"},
-        {"id": "batch-bio",     "label": "Batch vs Bio",         "key": "batch_bio_int_avail"},
         {"id": "per-embedding", "label": "Per-Embedding UMAP",   "key": "embedding_umaps_avail"},
         {"id": "segmentation",  "label": "Segmentation Quality", "key": "segmentation"},
     ]
-    context["batch_bio_int_avail"] = (
-        context.get("integration_plots", {}) or {}
-    ).get("batch_vs_bio") or None
     context["umap_grid_avail"] = context.get("plots", {}).get("umap_grid") or None
     context["embedding_umaps_avail"] = context.get("plots", {}).get("embedding_umaps") or None
     context["cluster_dist_avail"] = context.get("plots", {}).get("cluster_dist") or None
@@ -987,13 +983,9 @@ def generate_post_celltyping_report(
         {"id": "composition",  "label": "Celltype Composition",  "key": "composition_avail"},
         {"id": "per-sample",   "label": "Per-Sample Distribution", "key": "cluster_dist_ct_avail"},
         {"id": "markers",      "label": "Marker Expression",     "key": "marker_dotplot_avail"},
-        {"id": "batch-bio",    "label": "Batch vs Bio",          "key": "batch_bio_ct_avail"},
         {"id": "radar",        "label": "Metrics Radar",         "key": "integration_plots"},
         {"id": "segmentation", "label": "Segmentation Quality",  "key": "segmentation"},
     ]
-    context["batch_bio_ct_avail"] = (
-        context.get("integration_plots", {}) or {}
-    ).get("batch_vs_bio") or None
     context["umap_avail"] = context.get("plots", {}).get("umap_grid") or None
     context["composition_avail"] = (
         context.get("plots", {}).get("celltype_abundance") or context.get("celltype_table") or None

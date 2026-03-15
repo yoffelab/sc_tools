@@ -256,7 +256,6 @@ def generate_integration_report(
     Path to the generated report.
     """
     from sc_tools.pl.benchmarking import (
-        plot_batch_vs_bio,
         plot_integration_comparison_table,
         plot_integration_radar,
         plot_integration_ranking_bar,
@@ -308,12 +307,6 @@ def generate_integration_report(
     else:
         context["plot_radar"] = None
 
-    # Batch vs Bio scatter
-    if "batch_score" in comparison_df.columns and "bio_score" in comparison_df.columns:
-        context["plot_batch_vs_bio"] = _render(plot_batch_vs_bio(comparison_df))
-    else:
-        context["plot_batch_vs_bio"] = None
-
     # UMAP grid (static matplotlib)
     if adata is not None and embeddings is not None:
         from sc_tools.pl.benchmarking import plot_embedding_comparison_umap
@@ -345,7 +338,6 @@ def generate_integration_report(
         {"id": "metrics-heatmap", "label": "Metrics Heatmap"},
         {"id": "umap-grid",       "label": "UMAP Comparison",        "key": "umap_img"},
         {"id": "ranking",         "label": "Integration Ranking"},
-        {"id": "batch-bio",       "label": "Batch vs Bio",           "key": "plot_batch_vs_bio"},
         {"id": "radar",           "label": "Metrics Radar",          "key": "plot_radar"},
     ]
     context["sections"] = [s for s in _INT_SECTIONS if "key" not in s or context.get(s["key"]) is not None]

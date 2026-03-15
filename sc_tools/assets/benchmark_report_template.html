@@ -12,7 +12,7 @@
 .plot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 table { border-collapse: collapse; width: 100%; margin: 10px 0; }
 th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--bs-border-color); }
-th { background: #34495e; color: white; }
+th { background: #f1f3f5; font-weight: 600; border-bottom: 2px solid var(--bs-border-color); }
 tr:nth-child(even) { background: var(--bs-tertiary-bg); }
 img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 </style>
@@ -52,7 +52,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="method-ranking" class="report-section">
 <h2>Method Ranking</h2>
 <div class="plot-section">
-    {{ plot_method_ranking }}
+    {{ plot_method_ranking | safe }}
 </div>
 </section>
 {% endif %}
@@ -61,7 +61,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="statistics" class="report-section">
 <h2>Statistical Comparisons</h2>
 <div class="plot-section">
-    {{ stats_table }}
+    {{ stats_table | safe }}
 </div>
 </section>
 {% endif %}
@@ -70,7 +70,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="per-dataset" class="report-section">
 <h2>Per-Dataset Performance</h2>
 <div class="plot-section">
-    {{ plot_dataset_heatmap }}
+    {{ plot_dataset_heatmap | safe }}
 </div>
 </section>
 {% endif %}
@@ -79,7 +79,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="strategy-comparison" class="report-section">
 <h2>Strategy Comparison</h2>
 <div class="plot-section">
-    {{ plot_strategy_comparison }}
+    {{ plot_strategy_comparison | safe }}
 </div>
 </section>
 {% endif %}
@@ -88,7 +88,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="tissue-analysis" class="report-section">
 <h2>Per-Tissue Analysis</h2>
 <div class="plot-section">
-    {{ plot_tissue_boxplot }}
+    {{ plot_tissue_boxplot | safe }}
 </div>
 </section>
 {% endif %}
@@ -97,7 +97,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="generalization" class="report-section">
 <h2>Generalization Across Datasets</h2>
 <div class="plot-section">
-    {{ plot_generalization }}
+    {{ plot_generalization | safe }}
 </div>
 </section>
 {% endif %}
@@ -106,7 +106,7 @@ img.plot-img { max-width: 100%; height: auto; border-radius: 4px; }
 <section id="runtime" class="report-section">
 <h2>Runtime Comparison</h2>
 <div class="plot-section">
-    {{ plot_runtime }}
+    {{ plot_runtime | safe }}
 </div>
 </section>
 {% endif %}

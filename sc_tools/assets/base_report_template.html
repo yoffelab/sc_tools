@@ -51,12 +51,6 @@
           </li>
           {% endfor %}
         </ul>
-        <div class="px-3 mt-4">
-          <button class="btn btn-sm btn-outline-secondary w-100"
-            onclick="var e=document.documentElement;e.setAttribute('data-bs-theme',e.getAttribute('data-bs-theme')==='dark'?'light':'dark')">
-            Toggle Dark Mode
-          </button>
-        </div>
       </nav>
       <main class="col-md-10 py-4 px-4">
         {% block content %}{% endblock %}

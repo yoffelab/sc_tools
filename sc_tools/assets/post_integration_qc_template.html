@@ -70,6 +70,13 @@
   <p style="color: #666; font-size: 0.9rem; margin-bottom: 12px;">
     Ranked by overall score (0.6 &times; batch + 0.4 &times; bio). Batch score is the primary metric for integration selection pre-celltyping.
   </p>
+  {% if scib_fallback %}
+  <div class="alert alert-warning" role="alert" style="margin-bottom:12px;">
+    <strong>Metrics backend: sklearn fallback.</strong>
+    <code>scib-metrics</code> is not installed &mdash; ASW Batch, PCR, ASW Cell values were computed with sklearn equivalents.
+    Install with <code>pip install sc-tools[benchmark]</code> for the full scib-metrics suite (iLISI, kBET, cLISI).
+  </div>
+  {% endif %}
   <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 16px;margin:12px 0;">
     <strong>Note:</strong> Bio metrics (ASW Cell, ARI, NMI) use preliminary Leiden cluster labels and are informational only.
     See Report 4 (Post-celltyping) for validated bio metrics.
@@ -79,7 +86,7 @@
     <thead>
       <tr>
         <th style="width: 40px;">Rank</th>
-        {% if ranking_rows[0].group is defined and ranking_rows[0].group %}<th>Group</th>{% endif %}
+        {% if ranking_rows[0].get('group') %}<th>Group</th>{% endif %}
         <th>Method</th>
         <th style="text-align: right;">Overall</th>
         <th style="text-align: right; font-weight: 700; background: #e8f4f8;">Batch</th>
@@ -96,7 +103,7 @@
       {% for row in ranking_rows %}
       <tr{% if loop.index == 1 %} style="background: #e8f5e9; font-weight: 600;"{% endif %}>
         <td>{{ row.rank }}</td>
-        {% if row.group is defined and ranking_rows[0].group %}<td>{{ row.group }}</td>{% endif %}
+        {% if ranking_rows[0].get('group') %}<td>{{ row.get('group', '') }}</td>{% endif %}
         <td>{{ row.method }}</td>
         <td style="text-align: right;">{% if row.overall is not none %}{{ "%.3f" | format(row.overall) }}{% endif %}</td>
         <td style="text-align: right; font-weight: 700;">{% if row.batch is not none %}{{ "%.3f" | format(row.batch) }}{% endif %}</td>

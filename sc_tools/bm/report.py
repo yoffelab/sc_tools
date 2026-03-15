@@ -605,11 +605,12 @@ _INDEX_TEMPLATE = """<!DOCTYPE html>
               {%- if r.report_type == 'benchmark' %} bg-primary
               {%- elif r.report_type == 'integration' %} bg-success
               {%- elif r.report_type == 'segmentation' %} bg-warning text-dark
+              {%- elif r.report_type == 'celltyping' %} bg-info text-dark
               {%- else %} bg-secondary{%- endif %}">{{ r.report_type }}</span>
           </div>
           <p class="text-muted small mb-2">{{ r.date }}</p>
-          {% if r.best_method != '\u2014' %}
-          <p class="mb-0 small">Best: <strong>{{ r.best_method }}</strong></p>
+          {% if r.best_method and r.best_method != '\u2014' %}
+          <p class="mb-0 small"><strong>{{ r.best_method }}</strong></p>
           {% endif %}
         </div>
         <div class="card-footer bg-transparent border-top-0">
@@ -677,9 +678,24 @@ def generate_report_index(
             mtime = html_file.stat().st_mtime
             date = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d")
 
-        # Best method (first success-colored value card)
-        m = re.search(r'class="display-6 fw-bold text-success"[^>]*>(.*?)</div>', text, re.DOTALL)
-        best_method = m.group(1).strip() if m else "\u2014"
+        # Key metric extraction — try multiple patterns used by different report types.
+        # 1. Benchmark/integration reports: .card.best .value (method name or score)
+        m = re.search(
+            r'class="[^"]*\bcard\b[^"]*\bbest\b[^"]*"[^>]*>.*?'
+            r'class="value"[^>]*>(.*?)</div>',
+            text,
+            re.DOTALL,
+        )
+        best_method = m.group(1).strip() if m else None
+
+        # 2. QC reports: extract n_cells / n_spots from header span
+        if best_method is None:
+            m2 = re.search(r"Total (?:cells|spots|observations):\s*([\d,]+)", text)
+            if m2:
+                best_method = f"{m2.group(1).replace(',', '')} cells"
+
+        if best_method is None:
+            best_method = "\u2014"
 
         # Report type from filename
         name_lower = html_file.name.lower()
@@ -689,6 +705,8 @@ def generate_report_index(
             report_type = "integration"
         elif "segmentation" in name_lower:
             report_type = "segmentation"
+        elif "celltyp" in name_lower or "post_cell" in name_lower:
+            report_type = "celltyping"
         else:
             report_type = "qc"
 

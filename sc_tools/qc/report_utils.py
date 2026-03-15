@@ -372,6 +372,9 @@ def compute_integration_section(
     if comparison_df.empty:
         return None
 
+    # Preserve scib_fallback flag from DataFrame.attrs (set by compare_integrations).
+    scib_fallback: bool = bool(comparison_df.attrs.get("scib_fallback", False))
+
     plots: dict[str, str] = {}
 
     # Radar chart
@@ -397,7 +400,7 @@ def compute_integration_section(
         except Exception:
             logger.debug("Batch vs bio plot failed", exc_info=True)
 
-    return {"comparison_df": comparison_df, "plots": plots}
+    return {"comparison_df": comparison_df, "plots": plots, "scib_fallback": scib_fallback}
 
 
 # ---------------------------------------------------------------------------
@@ -546,18 +549,21 @@ def _wrap_with_tabs(
         )
     panels_html = "\n".join(panel_parts)
 
+    bootstrap_css = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/flatly/bootstrap.min.css">'
+    bootstrap_js = '<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js"></script>'
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
+{bootstrap_css}
 {plotly_cdn}
 {current_head_extras}
 <style>
   *, *::before, *::after {{ box-sizing: border-box; }}
-  body {{ margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont,
-         "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
+  body {{ margin: 0; padding: 0; }}
   .tab-nav {{
     position: sticky; top: 0; z-index: 1000;
     background: #1a1a2e; padding: 0 8px;
@@ -593,6 +599,7 @@ def _wrap_with_tabs(
   {nav_html}
 </div>
 {panels_html}
+{bootstrap_js}
 </body>
 </html>"""
     return html

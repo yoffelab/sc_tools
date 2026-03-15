@@ -417,6 +417,12 @@ def compare_integrations(
     if len(df) > 0:
         df = df.sort_values("overall_score", ascending=False).reset_index(drop=True)
 
+    # Annotate whether sklearn fallback was actually used so that report consumers
+    # can surface a warning.  Fallback is active when scib-metrics is absent OR
+    # when the caller explicitly forced use_scib="sklearn".
+    _sklearn_forced = use_scib == "sklearn"
+    df.attrs["scib_fallback"] = _sklearn_forced or not _HAS_SCIB
+
     # TODO: When unintegrated baseline wins, consider emitting a warning.
     # This usually indicates insufficient batch effect or benchmark misconfiguration.
 
@@ -429,7 +435,7 @@ def compare_integrations(
 
 # Default methods per modality category
 _PROTEIN_METHODS = ["harmony", "bbknn", "combat", "scanorama", "cytovi", "pca"]
-_TRANSCRIPTOMIC_METHODS = ["harmony", "bbknn", "combat", "scanorama", "scvi", "pca"]
+_TRANSCRIPTOMIC_METHODS = ["harmony", "bbknn", "combat", "scanorama", "scvi", "resolvi", "pca"]
 
 # Modalities that use protein-based integration
 _PROTEIN_MODALITIES = {"imc"}
@@ -561,6 +567,17 @@ def run_integration_benchmark(
                 )
                 embedding_keys["CytoVI"] = "X_cytovi"
 
+            elif method == "resolvi":
+                from sc_tools.pp.integrate import run_resolvi
+
+                run_resolvi(
+                    adata,
+                    batch_key=batch_key,
+                    max_epochs=max_epochs,
+                    use_gpu=use_gpu,
+                )
+                embedding_keys["resolVI"] = "X_resolvi"
+
             elif method == "pca":
                 embedding_keys["Unintegrated (PCA)"] = "X_pca"
 
@@ -670,6 +687,7 @@ _METHOD_APPLY: dict[str, tuple[str | None, str]] = {
     "scvi": ("run_scvi", "X_scVI"),
     "scanvi": ("run_scanvi", "X_scANVI"),
     "cytovi": ("run_cytovi", "X_cytovi"),
+    "resolvi": ("run_resolvi", "X_resolvi"),
     "pca": (None, "X_pca"),
 }
 
@@ -682,6 +700,7 @@ _DISPLAY_TO_METHOD: dict[str, str] = {
     "scVI": "scvi",
     "scANVI": "scanvi",
     "CytoVI": "cytovi",
+    "resolVI": "resolvi",
     "Unintegrated (PCA)": "pca",
     "Unintegrated": "pca",
 }
@@ -758,7 +777,7 @@ def _apply_integration_method(
     func = getattr(integrate_mod, func_name)
 
     kwargs: dict = {"batch_key": batch_key}
-    if short in ("scvi", "scanvi", "cytovi"):
+    if short in ("scvi", "scanvi", "cytovi", "resolvi"):
         kwargs["max_epochs"] = max_epochs
         kwargs["use_gpu"] = use_gpu
     if short == "scanvi" and celltype_key:

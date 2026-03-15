@@ -519,6 +519,8 @@ def generate_post_integration_report(
                 best_method = str(comp_df.iloc[0]["method"])
                 best_score = float(comp_df.iloc[0]["overall_score"])
 
+    scib_fallback: bool = result["scib_fallback"] if result is not None else False
+
     # Cluster count
     n_clusters = 0
     if cluster_key in adata.obs.columns:
@@ -577,6 +579,7 @@ def generate_post_integration_report(
         "best_method": best_method,
         "best_score": best_score,
         "has_celltype": has_celltype,
+        "scib_fallback": scib_fallback,
         "plots": plots,
         "integration_plots": integration_plots,
         "ranking_rows": ranking_rows,
@@ -631,7 +634,6 @@ def generate_post_integration_report(
             _cur_body_integ,
             _prev_tabs_integ,
             _cur_css_integ,
-            current_head_extras='<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>',
         )
 
     output_path = output_dir / f"post_integration_qc_{ds}.html"
@@ -879,6 +881,8 @@ def generate_post_celltyping_report(
                     best_bio_method = str(bio_sorted.iloc[0]["method"])
                     best_bio_score = float(bio_sorted.iloc[0]["bio_score"])
 
+    scib_fallback: bool = result["scib_fallback"] if result is not None else False
+
     # Build ranking_rows sorted by bio_score (primary for Phase 4)
     ranking_rows: list[dict] = []
     _rank_df = result["comparison_df"] if result is not None else None
@@ -967,6 +971,7 @@ def generate_post_celltyping_report(
         "has_celltype": True,
         "celltype_key": celltype_key,
         "show_p3_bio": bool(_p3_bio_lookup) if "_p3_bio_lookup" in dir() else False,
+        "scib_fallback": scib_fallback,
         "ranking_rows": ranking_rows,
         "celltype_table": celltype_table,
         "plots": plots,
@@ -1023,7 +1028,6 @@ def generate_post_celltyping_report(
             _cur_body_ct,
             _prev_tabs_ct,
             _cur_css_ct,
-            current_head_extras='<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>',
         )
 
     output_path = output_dir / f"post_celltyping_qc_{ds}.html"

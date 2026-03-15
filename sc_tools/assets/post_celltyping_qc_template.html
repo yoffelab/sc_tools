@@ -91,6 +91,13 @@
 {% if ranking_rows %}
 <section id="benchmark" class="report-section">
   <h2>Integration Benchmark - Phase 3 vs Phase 4</h2>
+  {% if scib_fallback %}
+  <div class="alert alert-warning" role="alert" style="margin-bottom:12px;">
+    <strong>Metrics backend: sklearn fallback.</strong>
+    <code>scib-metrics</code> is not installed &mdash; ASW Batch, PCR, ASW Cell values were computed with sklearn equivalents.
+    Install with <code>pip install sc-tools[benchmark]</code> for the full scib-metrics suite (iLISI, kBET, cLISI).
+  </div>
+  {% endif %}
   <div class="bio-primary-note">
     <strong>Bio metrics here use validated cell type labels</strong> - these are the authoritative values.
     Bio conservation (ASW Cell, ARI, NMI) is now the primary evaluation criterion.

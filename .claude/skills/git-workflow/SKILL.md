@@ -24,35 +24,13 @@ git push -u origin feature/feature-name
 
 ## Committing
 
-**Conventional commit format:**
-```
-<type>(<scope>): <subject>
+See the **git-commit** skill for full commit message format, examples, and pre-commit checklist. Key points:
 
-<body>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
-**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
-
-**sc_tools examples:**
-- `feat(qc): add filter_spots() for visium_hd modality`
-- `fix(ingest): correct load_imc_sample() processed_dir handling`
-- `test(pp): add unit tests for run_scvi GPU detection`
-- `ci: pin pulp<2.8 for snakemake 7 compatibility`
-
-**Always use HEREDOC for multi-line messages:**
-```bash
-git commit -m "$(cat <<'EOF'
-feat(qc): add generate_post_celltyping_report()
-
-Implements the fourth QC report phase with biological metrics
-(silhouette, cluster purity) meaningful only post-celltyping.
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-EOF
-)"
-```
+- Conventional commit format: `<type>(<scope>): <subject>`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
+- Imperative mood, 72-char max, no vague words
+- Always use HEREDOC for multi-line messages
+- One logical change per commit
 
 ## Staging
 

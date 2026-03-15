@@ -6,6 +6,8 @@ tier: 2
 
 # HPC Monitor Job
 
+> **TL;DR:** Submit job → start background monitor (90s poll via `sacct`) → continue working → verify outputs on completion → update docs.
+
 **Core principle:** Job submission and monitoring are one atomic workflow. Never submit a SLURM job and walk away — always attach a background monitor, verify outputs on completion, and update project docs.
 
 **Announce at start:** "I'm using the hpc-monitor-job skill to submit and track this SLURM job."

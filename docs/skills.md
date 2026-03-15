@@ -53,6 +53,70 @@ Use `sc_tools.ingest.loaders` for `ingest_load` loading. Each loader sets `obs['
 - Evaluate doublets using robust methods such as `scDblFinder` or `Solo` (within `scvi-tools`).
 - Filter low-quality cells using explicit, documented thresholds. Avoid fixed cutoffs that might bias against rare, high-metabolic states.
 
+#### Solo Doublet Detection (`sc_tools.qc.score_doublets_solo`)
+
+Use `sc_tools.qc.score_doublets_solo` for probabilistic doublet scoring on single-cell resolution
+modalities.  The function annotates only -- it does NOT filter.  The caller removes doublets after
+reviewing the score distribution.
+
+**Applicable modalities** (single-cell resolution):
+
+| Modality | Note |
+|----------|------|
+| `xenium` | Targeted spatial single-cell transcriptomics |
+| `cosmx` | Spatial single-cell transcriptomics |
+| `visium_hd_cell` | SpaceRanger 4 cell-segmented Visium HD |
+
+**Not applicable** (spot-based or protein-based):
+
+| Modality | Reason |
+|----------|--------|
+| `visium` | Each spot covers ~10-50 cells; doublet concept does not apply |
+| `visium_hd` | 8 um bins contain multiple cells |
+| `imc` | Protein imaging; Solo is not trained on protein data |
+
+Calling `score_doublets_solo` on a spot-based or IMC modality raises a `ValueError` immediately,
+before any model training.
+
+**Outputs written to AnnData:**
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `obs['solo_doublet_score']` | float64 | Probability of being a doublet (0-1) |
+| `obs['solo_is_doublet']` | bool | True when score exceeds threshold (default 0.5) |
+| `uns['solo_summary']` | dict | `n_doublets`, `pct_doublets`, `threshold` |
+
+**Threshold guidance:**
+
+- Default threshold of 0.5 is conservative.  In high-density tissues (lymph nodes, tumors)
+  expect 5-15% doublet rates; sparse tissues 1-5%.
+- Inspect the score distribution before applying a hard filter.  A bimodal distribution with
+  a clear gap at ~0.5 indicates reliable separation.
+- If doublet rate exceeds 20%, investigate upstream cell loading concentration rather than
+  raising the threshold.
+
+**Usage example:**
+
+```python
+from sc_tools.qc import score_doublets_solo
+
+adata = score_doublets_solo(
+    adata,
+    batch_key="library_id",   # scVI batch variable
+    max_epochs=400,
+    use_gpu=True,
+    threshold=0.5,
+)
+
+# Inspect score distribution before filtering
+import matplotlib.pyplot as plt
+adata.obs["solo_doublet_score"].hist(bins=50)
+plt.title(f"Doublets: {adata.uns['solo_summary']['pct_doublets']:.1f}%")
+
+# Remove doublets (caller decision)
+adata_clean = adata[~adata.obs["solo_is_doublet"]].copy()
+```
+
 ### Spatial Transcriptomics
 - Assess tissue coverage and spot/cell quality.
 - Avoid aggressive filtering that removes biologically informative low-count areas in sparse tissues.
@@ -181,6 +245,183 @@ For all statistical comparisons (boxplots, violin plots, strip plots), the follo
   - **Two groups:** Perform pairwise comparison.
   - **More than two groups:** Default to **1-vs-rest** comparisons.
   - **Option:** Allow a toggle for **all-pairwise** comparisons when required.
+
+### 10.1. Bayesian Differential Expression (scVI)
+
+#### When to use
+
+Use scVI Bayesian DE when:
+- Comparing >2 conditions in heterogeneous spatial or single-cell data where parametric assumptions (normality, equal variance) do not hold.
+- The dataset contains many technical batches that a simple Wilcoxon test cannot account for, because the scVI latent space already absorbs batch variation.
+- A posterior probability of differential expression is more interpretable than a frequentist p-value for the scientific question at hand.
+
+Do **not** use scVI Bayesian DE for pseudobulk aggregation workflows — use edgeR or DESeq2 instead (see below).
+
+#### API
+
+```python
+# model must be trained on the same adata (scVI or scANVI)
+de_results = model.differential_expression(
+    adata=adata,
+    groupby="celltype",
+    group1="Macrophage",
+    group2="Monocyte",
+    mode="change",          # "change" uses posterior LFC; "vanilla" uses NB likelihood ratio
+    delta=0.25,             # minimum absolute log2FC to call DE (default 0.25, ~1.19x fold change)
+    fdr_target=0.05,        # posterior FDR threshold used to set is_de_fdr_0.05
+    silent=True,
+)
+```
+
+#### Key parameters
+
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `mode` | `"change"` | Use `"change"` for most analyses; it reports posterior probability that |LFC| > delta. `"vanilla"` uses NB likelihood ratio — less interpretable. |
+| `delta` | `0.25` | Minimum absolute log2 fold change to count as meaningful. delta=0.25 corresponds to approximately 1.19x fold change. Increase to 0.5 for stringent filtering. |
+| `fdr_target` | `0.05` | Controls the posterior FDR threshold used to populate `is_de_fdr_0.05`. This is **not** a frequentist FDR; it is derived from the posterior probability directly. |
+
+#### How to interpret output columns
+
+| Column | Interpretation |
+|--------|---------------|
+| `lfc_mean` | Posterior mean log fold change (natural log, group1 vs group2). Positive = higher in group1. |
+| `lfc_median` | Posterior median LFC; more robust than mean for heavy-tailed posteriors. |
+| `proba_de` | Posterior probability that the gene is DE (|LFC| > delta). Range 0-1; higher = more confident. |
+| `proba_not_de` | 1 - proba_de. |
+| `is_de_fdr_0.05` | Boolean; True if the gene passes the posterior FDR <= 0.05 threshold. Use this as the primary filter. Note: this column name is generated from fdr_target — if fdr_target=0.1 is used, the column will be named is_de_fdr_0.1. |
+| `bayes_factor` | log(proba_de / proba_not_de). Not always reported; use proba_de instead. |
+
+**Reporting rule:** Report `lfc_mean` and `proba_de`, not p-values. The output is already FDR-controlled via the posterior; Exception to the general BH rule above — the posterior already controls FDR; do not apply a second Benjamini-Hochberg correction.
+
+Example caption: "Genes with posterior probability of DE > 0.95 and |LFC| > 0.25 (scVI Bayesian DE, delta=0.25, FDR target=0.05)."
+
+#### How to store results
+
+```python
+# Store in adata.uns under a consistent key
+if "de_results" not in adata.uns:
+    adata.uns["de_results"] = {}
+adata.uns["de_results"][f"{group1}_vs_{group2}"] = de_results
+```
+
+For large result tables (many gene x group combinations), prefer saving to `results/de_{group1}_vs_{group2}.csv` and recording the path in `adata.uns["de_results"]`.
+
+#### When NOT to use
+
+- **Pseudobulk analysis** (patient-level or ROI-level comparisons): aggregate to pseudobulk first, then use **edgeR** (`edgeR::glmQLFit`) or **DESeq2**. These methods properly model inter-donor variability that scVI DE ignores.
+- **Very small groups** (< 10 cells per group): posterior estimates are unreliable; use exact tests.
+- **Bulk RNA-seq**: scVI DE is designed for single-cell count distributions; use DESeq2/edgeR for bulk.
+
+---
+
+### 10.2. MrVI Multi-Sample Decomposition
+
+MrVI (Multi-resolution Variational Inference) extends scVI to explicitly model **per-sample latent representations**, disentangling biological variation across conditions from technical noise. It is part of `scvi-tools`.
+
+#### What it models
+
+Standard scVI produces a single shared latent space across all cells. MrVI learns two representations:
+- **`u` space** (`obsm['X_mrvi_u']`): sample-specific representations that capture both biological and technical per-sample effects.
+- **`z` space** (`obsm['X_mrvi_z']`): biological representations after removing sample-level technical variation.
+
+Sample-level embeddings (one vector per donor/sample) can then be compared directly for condition-level analysis, donor clustering, and variance decomposition.
+
+#### When to use
+
+- Multi-condition spatial or single-cell studies with **>5 donors/patients per condition** (e.g. IBD vs control, tumor vs adjacent normal).
+- When you want to ask: "Which genes or programs vary most between conditions, accounting for within-condition donor heterogeneity?"
+- Directly applicable to the `multiplatform/ibd_spatial` project (IBD vs control, multi-donor CosMx/Xenium data).
+
+Do not use MrVI with fewer than 5 samples per condition — the sample-level posterior will be unreliable.
+
+#### Expected input
+
+`results/adata.normalized.h5ad` (from the `preprocess` phase). Required `obs` columns:
+
+| Column | Role |
+|--------|------|
+| `obs['sample']` | Sample/donor identifier (one unique value per donor). |
+| `obs['condition']` | Condition label (e.g. `"IBD"` / `"Control"`). |
+| `obs['batch']` / `obs['library_id']` | Technical batch for batch correction within the model. |
+
+Input must contain **raw counts** in `adata.X` (or `adata.layers['counts']`). Do not pass log-normalized data.
+
+#### How to run
+
+```python
+import scvi
+
+# Setup
+scvi.model.MRVI.setup_anndata(
+    adata,
+    sample_key="sample",          # per-donor identifier
+    batch_key="library_id",       # technical batch
+    layer="counts",               # raw counts layer (or None if adata.X is raw)
+)
+
+# Train
+model = scvi.model.MRVI(adata)
+model.train(max_epochs=400, early_stopping=True)
+
+# Extract representations
+adata.obsm["X_mrvi_u"] = model.get_latent_representation(give_mean=True, representation_kind="u")
+adata.obsm["X_mrvi_z"] = model.get_latent_representation(give_mean=True, representation_kind="z")
+
+# Sample-level embeddings (one row per donor)
+# scvi-tools 1.4.2: get_sample_representation() does not exist; aggregate per-cell
+# latent representations (X_mrvi_u, representation_kind="u") by sample instead.
+# Example aggregation:
+#   import pandas as pd
+#   u_df = pd.DataFrame(adata.obsm["X_mrvi_u"], index=adata.obs_names)
+#   u_df["sample"] = adata.obs["sample"].values
+#   sample_embeddings = u_df.groupby("sample").mean()  # DataFrame: index = sample IDs
+try:
+    sample_embeddings = model.get_latent_representation(
+        give_mean=True, representation_kind="u"
+    )
+    # aggregate to sample level
+    import pandas as pd
+    _u_df = pd.DataFrame(sample_embeddings, index=adata.obs_names)
+    _u_df["_sample"] = adata.obs["sample"].values
+    sample_embeddings = _u_df.groupby("_sample").mean()
+except Exception:
+    raise RuntimeError(
+        "Could not obtain sample-level embeddings. "
+        "Aggregate adata.obsm['X_mrvi_u'] by sample manually."
+    )
+```
+
+#### Outputs
+
+| Key | Shape | Use |
+|-----|-------|-----|
+| `obsm['X_mrvi_u']` | (n_cells, n_latent) | Sample-specific; use for per-cell UMAP that separates donor effects. |
+| `obsm['X_mrvi_z']` | (n_cells, n_latent) | Biological; use for clustering, cell typing, and biology-phase analysis. |
+| `sample_embeddings` | (n_samples, n_latent) | One row per donor; use for condition comparison and donor clustering. |
+
+Use `obsm['X_mrvi_z']` as the `use_rep` for Leiden clustering and UMAP in the same way as `X_scVI`. Use `sample_embeddings` for downstream condition-level tests (PCA of sample space, MANOVA, distance-based tests).
+
+#### Connection to biology phase
+
+After MrVI training, use sample embeddings for:
+- **Condition comparison:** PCA or UMAP of sample embeddings colored by condition.
+- **Donor clustering:** Hierarchical clustering of sample embeddings to detect patient subgroups within a condition.
+- **Variance decomposition:** How much of the sample-level variance is explained by condition vs other covariates (e.g. batch, disease duration).
+- **Differential abundance:** Test whether cell-type proportions differ between conditions using the `z` representation as the clustering basis.
+
+Store the trained model:
+```python
+model.save("results/mrvi_model/", overwrite=True)
+# Reload with: model = scvi.model.MRVI.load("results/mrvi_model/", adata=adata)
+```
+
+#### Relevance to multiplatform/ibd_spatial
+
+The `multiplatform/ibd_spatial` project has multi-donor IBD vs control spatial data across CosMx and Visium platforms. MrVI is the recommended method for:
+1. Integrating across donors and platforms in the `preprocess` phase.
+2. Extracting sample-level IBD vs control differences in the `biology` phase.
+3. Replacing or complementing `run_resolvi_semisup.py` for condition-aware integration when labeled data is available.
 
 ---
 
@@ -963,6 +1204,60 @@ bm.run_single_method(adata, method='$METHOD', output_dir='results/tmp/integratio
 
 ### CI/CD, Linting & Docs
 - `ruff` (lint + format), `pytest`, `sphinx`, `snakemake`, GitHub Actions
+
+## 19. Supabase / PostgreSQL Registry
+
+The project registry is backed by Supabase (PostgreSQL). Local development uses Docker-based Supabase; production/HPC uses hosted Supabase cloud.
+
+### Connection
+- **Local**: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+- **Cloud**: set via `SC_TOOLS_REGISTRY_URL` env var
+- MCP servers read the URL from `.mcp.json` → `env.SC_TOOLS_REGISTRY_URL`
+
+### Supabase CLI essentials
+```bash
+supabase start          # start local Postgres + services (Docker required)
+supabase stop           # tear down containers (data persists)
+supabase status         # show ports, URLs, keys
+supabase db dump        # export schema SQL
+supabase db push        # apply local migrations to linked cloud project
+supabase link --project-ref <REF>  # link to cloud project
+```
+
+### Schema migrations (Alembic)
+```bash
+# Run all pending migrations
+SC_TOOLS_REGISTRY_URL="postgresql://..." alembic upgrade head
+
+# Create a new migration
+SC_TOOLS_REGISTRY_URL="postgresql://..." alembic revision -m "description"
+```
+
+Migration file requirements:
+- `from __future__ import annotations` first
+- `revision = "NNNN"` and `down_revision = "NNNN-1"` module-level variables
+- Dialect-agnostic SQL (no SQLite or PostgreSQL-specific constructs)
+- Use `op.batch_alter_table()` for ALTER TABLE
+
+### Data migration (SQLite → PostgreSQL)
+```bash
+python scripts/migrate_sqlite_to_pg.py --dry-run          # preview
+python scripts/migrate_sqlite_to_pg.py --target "postgresql://..."  # migrate
+```
+- Disables FK checks via `SET session_replication_role = 'replica'` during load
+- Resets PostgreSQL sequences after bulk insert
+
+### Registry tables (dependency order)
+`projects` → `data_sources` → `project_data_sources` → `subjects` → `samples` → `subject_project_links` → `project_phases` → `datasets` → `bio_data` (+ JTI children: `bio_images`, `rnaseq_data`, `spatial_seq_data`, `epigenomics_data`, `genome_seq_data`) → `slurm_jobs` → `agent_tasks`
+
+### Verification
+```bash
+SC_TOOLS_REGISTRY_URL="postgresql://..." python -c "
+from sc_tools.registry import Registry
+r = Registry()
+print(r.status())
+"
+```
 
 ## Key References
 

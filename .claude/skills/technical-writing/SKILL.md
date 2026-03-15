@@ -11,7 +11,6 @@ allowed-tools: Read Write Edit Glob Grep
 
 ### Mission.md / Journal.md (sc_tools standard)
 - Mission.md: todo list format with checkboxes, phases, blockers
-- Journal.md: dated entries — action, rationale, decisions
 - Journal.md: dated entries recording actions, rationale, and decisions
 - No apostrophes in any generated documentation text
 

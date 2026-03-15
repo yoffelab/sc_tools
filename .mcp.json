@@ -4,14 +4,14 @@
       "command": "python",
       "args": ["-m", "sc_tools.mcp.tools_server"],
       "env": {
-        "SC_TOOLS_REGISTRY_URL": "sqlite:////Users/junbumkim/.sc_tools/registry.db"
+        "SC_TOOLS_REGISTRY_URL": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
       }
     },
     "sc-registry": {
       "command": "python",
       "args": ["-m", "sc_tools.mcp.registry_server"],
       "env": {
-        "SC_TOOLS_REGISTRY_URL": "sqlite:////Users/junbumkim/.sc_tools/registry.db"
+        "SC_TOOLS_REGISTRY_URL": "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
       }
     }
   }

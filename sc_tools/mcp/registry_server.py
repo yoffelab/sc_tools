@@ -5,18 +5,30 @@ query project state, checkpoint locations, and data objects.
 
 Tools
 -----
-    registry_status      -- high-level summary (projects, data, patients)
-    list_datasets        -- all checkpoints for a project (queries data table)
-    get_checkpoint_uri   -- "where is adata.normalized.h5ad for ggo_visium?"
-    register_dataset     -- add a new checkpoint (routes to data table)
-    mark_phase_complete  -- mark a pipeline phase as complete for a project
-    get_phase_status     -- status and checkpoint details for a specific phase
-    set_phase_status     -- update the pipeline status for a phase
-    add_subject          -- register a de-identified patient (backward compat)
-    list_subjects        -- query patients (backward compat)
-    register_biodata     -- register a data object (backward compat)
-    list_biodata         -- query data objects (backward compat)
-    project_data_summary -- counts by category/platform
+    registry_status         -- high-level summary (projects, data sources, inventory, datasets)
+    register_inventory_item -- add an inventory item (Layer 1)
+    list_inventory_items    -- query inventory items with filters
+    create_dataset          -- create a named dataset (Layer 2)
+    add_dataset_member      -- add an inventory item to a dataset
+    link_project_dataset    -- link a project to a dataset
+    list_datasets           -- datasets linked to a project
+    record_provenance       -- record transformation provenance
+    get_provenance          -- query provenance records
+    set_phase_status        -- upsert a pipeline phase status
+    get_phase_status        -- status and details for a specific phase
+    mark_phase_complete     -- mark a pipeline phase as complete
+    get_available_next_phases -- what phases can run next
+    project_data_summary    -- dataset/inventory summary for a project
+    add_project             -- register a new project
+    register_data_source    -- register a raw data source
+    list_data_sources       -- query data sources
+    add_subject / list_subjects -- patient management
+    list_modalities         -- BioData modality catalog
+    register_dataset        -- backward compat wrapper (deprecated)
+    register_biodata        -- backward compat wrapper (deprecated)
+    list_biodata            -- backward compat wrapper (deprecated)
+    get_checkpoint_uri      -- deprecated, use get_phase_status
+    link_project_data_source -- deprecated, use link_project_dataset
 
 Start the server::
 
@@ -58,7 +70,8 @@ def _registry():
 def registry_status() -> str:
     """Return a high-level status summary of the sc_tools registry.
 
-    Shows total projects, data objects, patients, and per-project status.
+    Shows total projects, data sources, inventory items, datasets, and patients,
+    plus per-project phase status.
 
     Returns
     -------
@@ -72,7 +85,9 @@ def registry_status() -> str:
             "sc_tools Registry Status",
             "=" * 40,
             f"  Projects          : {s['n_projects']}",
-            f"  Data objects      : {s['n_data']}",
+            f"  Data sources      : {s['n_data_sources']}",
+            f"  Inventory items   : {s['n_inventory_items']}",
+            f"  Datasets          : {s['n_datasets']}",
             f"  Patients          : {s['n_patients']}",
         ]
         if s["active_projects"]:
@@ -82,8 +97,260 @@ def registry_status() -> str:
                 phase_summary = s.get("phase_summary", {}).get(name, {})
                 if phase_summary:
                     parts = ", ".join(f"{k}={v}" for k, v in sorted(phase_summary.items()))
-                    lines.append(f"      data status: {parts}")
+                    lines.append(f"      phases: {parts}")
         return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: register_inventory_item
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def register_inventory_item(
+    name: str,
+    uri: str,
+    modality: str,
+    data_source_name: str = "",
+    platform: str = "",
+    fmt: str = "h5ad",
+    n_obs: int = 0,
+    n_vars: int = 0,
+    size_mb: float = 0.0,
+    organism: str = "",
+    tissue: str = "",
+) -> str:
+    """Register an inventory item (Layer 1 data object) in the registry.
+
+    Inventory items represent individual data files (AnnData, images, etc.)
+    that can later be assembled into multi-modal datasets.
+
+    Parameters
+    ----------
+    name
+        Unique identifier for this item (e.g. ibd_cosmx_rna, robin_visium_raw).
+    uri
+        Path or URI to the data file.
+    modality
+        Data modality (e.g. spatial_transcriptomics, imaging_mass_cytometry).
+    data_source_name
+        Name of the data source this item comes from (must exist). Empty to skip.
+    platform
+        Technology platform (e.g. cosmx, visium, xenium).
+    fmt
+        File format: h5ad (default), zarr, tiff, tsv, mudata.
+    n_obs
+        Number of observations/cells/spots (0 to skip).
+    n_vars
+        Number of variables/genes/proteins (0 to skip).
+    size_mb
+        File size in megabytes (0.0 to skip).
+    organism
+        Organism (e.g. human, mouse).
+    tissue
+        Tissue type (e.g. colon, brain, lung).
+
+    Returns
+    -------
+    str
+        Confirmation with assigned inventory item id.
+    """
+    try:
+        reg = _registry()
+        item_id = reg.register_inventory_item(
+            name,
+            uri,
+            modality,
+            data_source_name=data_source_name or None,
+            platform=platform or None,
+            fmt=fmt,
+            n_obs=n_obs or None,
+            n_vars=n_vars or None,
+            size_mb=size_mb or None,
+            organism=organism or None,
+            tissue=tissue or None,
+        )
+        return f"Inventory item '{name}' registered (id={item_id})."
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_inventory_items
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_inventory_items(modality: str = "", platform: str = "") -> str:
+    """List inventory items in the registry, with optional filters.
+
+    Parameters
+    ----------
+    modality
+        Filter by modality string (e.g. spatial_transcriptomics). Empty means all.
+    platform
+        Filter by platform string (e.g. cosmx, visium). Empty means all.
+
+    Returns
+    -------
+    str
+        Formatted table of inventory items.
+    """
+    try:
+        reg = _registry()
+        items = reg.list_inventory_items(
+            modality=modality or None,
+            platform=platform or None,
+        )
+        if not items:
+            return "No inventory items found matching the given filters."
+        lines = [f"Inventory items ({len(items)} total):"]
+        lines.append(
+            f"  {'ID':<4}  {'Name':<40}  {'Modality':<28}  {'Platform':<14}  {'Format':<8}  {'n_obs'}"
+        )
+        lines.append("  " + "-" * 110)
+        for it in items:
+            n_obs_str = str(it.get("n_obs", "")) if it.get("n_obs") else ""
+            lines.append(
+                f"  {it['id']:<4}  {(it.get('name') or ''):<40}  "
+                f"{(it.get('modality') or ''):<28}  "
+                f"{(it.get('platform') or ''):<14}  "
+                f"{(it.get('format') or ''):<8}  "
+                f"{n_obs_str}"
+            )
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: create_dataset
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def create_dataset(
+    name: str,
+    description: str = "",
+    fmt: str = "mudata",
+) -> str:
+    """Create a named dataset (Layer 2) that groups inventory items.
+
+    Datasets represent multi-modal collections of inventory items (e.g.
+    RNA + protein from the same experiment). Use add_dataset_member to
+    populate the dataset after creation.
+
+    Parameters
+    ----------
+    name
+        Unique dataset name (e.g. ibd_cosmx_multimodal, robin_discovery).
+    description
+        Optional human-readable description.
+    fmt
+        Format: mudata (default), h5ad, zarr.
+
+    Returns
+    -------
+    str
+        Confirmation with assigned dataset id.
+    """
+    try:
+        reg = _registry()
+        ds_id = reg.create_dataset(
+            name,
+            description=description or None,
+            fmt=fmt,
+        )
+        return f"Dataset '{name}' created (id={ds_id})."
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: add_dataset_member
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def add_dataset_member(
+    dataset_name: str,
+    inventory_name: str,
+    modality_key: str,
+) -> str:
+    """Add an inventory item to a dataset as a named modality slot.
+
+    Each modality_key must be unique within the dataset (e.g. 'rna',
+    'protein', 'morphology').
+
+    Parameters
+    ----------
+    dataset_name
+        Name of the target dataset (must exist, uses current version).
+    inventory_name
+        Name of the inventory item to add (must exist).
+    modality_key
+        Key for this modality within the dataset (e.g. 'rna', 'protein').
+
+    Returns
+    -------
+    str
+        Confirmation with assigned member id.
+    """
+    try:
+        reg = _registry()
+        member_id = reg.add_dataset_member(dataset_name, inventory_name, modality_key)
+        return (
+            f"Added '{inventory_name}' as '{modality_key}' to dataset "
+            f"'{dataset_name}' (member_id={member_id})."
+        )
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: link_project_dataset
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def link_project_dataset(
+    project_name: str,
+    dataset_name: str,
+    role: str = "primary",
+    notes: str = "",
+) -> str:
+    """Link a project to a dataset.
+
+    A project can have multiple datasets (e.g. primary analysis dataset,
+    reference scRNA dataset for deconvolution).
+
+    Parameters
+    ----------
+    project_name
+        Project name (must already exist in registry).
+    dataset_name
+        Dataset name (must already exist, uses current version).
+    role
+        primary | reference | supplementary.
+    notes
+        Optional free-text notes about the link.
+
+    Returns
+    -------
+    str
+        Confirmation with assigned link id.
+    """
+    try:
+        reg = _registry()
+        link_id = reg.link_project_dataset(
+            project_name, dataset_name, role=role, notes=notes or None
+        )
+        return (
+            f"Linked project '{project_name}' -> dataset '{dataset_name}' "
+            f"(role={role}, link_id={link_id})."
+        )
     except Exception as exc:
         return f"ERROR: {exc}"
 
@@ -94,42 +361,38 @@ def registry_status() -> str:
 
 
 @mcp.tool()
-def list_datasets(project_name: str, phase: str = "") -> str:
-    """List all checkpoint datasets for a project.
+def list_datasets(project_name: str = "") -> str:
+    """List datasets, optionally filtered by project.
 
     Parameters
     ----------
     project_name
-        Project name (e.g. ggo_visium, robin).
-    phase
-        Optional phase filter (e.g. qc_filter, scoring). Empty means all.
+        Filter by project name. Empty means all datasets.
 
     Returns
     -------
     str
-        Table of datasets with id, phase, role, status, and URI.
+        Table of datasets with name, version, format, and is_current flag.
     """
     try:
         reg = _registry()
         datasets = reg.list_datasets(
-            project_name=project_name,
-            phase=phase if phase else None,
+            project_name=project_name or None,
         )
         if not datasets:
-            return (
-                f"No datasets found for project '{project_name}'"
-                + (f" phase '{phase}'" if phase else "")
-                + "."
-            )
-        lines = [f"Datasets for '{project_name}'" + (f" phase={phase}" if phase else "") + ":"]
+            msg = "No datasets found"
+            if project_name:
+                msg += f" for project '{project_name}'"
+            return msg + "."
+        lines = [f"Datasets ({len(datasets)} total):"]
+        lines.append(f"  {'ID':<4}  {'Name':<40}  {'Ver':<4}  {'Format':<10}  {'Current'}")
+        lines.append("  " + "-" * 72)
         for ds in datasets:
-            role = ds.get("file_role", "primary")
-            n_obs = ds.get("n_obs")
-            obs_str = f" n_obs={n_obs}" if n_obs else ""
             lines.append(
-                f"  id={ds['id']} phase={ds['phase']} role={role} "
-                f"status={ds['status']}{obs_str}\n"
-                f"    uri: {ds['uri']}"
+                f"  {ds['id']:<4}  {(ds.get('name') or ''):<40}  "
+                f"v{ds.get('version', 1):<3}  "
+                f"{(ds.get('format') or ''):<10}  "
+                f"{'yes' if ds.get('is_current') else 'no'}"
             )
         return "\n".join(lines)
     except Exception as exc:
@@ -137,157 +400,410 @@ def list_datasets(project_name: str, phase: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Tool: get_checkpoint_uri
+# Tool: record_provenance
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def get_checkpoint_uri(project_name: str, phase: str, sample_id: str = "") -> str:
-    """Return the URI for a specific checkpoint.
+def record_provenance(
+    tool: str,
+    tool_version: str = "",
+    phase_id: int = 0,
+    dataset_id: int = 0,
+    reference_genome: str = "",
+    reference_dataset: str = "",
+    signature_source: str = "",
+    params_json: str = "",
+    environment_json: str = "",
+    script_uri: str = "",
+    agent: str = "",
+) -> str:
+    """Record provenance metadata for a transformation or analysis step.
+
+    Exactly one of phase_id or dataset_id must be non-zero
+    to identify the target of this provenance record.
+
+    Parameters
+    ----------
+    tool
+        Name of the tool or function (e.g. scanpy.pp.normalize_total, scvi.SCVI).
+    tool_version
+        Version string of the tool.
+    phase_id
+        Target phase id (0 to skip).
+    dataset_id
+        Target dataset id (0 to skip).
+    reference_genome
+        Reference genome used (e.g. GRCh38).
+    reference_dataset
+        Reference dataset used (e.g. HuBMAP gut atlas).
+    signature_source
+        Source of gene signatures (e.g. MSigDB, CellTypist).
+    params_json
+        JSON string of parameters used (e.g. '{"n_top_genes": 2000}').
+    environment_json
+        JSON string of environment snapshot (e.g. '{"python": "3.11", ...}').
+    script_uri
+        URI of the script that performed the transformation.
+    agent
+        Name of the agent that performed the transformation.
+
+    Returns
+    -------
+    str
+        Confirmation with assigned provenance id.
+    """
+    try:
+        # Parse JSON strings
+        params = json.loads(params_json) if params_json else None
+        environment = json.loads(environment_json) if environment_json else None
+
+        reg = _registry()
+        prov_id = reg.record_provenance(
+            tool,
+            tool_version=tool_version or None,
+            phase_id=phase_id or None,
+            dataset_id=dataset_id or None,
+            reference_genome=reference_genome or None,
+            reference_dataset=reference_dataset or None,
+            signature_source=signature_source or None,
+            params=params,
+            environment=environment,
+            script_uri=script_uri or None,
+            agent=agent or None,
+        )
+        return f"Provenance recorded (id={prov_id}) for tool='{tool}'."
+    except json.JSONDecodeError as exc:
+        return f"ERROR: Invalid JSON: {exc}"
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: get_provenance
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def get_provenance(
+    phase_id: int = 0,
+    dataset_id: int = 0,
+) -> str:
+    """Query provenance records for a specific target.
+
+    Provide one of phase_id or dataset_id to filter.
+    If both are 0, returns all provenance records.
+
+    Parameters
+    ----------
+    phase_id
+        Filter by phase id (0 to skip).
+    dataset_id
+        Filter by dataset id (0 to skip).
+
+    Returns
+    -------
+    str
+        Formatted list of provenance records.
+    """
+    try:
+        reg = _registry()
+        records = reg.get_provenance(
+            phase_id=phase_id or None,
+            dataset_id=dataset_id or None,
+        )
+        if not records:
+            return "No provenance records found."
+        lines = [f"Provenance records ({len(records)} total):"]
+        for r in records:
+            lines.append(
+                f"  id={r['id']} tool={r.get('tool', '')} "
+                f"target={r.get('target_type', '')} "
+                f"version={r.get('tool_version', '') or ''}"
+            )
+            if r.get("script_uri"):
+                lines.append(f"    script: {r['script_uri']}")
+            if r.get("agent"):
+                lines.append(f"    agent: {r['agent']}")
+            if r.get("params"):
+                lines.append(f"    params: {json.dumps(r['params'])}")
+            if r.get("created_at"):
+                lines.append(f"    created: {r['created_at']}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: set_phase_status
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def set_phase_status(
+    project_name: str,
+    dataset_name: str,
+    phase_group: str,
+    subphase: str,
+    status: str,
+    notes: str = "",
+    n_obs: int = 0,
+    n_vars: int = 0,
+) -> str:
+    """Update the pipeline status for a phase (upsert).
+
+    Creates a phase row if none exists for this project + dataset +
+    phase_group + subphase combination.
 
     Parameters
     ----------
     project_name
         Project name (e.g. ggo_visium).
-    phase
-        Phase slug: ingest_raw, ingest_load, qc_filter, metadata_attach,
-        preprocess, scoring, celltype_manual, biology, meta_analysis.
-    sample_id
-        Optional sample identifier (for per-sample ingest_load checkpoints).
+    dataset_name
+        Dataset name (must exist, uses current version).
+    phase_group
+        Phase group: data_processing | discovery.
+    subphase
+        Subphase slug (e.g. qc_filter, clustering_v1, scoring).
+    status
+        New status: not_started | in_progress | complete | failed | skipped | ready.
+    notes
+        Optional free-text notes (e.g. method selection rationale).
+    n_obs
+        Number of cells/spots at this phase (0 to skip).
+    n_vars
+        Number of genes/proteins at this phase (0 to skip).
 
     Returns
     -------
     str
-        URI string, or a message indicating the checkpoint is not registered.
+        Confirmation message.
     """
     try:
         reg = _registry()
-        uri = reg.get_dataset_uri(
-            project_name=project_name,
-            phase=phase,
-            sample_id=sample_id if sample_id else None,
+        reg.upsert_phase(
+            project_name,
+            dataset_name,
+            phase_group,
+            subphase,
+            status=status,
+            notes=notes or None,
+            n_obs=n_obs or None,
+            n_vars=n_vars or None,
         )
-        if uri is None:
-            return (
-                f"No checkpoint registered for project='{project_name}' "
-                f"phase='{phase}'" + (f" sample='{sample_id}'" if sample_id else "") + "."
-            )
-        return uri
+        parts = [
+            f"Set phase '{phase_group}/{subphase}' to status='{status}' "
+            f"for project '{project_name}' dataset '{dataset_name}'."
+        ]
+        if n_obs:
+            parts.append(f"n_obs={n_obs:,}")
+        if n_vars:
+            parts.append(f"n_vars={n_vars:,}")
+        return " ".join(parts)
     except Exception as exc:
         return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# Tool: register_dataset
+# Tool: get_phase_status
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def register_dataset(
+def get_phase_status(
     project_name: str,
-    phase: str,
-    uri: str,
-    fmt: str = "h5ad",
-    sample_id: str = "",
-    status: str = "ready",
-    file_role: str = "primary",
-    validated: bool = False,
-    n_obs: int = 0,
-    n_vars: int = 0,
+    phase_group: str,
+    subphase: str,
 ) -> str:
-    """Add a new checkpoint to the registry.
+    """Return the status and details for a specific phase of a project.
 
     Parameters
     ----------
     project_name
-        Project name. Must already exist (call add_project first if needed).
-    phase
-        Phase slug: ingest_raw, ingest_load, qc_filter, metadata_attach,
-        preprocess, scoring, celltype_manual, biology, meta_analysis.
-    uri
-        Path or URI to the checkpoint file.
-    fmt
-        File format: h5ad (default), zarr, tiff, tsv.
-    sample_id
-        Optional sample identifier (for per-sample ingest_load checkpoints).
-    status
-        Dataset status: ready (default), pending, archived, or error.
-    file_role
-        File role: primary (default), supplementary, entry_point,
-        spatialdata, image, or metadata.
-    validated
-        True if validate_checkpoint() has passed for this file.
-    n_obs
-        Number of cells/spots (0 = unknown).
-    n_vars
-        Number of genes/proteins (0 = unknown).
+        Project name (e.g. ggo_visium).
+    phase_group
+        Phase group: data_processing | discovery.
+    subphase
+        Subphase slug (e.g. qc_filter, clustering_v1).
 
     Returns
     -------
     str
-        Confirmation with assigned dataset id.
+        Formatted phase details including status, n_obs, n_vars, notes.
     """
     try:
         reg = _registry()
-        ds_id = reg.register_dataset(
-            project_name=project_name,
-            phase=phase,
-            uri=uri,
-            sample_id=sample_id if sample_id else None,
-            fmt=fmt,
-            status=status,
-            file_role=file_role,
-            validated=validated,
-            n_obs=n_obs if n_obs else None,
-            n_vars=n_vars if n_vars else None,
-        )
-        return f"Registered dataset id={ds_id}: {project_name}/{phase} [{file_role}] at {uri}"
+        row = reg.get_phase(project_name, phase_group, subphase)
+        if row is None:
+            return (
+                f"No phase entry for project='{project_name}' "
+                f"phase='{phase_group}/{subphase}'. "
+                "Use set_phase_status to create one."
+            )
+        lines = [f"Phase '{phase_group}/{subphase}' for project '{project_name}':"]
+        lines.append(f"  status        : {row['status']}")
+        if row.get("uri"):
+            lines.append(f"  uri           : {row['uri']}")
+        if row.get("n_obs"):
+            lines.append(f"  n_obs         : {row['n_obs']}")
+        if row.get("n_vars"):
+            lines.append(f"  n_vars        : {row['n_vars']}")
+        if row.get("dataset_id"):
+            lines.append(f"  dataset_id    : {row['dataset_id']}")
+        if row.get("notes"):
+            lines.append(f"  notes         : {row['notes']}")
+        lines.append(f"  updated_at    : {row.get('updated_at', '')}")
+        return "\n".join(lines)
     except Exception as exc:
         return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_slurm_jobs (deprecated)
+# Tool: mark_phase_complete
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def list_slurm_jobs(active_only: bool = True) -> str:
-    """SLURM jobs table has been removed (migration 0008).
+def mark_phase_complete(
+    project_name: str,
+    phase_group: str,
+    subphase: str,
+) -> str:
+    """Mark a pipeline phase as complete (status='ready') for a project.
 
     Parameters
     ----------
-    active_only
-        Ignored (table no longer exists).
+    project_name
+        Project name (e.g. ggo_visium).
+    phase_group
+        Phase group: data_processing | discovery.
+    subphase
+        Subphase slug (e.g. qc_filter, clustering_v1).
 
     Returns
     -------
     str
-        Notice that the table has been removed.
+        Confirmation message.
     """
-    return "SLURM jobs table has been removed (migration 0008). No jobs to display."
+    try:
+        reg = _registry()
+        reg.mark_phase_complete(project_name, phase_group, subphase)
+        return (
+            f"Marked phase '{phase_group}/{subphase}' as complete "
+            f"for project '{project_name}'."
+        )
+    except Exception as exc:
+        return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
-# Tool: list_agent_tasks (deprecated)
+# Tool: get_available_next_phases
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def list_agent_tasks(running_only: bool = True) -> str:
-    """Agent tasks table has been removed.
+def get_available_next_phases(project_name: str) -> str:
+    """Return which pipeline phases are available to run next for a project.
+
+    Queries the registry for completed phases then applies the pipeline DAG
+    to determine what is unblocked.
 
     Parameters
     ----------
-    running_only
-        Ignored (table no longer exists).
+    project_name
+        Project name (e.g. ggo_visium).
 
     Returns
     -------
     str
-        Notice that the table has been removed.
+        List of available phase slugs with labels, checkpoints, and
+        dependency information.
     """
-    return "Agent tasks table has been removed (migration 0007). No tasks to display."
+    try:
+        from sc_tools.pipeline import get_available_next, get_dag
+
+        reg = _registry()
+        phase_rows = reg.list_phases(project_name)
+        completed = [
+            r["subphase"] for r in phase_rows if r["status"] in ("complete", "ready")
+        ]
+        in_progress = [r["subphase"] for r in phase_rows if r["status"] == "in_progress"]
+
+        dag = get_dag()
+        available = get_available_next(completed)
+
+        lines = [
+            f"Pipeline status for '{project_name}'",
+            "=" * 40,
+            f"  Completed  : {', '.join(completed) or 'none'}",
+            f"  In progress: {', '.join(in_progress) or 'none'}",
+            "",
+            "  Available next:",
+        ]
+        if not available:
+            lines.append("    (none -- all phases complete or blocked)")
+        else:
+            for slug in available:
+                spec = dag[slug]
+                cp = spec.checkpoint or "(no checkpoint file)"
+                flags = []
+                if spec.optional:
+                    flags.append("optional")
+                if spec.iterative:
+                    flags.append("iterative")
+                flag_str = f"  [{', '.join(flags)}]" if flags else ""
+                lines.append(f"    {slug:<20} {spec.label}{flag_str}")
+                lines.append(f"      checkpoint: {cp}")
+                if spec.depends_on:
+                    lines.append(f"      depends on: {', '.join(spec.depends_on)}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: project_data_summary
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def project_data_summary(project_name: str) -> str:
+    """Return a summary of datasets and inventory items for a project.
+
+    Parameters
+    ----------
+    project_name
+        Project name.
+
+    Returns
+    -------
+    str
+        Formatted summary with dataset details and member counts.
+    """
+    try:
+        reg = _registry()
+        summary = reg.project_data_summary(project_name)
+        lines = [
+            f"Data summary for '{project_name}':",
+            f"  Datasets        : {summary['n_datasets']}",
+            f"  Inventory items : {summary['n_inventory_items']}",
+        ]
+        for ds in summary.get("datasets", []):
+            current = " (current)" if ds.get("is_current") else ""
+            lines.append(
+                f"\n  Dataset: {ds['name']} v{ds.get('version', 1)}{current} "
+                f"[{ds.get('format', '')}] role={ds.get('role', '')}"
+            )
+            lines.append(f"    Members ({ds.get('n_members', 0)}):")
+            for m in ds.get("members", []):
+                n_obs_str = f" n_obs={m['n_obs']}" if m.get("n_obs") else ""
+                lines.append(
+                    f"      {m['modality_key']}: {m.get('inventory_name', '')} "
+                    f"({m.get('modality', '')}){n_obs_str}"
+                )
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"ERROR: {exc}"
 
 
 # ---------------------------------------------------------------------------
@@ -333,275 +849,6 @@ def add_project(
             domain=domain or None,
         )
         return f"Project '{name}' registered (id={proj_id})."
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: get_available_next_phases
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def get_available_next_phases(project_name: str) -> str:
-    """Return which pipeline phases are available to run next for a project.
-
-    Queries the registry for completed phases then applies the pipeline DAG
-    to determine what is unblocked.
-
-    Parameters
-    ----------
-    project_name
-        Project name (e.g. ggo_visium).
-
-    Returns
-    -------
-    str
-        List of available phase slugs with labels, checkpoints, and
-        dependency information.
-    """
-    try:
-        from sc_tools.pipeline import get_available_next, get_dag
-
-        reg = _registry()
-        phase_rows = reg.list_phases(project_name)
-        completed = [r["phase"] for r in phase_rows if r["status"] == "complete"]
-        in_progress = [r["phase"] for r in phase_rows if r["status"] == "in_progress"]
-
-        dag = get_dag()
-        available = get_available_next(completed)
-
-        lines = [
-            f"Pipeline status for '{project_name}'",
-            "=" * 40,
-            f"  Completed  : {', '.join(completed) or 'none'}",
-            f"  In progress: {', '.join(in_progress) or 'none'}",
-            "",
-            "  Available next:",
-        ]
-        if not available:
-            lines.append("    (none -- all phases complete or blocked)")
-        else:
-            for slug in available:
-                spec = dag[slug]
-                cp = spec.checkpoint or "(no checkpoint file)"
-                flags = []
-                if spec.optional:
-                    flags.append("optional")
-                if spec.iterative:
-                    flags.append("iterative")
-                flag_str = f"  [{', '.join(flags)}]" if flags else ""
-                lines.append(f"    {slug:<20} {spec.label}{flag_str}")
-                lines.append(f"      checkpoint: {cp}")
-                if spec.depends_on:
-                    lines.append(f"      depends on: {', '.join(spec.depends_on)}")
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: record_provenance
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def record_provenance(project_name: str, phase: str, env_snapshot_json: str) -> str:
-    """Store a runtime environment snapshot alongside a pipeline phase record.
-
-    Parameters
-    ----------
-    project_name
-        Project name (e.g. ggo_visium).
-    phase
-        Phase slug (e.g. preprocess, scoring).
-    env_snapshot_json
-        JSON string from environment_info() output, or any provenance note.
-
-    Returns
-    -------
-    str
-        Confirmation message.
-    """
-    try:
-        reg = _registry()
-        reg.upsert_phase(project_name, phase, notes=env_snapshot_json)
-        return f"Provenance recorded for '{project_name}' phase '{phase}'."
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: update_slurm_job_status (deprecated)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def update_slurm_job_status(
-    slurm_job_id: str,
-    status: str,
-    error: str = "",
-    log_uri: str = "",
-) -> str:
-    """SLURM jobs table has been removed (migration 0008).
-
-    Parameters
-    ----------
-    slurm_job_id
-        Ignored.
-    status
-        Ignored.
-
-    Returns
-    -------
-    str
-        Notice that the table has been removed.
-    """
-    return "SLURM jobs table has been removed (migration 0008). Cannot update."
-
-
-# ---------------------------------------------------------------------------
-# Tool: mark_phase_complete
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def mark_phase_complete(project_name: str, phase: str) -> str:
-    """Mark a pipeline phase as complete for a project.
-
-    Updates data rows for this project+phase to status='ready'.
-
-    Parameters
-    ----------
-    project_name
-        Project name (e.g. ggo_visium).
-    phase
-        Phase slug: ingest_raw, ingest_load, qc_filter, metadata_attach,
-        preprocess, scoring, celltype_manual, biology, meta_analysis.
-
-    Returns
-    -------
-    str
-        Confirmation message.
-    """
-    try:
-        reg = _registry()
-        reg.mark_phase_complete(project_name, phase)
-        return f"Marked phase '{phase}' as complete for project '{project_name}'."
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: get_phase_status
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def get_phase_status(project_name: str, phase: str) -> str:
-    """Return the status and checkpoint details for a specific phase of a project.
-
-    Parameters
-    ----------
-    project_name
-        Project name (e.g. ggo_visium).
-    phase
-        Phase slug: ingest_raw, ingest_load, qc_filter, metadata_attach,
-        preprocess, scoring, celltype_manual, biology, meta_analysis.
-
-    Returns
-    -------
-    str
-        Formatted phase details including status, n_obs, n_samples, notes.
-    """
-    try:
-        reg = _registry()
-        row = reg.get_phase(project_name, phase)
-        if row is None:
-            return (
-                f"No phase entry for project='{project_name}' phase='{phase}'. "
-                "Use set_phase_status to create one."
-            )
-        lines = [f"Phase '{phase}' for project '{project_name}':"]
-        lines.append(f"  status        : {row['status']}")
-        lines.append(f"  entry_phase   : {row.get('entry_phase', False)}")
-        if row.get("n_obs"):
-            lines.append(f"  n_obs         : {row['n_obs']}")
-        if row.get("n_vars"):
-            lines.append(f"  n_vars        : {row['n_vars']}")
-        if row.get("n_samples"):
-            lines.append(f"  n_samples     : {row['n_samples']}")
-        if row.get("primary_dataset_id"):
-            lines.append(f"  dataset_id    : {row['primary_dataset_id']}")
-        if row.get("notes"):
-            lines.append(f"  notes         : {row['notes']}")
-        lines.append(f"  updated_at    : {row.get('updated_at', '')}")
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: set_phase_status
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def set_phase_status(
-    project_name: str,
-    phase: str,
-    status: str,
-    notes: str = "",
-    n_obs: int = 0,
-    n_vars: int = 0,
-    n_samples: int = 0,
-) -> str:
-    """Update the pipeline status for a phase.
-
-    Creates a data row if none exists for this phase (upsert).
-
-    Parameters
-    ----------
-    project_name
-        Project name (e.g. ggo_visium).
-    phase
-        Phase slug: ingest_raw, ingest_load, qc_filter, metadata_attach,
-        preprocess, scoring, celltype_manual, biology, meta_analysis.
-    status
-        New status: not_started | in_progress | complete | failed | skipped.
-    notes
-        Optional free-text notes (e.g. method selection rationale).
-    n_obs
-        Number of cells/spots at this phase (0 to skip).
-    n_vars
-        Number of genes/proteins at this phase (0 to skip).
-    n_samples
-        Number of samples at this phase (0 to skip).
-
-    Returns
-    -------
-    str
-        Confirmation message.
-    """
-    try:
-        reg = _registry()
-        reg.upsert_phase(
-            project_name,
-            phase,
-            status=status,
-            notes=notes if notes else None,
-            n_obs=n_obs if n_obs else None,
-            n_vars=n_vars if n_vars else None,
-            n_samples=n_samples if n_samples else None,
-        )
-        parts = [f"Set phase '{phase}' to status='{status}' for project '{project_name}'."]
-        if n_obs:
-            parts.append(f"n_obs={n_obs:,}")
-        if n_vars:
-            parts.append(f"n_vars={n_vars:,}")
-        if n_samples:
-            parts.append(f"n_samples={n_samples}")
-        return " ".join(parts)
     except Exception as exc:
         return f"ERROR: {exc}"
 
@@ -729,50 +976,6 @@ def list_data_sources(
 
 
 # ---------------------------------------------------------------------------
-# Tool: link_project_data_source
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def link_project_data_source(
-    project_name: str,
-    data_source_name: str,
-    role: str = "input",
-    notes: str = "",
-) -> str:
-    """Link a project to a data source.
-
-    Parameters
-    ----------
-    project_name
-        Project name (must already exist in registry).
-    data_source_name
-        Data source name (must already exist in registry).
-    role
-        input (primary data used) | reference (e.g. scRNA ref for deconvolution) |
-        supplementary (additional context).
-    notes
-        Optional free-text notes about the link.
-
-    Returns
-    -------
-    str
-        Confirmation message.
-    """
-    try:
-        reg = _registry()
-        link_id = reg.link_project_data_source(
-            project_name, data_source_name, role=role, notes=notes or None
-        )
-        return (
-            f"Linked project '{project_name}' -> data source '{data_source_name}' "
-            f"(role={role}, link_id={link_id})."
-        )
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
 # Tool: add_subject (backward compat -> add_patient)
 # ---------------------------------------------------------------------------
 
@@ -892,179 +1095,6 @@ def list_subjects(
 
 
 # ---------------------------------------------------------------------------
-# Tool: add_sample (deprecated)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def add_sample(
-    sample_id: str,
-    subject_id: str = "",
-    project_name: str = "",
-    tissue: str = "",
-    tissue_region: str = "",
-    fixation_method: str = "",
-    sample_type: str = "",
-    batch: str = "",
-    notes: str = "",
-) -> str:
-    """Samples table has been merged into patients (migration 0008).
-
-    Sample info is now stored in patients.metadata JSONB.
-
-    Returns
-    -------
-    str
-        Deprecation notice.
-    """
-    return (
-        "Samples table has been removed (migration 0008). "
-        "Sample info is now stored in patients.metadata JSONB. "
-        "Use add_subject to register a patient with sample metadata."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Tool: list_samples (deprecated)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def list_samples(
-    project_name: str = "",
-    subject_id: str = "",
-    batch: str = "",
-) -> str:
-    """Samples table has been merged into patients (migration 0008).
-
-    Returns
-    -------
-    str
-        Deprecation notice.
-    """
-    return (
-        "Samples table has been removed (migration 0008). "
-        "Sample info is now in patients.metadata JSONB."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Tool: register_biodata (backward compat -> register_data)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def register_biodata(
-    project_name: str,
-    category: str,
-    platform: str,
-    uri: str,
-    fmt: str = "",
-    status: str = "pending",
-    file_role: str = "primary",
-    phase: str = "",
-    n_obs: int = 0,
-    n_vars: int = 0,
-) -> str:
-    """Register a data object in the registry.
-
-    Parameters
-    ----------
-    project_name
-        Project name (must already exist).
-    category
-        Data category: spatial_seq | image | rnaseq | epigenomics | genome_seq.
-    platform
-        Platform slug (e.g. visium, imc, xenium, chromium_3p).
-    uri
-        Path or URI to the data file.
-    fmt
-        File format: h5ad, zarr, tiff, tsv, fastq, bam, bed.
-    phase
-        Pipeline phase slug (optional).
-
-    Returns
-    -------
-    str
-        Confirmation with assigned data id.
-    """
-    try:
-        reg = _registry()
-        bd_id = reg.register_data(
-            project_name,
-            phase=phase or "unknown",
-            uri=uri,
-            fmt=fmt or None,
-            platform=platform,
-            category=category,
-            status=status,
-            file_role=file_role,
-            n_obs=n_obs or None,
-            n_vars=n_vars or None,
-        )
-        return f"Data[{category}] registered (id={bd_id}) for '{project_name}' at {uri}"
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
-# Tool: list_biodata (backward compat -> list_datasets)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def list_biodata(
-    project_name: str = "",
-    category: str = "",
-    platform: str = "",
-    modality: str = "",
-) -> str:
-    """List data objects in the registry, with optional filters.
-
-    Parameters
-    ----------
-    project_name
-        Filter by project name.
-    category
-        Filter by category: spatial_seq | image | rnaseq | epigenomics | genome_seq.
-    platform
-        Filter by platform slug (e.g. visium, imc).
-    modality
-        Filter by modality string.
-
-    Returns
-    -------
-    str
-        Formatted list of data objects.
-    """
-    try:
-        reg = _registry()
-        items = reg.list_biodata(
-            project_name=project_name or None,
-            category=category or None,
-            platform=platform or None,
-        )
-        if modality:
-            items = [bd for bd in items if bd.get("modality") == modality]
-        if not items:
-            return "No data objects found matching the given filters."
-        lines = [f"Data objects ({len(items)} total):"]
-        for bd in items:
-            role = bd.get("file_role", "primary")
-            mod = bd.get("modality", "")
-            mod_str = f" modality={mod}" if mod else ""
-            lines.append(
-                f"  id={bd['id']} category={bd.get('category', '')} "
-                f"platform={bd.get('platform', '')} "
-                f"role={role} status={bd.get('status', '')}{mod_str}"
-            )
-            lines.append(f"    uri: {bd['uri']}")
-        return "\n".join(lines)
-    except Exception as exc:
-        return f"ERROR: {exc}"
-
-
-# ---------------------------------------------------------------------------
 # Tool: list_modalities
 # ---------------------------------------------------------------------------
 
@@ -1105,46 +1135,276 @@ def list_modalities(biodata_type: str = "") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Tool: project_data_summary
+# Tool: register_dataset (backward compat wrapper -- DEPRECATED)
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def project_data_summary(project_name: str) -> str:
-    """Return a summary of data objects for a project, grouped by category and platform.
+def register_dataset(
+    project_name: str,
+    phase: str,
+    uri: str,
+    fmt: str = "h5ad",
+    sample_id: str = "",
+    status: str = "ready",
+    file_role: str = "primary",
+    validated: bool = False,
+    n_obs: int = 0,
+    n_vars: int = 0,
+) -> str:
+    """[DEPRECATED] Register a checkpoint dataset. Use register_inventory_item instead.
+
+    This is a backward-compatibility wrapper. It calls the deprecated
+    Registry.register_dataset() method which internally creates an
+    inventory item.
 
     Parameters
     ----------
     project_name
         Project name.
+    phase
+        Phase slug.
+    uri
+        Path or URI to the checkpoint file.
+    fmt
+        File format (default h5ad).
+    sample_id
+        Optional sample identifier.
+    status
+        Dataset status (default ready).
+    file_role
+        File role (default primary).
+    validated
+        Whether checkpoint has been validated.
+    n_obs
+        Number of observations (0 to skip).
+    n_vars
+        Number of variables (0 to skip).
 
     Returns
     -------
     str
-        Formatted summary with counts.
+        Confirmation with assigned id. Includes deprecation notice.
     """
     try:
         reg = _registry()
-        summary = reg.project_data_summary(project_name)
-        lines = [
-            f"Data summary for '{project_name}':",
-            f"  Total data objects: {summary['total']}",
-        ]
-        if summary["by_category"]:
-            lines.append("  By category:")
-            for cat, count in sorted(summary["by_category"].items()):
-                lines.append(f"    {cat}: {count}")
-        if summary.get("by_modality"):
-            lines.append("  By modality:")
-            for mod, count in sorted(summary["by_modality"].items()):
-                lines.append(f"    {mod}: {count}")
-        if summary["by_platform"]:
-            lines.append("  By platform:")
-            for plat, count in sorted(summary["by_platform"].items()):
-                lines.append(f"    {plat}: {count}")
+        ds_id = reg.register_dataset(
+            project_name=project_name,
+            phase=phase,
+            uri=uri,
+            sample_id=sample_id if sample_id else None,
+            fmt=fmt,
+            status=status,
+            file_role=file_role,
+            validated=validated,
+            n_obs=n_obs if n_obs else None,
+            n_vars=n_vars if n_vars else None,
+        )
+        return (
+            f"[DEPRECATED] Registered dataset id={ds_id}: {project_name}/{phase} "
+            f"[{file_role}] at {uri}. "
+            "Please migrate to register_inventory_item + create_dataset."
+        )
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: register_biodata (backward compat wrapper -- DEPRECATED)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def register_biodata(
+    project_name: str,
+    category: str,
+    platform: str,
+    uri: str,
+    fmt: str = "",
+    status: str = "pending",
+    file_role: str = "primary",
+    phase: str = "",
+    n_obs: int = 0,
+    n_vars: int = 0,
+) -> str:
+    """[DEPRECATED] Register a data object. Use register_inventory_item instead.
+
+    This is a backward-compatibility wrapper.
+
+    Parameters
+    ----------
+    project_name
+        Project name (must already exist).
+    category
+        Data category: spatial_seq | image | rnaseq | epigenomics | genome_seq.
+    platform
+        Platform slug (e.g. visium, imc, xenium, chromium_3p).
+    uri
+        Path or URI to the data file.
+    fmt
+        File format: h5ad, zarr, tiff, tsv, fastq, bam, bed.
+    phase
+        Pipeline phase slug (optional).
+
+    Returns
+    -------
+    str
+        Confirmation with assigned data id. Includes deprecation notice.
+    """
+    try:
+        reg = _registry()
+        bd_id = reg.register_data(
+            project_name,
+            phase=phase or "unknown",
+            uri=uri,
+            fmt=fmt or None,
+            platform=platform,
+            category=category,
+            status=status,
+            file_role=file_role,
+            n_obs=n_obs or None,
+            n_vars=n_vars or None,
+        )
+        return (
+            f"[DEPRECATED] Data[{category}] registered (id={bd_id}) "
+            f"for '{project_name}' at {uri}. "
+            "Please migrate to register_inventory_item."
+        )
+    except Exception as exc:
+        return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: list_biodata (backward compat wrapper -- DEPRECATED)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_biodata(
+    project_name: str = "",
+    category: str = "",
+    platform: str = "",
+    modality: str = "",
+) -> str:
+    """[DEPRECATED] List data objects. Use list_inventory_items instead.
+
+    This is a backward-compatibility wrapper.
+
+    Parameters
+    ----------
+    project_name
+        Filter by project name.
+    category
+        Filter by category.
+    platform
+        Filter by platform slug.
+    modality
+        Filter by modality string.
+
+    Returns
+    -------
+    str
+        Formatted list of data objects. Includes deprecation notice.
+    """
+    try:
+        reg = _registry()
+        items = reg.list_biodata(
+            project_name=project_name or None,
+            category=category or None,
+            platform=platform or None,
+        )
+        if modality:
+            items = [bd for bd in items if bd.get("modality") == modality]
+        if not items:
+            return "[DEPRECATED] No data objects found. Use list_inventory_items instead."
+        lines = [f"[DEPRECATED] Data objects ({len(items)} total) -- use list_inventory_items:"]
+        for bd in items:
+            role = bd.get("file_role", "primary")
+            mod = bd.get("modality", "")
+            mod_str = f" modality={mod}" if mod else ""
+            lines.append(
+                f"  id={bd['id']} category={bd.get('category', '')} "
+                f"platform={bd.get('platform', '')} "
+                f"role={role} status={bd.get('status', '')}{mod_str}"
+            )
+            lines.append(f"    uri: {bd['uri']}")
         return "\n".join(lines)
     except Exception as exc:
         return f"ERROR: {exc}"
+
+
+# ---------------------------------------------------------------------------
+# Tool: link_project_data_source (DEPRECATED stub)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def link_project_data_source(
+    project_name: str,
+    data_source_name: str,
+    role: str = "input",
+    notes: str = "",
+) -> str:
+    """[DEPRECATED] Link a project to a data source.
+
+    This tool is deprecated. Use link_project_dataset instead.
+    Data sources are now linked to projects through datasets:
+    register_inventory_item -> create_dataset -> add_dataset_member -> link_project_dataset.
+
+    Parameters
+    ----------
+    project_name
+        Project name.
+    data_source_name
+        Data source name.
+    role
+        Link role.
+    notes
+        Optional notes.
+
+    Returns
+    -------
+    str
+        Deprecation notice.
+    """
+    return (
+        "Deprecated. Use link_project_dataset instead. "
+        "Data sources are now linked to projects through the inventory/dataset layer: "
+        "register_inventory_item -> create_dataset -> add_dataset_member -> link_project_dataset."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool: get_checkpoint_uri (DEPRECATED stub)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def get_checkpoint_uri(project_name: str, phase: str = "", sample_id: str = "") -> str:
+    """[DEPRECATED] Get checkpoint URI. Use get_phase_status instead.
+
+    Checkpoint URIs are now stored in the project_phases table. Use
+    get_phase_status to retrieve phase details including URI.
+
+    Parameters
+    ----------
+    project_name
+        Project name.
+    phase
+        Phase slug.
+    sample_id
+        Sample identifier (ignored in new schema).
+
+    Returns
+    -------
+    str
+        Deprecation notice with migration guidance.
+    """
+    return (
+        "Deprecated. Checkpoint URIs are now stored in the project_phases table. "
+        "Use get_phase_status(project_name, phase_group, subphase) to retrieve "
+        "phase details including the URI."
+    )
 
 
 # ---------------------------------------------------------------------------

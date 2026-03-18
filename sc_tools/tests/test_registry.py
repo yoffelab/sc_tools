@@ -1,17 +1,13 @@
-"""Unit tests for sc_tools.registry."""
+"""Unit tests for sc_tools.registry -- four-layer schema."""
 
 from __future__ import annotations
 
-import json
 import warnings
 
 import pytest
 
 # Skip all tests if SQLAlchemy is not installed
 sqlalchemy = pytest.importorskip("sqlalchemy", reason="sqlalchemy not installed")
-
-# Suppress register_dataset deprecation warnings in existing tests
-pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 # ---------------------------------------------------------------------------
@@ -21,15 +17,48 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 @pytest.fixture()
 def reg(tmp_path):
-    """Return an in-memory SQLite Registry for testing."""
+    """Return a file-backed SQLite Registry for testing."""
     from sc_tools.registry import Registry
 
     db_url = f"sqlite:///{tmp_path / 'test_registry.db'}"
     return Registry(db_url=db_url)
 
 
+def _make_data_source(reg, name="src_geo_ibd", **kwargs):
+    """Helper: register a data source with sensible defaults."""
+    defaults = {
+        "uri": "s3://bucket/raw/geo_ibd",
+        "platform": "visium",
+        "source_type": "geo",
+        "disease": "ibd",
+        "tissue": "colon",
+    }
+    defaults.update(kwargs)
+    return reg.register_data_source(name, **defaults)
+
+
+def _make_inventory_item(reg, name="item_rna_v1", **kwargs):
+    """Helper: register an inventory item with sensible defaults."""
+    defaults = {"uri": "/data/rna_v1.h5ad", "modality": "rna"}
+    defaults.update(kwargs)
+    return reg.register_inventory_item(name, **defaults)
+
+
+def _make_dataset(reg, name="ds_ibd_v1"):
+    """Helper: create a dataset."""
+    return reg.create_dataset(name)
+
+
+def _setup_project_with_dataset(reg, project="proj_a", dataset="ds_a"):
+    """Helper: create a project, dataset, and link them."""
+    reg.add_project(project, platform="visium")
+    reg.create_dataset(dataset)
+    reg.link_project_dataset(project, dataset)
+    return project, dataset
+
+
 # ---------------------------------------------------------------------------
-# Projects
+# TestProjects
 # ---------------------------------------------------------------------------
 
 
@@ -45,1185 +74,907 @@ class TestProjects:
         assert pid1 == pid2
 
     def test_get_project(self, reg):
-        reg.add_project("proj_b", platform="imc")
+        reg.add_project("proj_b")
         proj = reg.get_project("proj_b")
         assert proj is not None
         assert proj["name"] == "proj_b"
-        assert proj["platform"] == "imc"
-        assert proj["status"] == "active"
 
-    def test_get_project_missing(self, reg):
+    def test_get_project_not_found(self, reg):
         assert reg.get_project("nonexistent") is None
 
     def test_list_projects(self, reg):
-        reg.add_project("p1", platform="visium")
-        reg.add_project("p2", platform="xenium")
+        reg.add_project("proj_a")
+        reg.add_project("proj_b")
         projects = reg.list_projects()
         names = [p["name"] for p in projects]
-        assert "p1" in names
-        assert "p2" in names
+        assert "proj_a" in names
+        assert "proj_b" in names
 
-    def test_mark_phase_complete(self, reg):
-        reg.add_project("proj_c", platform="visium")
-        reg.mark_phase_complete("proj_c", "p1")
-        reg.mark_phase_complete("proj_c", "p2")
-        proj = reg.get_project("proj_c")
-        phases = json.loads(proj["phases_complete"])
-        assert "p1" in phases
-        assert "p2" in phases
+    def test_delete_project(self, reg):
+        reg.add_project("proj_del")
+        assert reg.delete_project("proj_del") is True
+        assert reg.get_project("proj_del") is None
 
-    def test_mark_phase_complete_idempotent(self, reg):
-        reg.add_project("proj_d", platform="visium")
-        reg.mark_phase_complete("proj_d", "p1")
-        reg.mark_phase_complete("proj_d", "p1")  # duplicate
-        proj = reg.get_project("proj_d")
-        phases = json.loads(proj["phases_complete"])
-        assert phases.count("p1") == 1
-
-    def test_mark_phase_complete_missing_project(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.mark_phase_complete("nonexistent", "p1")
+    def test_delete_project_not_found(self, reg):
+        assert reg.delete_project("nonexistent") is False
 
 
 # ---------------------------------------------------------------------------
-# Datasets
+# TestDataSources
+# ---------------------------------------------------------------------------
+
+
+class TestDataSources:
+    def test_register_data_source(self, reg):
+        sid = _make_data_source(reg)
+        assert isinstance(sid, int)
+        assert sid > 0
+
+    def test_register_data_source_idempotent(self, reg):
+        sid1 = _make_data_source(reg)
+        sid2 = _make_data_source(reg)
+        assert sid1 == sid2
+
+    def test_get_data_source(self, reg):
+        _make_data_source(reg, name="src_a")
+        ds = reg.get_data_source("src_a")
+        assert ds is not None
+        assert ds["name"] == "src_a"
+        assert ds["platform"] == "visium"
+
+    def test_get_data_source_not_found(self, reg):
+        assert reg.get_data_source("nonexistent") is None
+
+    def test_list_data_sources_no_filter(self, reg):
+        _make_data_source(reg, name="src_a", platform="visium")
+        _make_data_source(reg, name="src_b", platform="imc")
+        results = reg.list_data_sources()
+        assert len(results) == 2
+
+    def test_list_data_sources_filter_platform(self, reg):
+        _make_data_source(reg, name="src_a", platform="visium")
+        _make_data_source(reg, name="src_b", platform="imc")
+        results = reg.list_data_sources(platform="visium")
+        assert len(results) == 1
+        assert results[0]["name"] == "src_a"
+
+    def test_list_data_sources_filter_disease(self, reg):
+        _make_data_source(reg, name="src_a", disease="ibd")
+        _make_data_source(reg, name="src_b", disease="cancer")
+        results = reg.list_data_sources(disease="ibd")
+        assert len(results) == 1
+        assert results[0]["name"] == "src_a"
+
+    def test_list_data_sources_filter_tissue(self, reg):
+        _make_data_source(reg, name="src_a", tissue="colon")
+        _make_data_source(reg, name="src_b", tissue="liver")
+        results = reg.list_data_sources(tissue="colon")
+        assert len(results) == 1
+        assert results[0]["name"] == "src_a"
+
+    def test_list_data_sources_filter_source_type(self, reg):
+        _make_data_source(reg, name="src_a", source_type="geo")
+        _make_data_source(reg, name="src_b", source_type="hpc_directory")
+        results = reg.list_data_sources(source_type="geo")
+        assert len(results) == 1
+        assert results[0]["name"] == "src_a"
+
+
+# ---------------------------------------------------------------------------
+# TestInventoryItems
+# ---------------------------------------------------------------------------
+
+
+class TestInventoryItems:
+    def test_register_linked_to_data_source(self, reg):
+        _make_data_source(reg, name="src_a")
+        iid = reg.register_inventory_item(
+            "item_a",
+            uri="/data/item_a.h5ad",
+            modality="rna",
+            data_source_name="src_a",
+        )
+        assert isinstance(iid, int)
+        item = reg.get_inventory_item("item_a")
+        assert item is not None
+        assert item["data_source_id"] is not None
+
+    def test_register_standalone(self, reg):
+        iid = _make_inventory_item(reg, name="item_standalone")
+        assert isinstance(iid, int)
+        item = reg.get_inventory_item("item_standalone")
+        assert item is not None
+        assert item["data_source_id"] is None
+
+    def test_register_idempotent(self, reg):
+        iid1 = _make_inventory_item(reg, name="item_x")
+        iid2 = _make_inventory_item(reg, name="item_x")
+        assert iid1 == iid2
+
+    def test_register_invalid_data_source_raises(self, reg):
+        with pytest.raises(ValueError, match="DataSource.*not found"):
+            reg.register_inventory_item(
+                "item_bad",
+                uri="/data/bad.h5ad",
+                modality="rna",
+                data_source_name="nonexistent_source",
+            )
+
+    def test_get_inventory_item(self, reg):
+        _make_inventory_item(reg, name="item_a")
+        item = reg.get_inventory_item("item_a")
+        assert item["name"] == "item_a"
+        assert item["modality"] == "rna"
+
+    def test_get_inventory_item_not_found(self, reg):
+        assert reg.get_inventory_item("nonexistent") is None
+
+    def test_list_inventory_items_no_filter(self, reg):
+        _make_inventory_item(reg, name="item_a", modality="rna")
+        _make_inventory_item(reg, name="item_b", modality="protein")
+        results = reg.list_inventory_items()
+        assert len(results) == 2
+
+    def test_list_inventory_items_filter_modality(self, reg):
+        _make_inventory_item(reg, name="item_a", modality="rna")
+        _make_inventory_item(reg, name="item_b", modality="protein")
+        results = reg.list_inventory_items(modality="rna")
+        assert len(results) == 1
+        assert results[0]["name"] == "item_a"
+
+    def test_list_inventory_items_filter_platform(self, reg):
+        _make_inventory_item(reg, name="item_a", platform="visium")
+        _make_inventory_item(reg, name="item_b", platform="imc")
+        results = reg.list_inventory_items(platform="visium")
+        assert len(results) == 1
+        assert results[0]["name"] == "item_a"
+
+
+# ---------------------------------------------------------------------------
+# TestDatasets
 # ---------------------------------------------------------------------------
 
 
 class TestDatasets:
-    def test_register_dataset(self, reg):
-        reg.add_project("proj", platform="visium")
-        ds_id = reg.register_dataset("proj", phase="qc_filter", uri="/data/adata.raw.h5ad")
-        assert isinstance(ds_id, int)
+    def test_create_dataset(self, reg):
+        did = reg.create_dataset("ds_a")
+        assert isinstance(did, int)
+        assert did > 0
 
-    def test_register_dataset_missing_project(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.register_dataset("nonexistent", phase="p1", uri="/x.h5ad")
+    def test_create_dataset_idempotent(self, reg):
+        did1 = reg.create_dataset("ds_a")
+        did2 = reg.create_dataset("ds_a")
+        assert did1 == did2
 
-    def test_get_dataset_uri(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="preprocess", uri="/results/adata.normalized.h5ad")
-        uri = reg.get_dataset_uri("proj", phase="preprocess")
-        assert uri == "/results/adata.normalized.h5ad"
+    def test_get_dataset_by_name(self, reg):
+        reg.create_dataset("ds_a", description="test dataset")
+        ds = reg.get_dataset("ds_a")
+        assert ds is not None
+        assert ds["name"] == "ds_a"
+        assert ds["version"] == 1
+        assert ds["is_current"] is True
+        assert ds["description"] == "test dataset"
 
-    def test_get_dataset_uri_with_sample(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset("proj", phase="p0", uri="/data/s1/adata.p0.h5ad", sample_id="s1")
-        reg.register_dataset("proj", phase="p0", uri="/data/s2/adata.p0.h5ad", sample_id="s2")
-        assert reg.get_dataset_uri("proj", "p0", sample_id="s1") == "/data/s1/adata.p0.h5ad"
-        assert reg.get_dataset_uri("proj", "p0", sample_id="s2") == "/data/s2/adata.p0.h5ad"
+    def test_get_dataset_by_version(self, reg):
+        reg.create_dataset("ds_a")
+        ds = reg.get_dataset("ds_a", version=1)
+        assert ds is not None
+        assert ds["version"] == 1
 
-    def test_get_dataset_uri_missing(self, reg):
-        reg.add_project("proj", platform="visium")
-        assert reg.get_dataset_uri("proj", "p99") is None
+    def test_get_dataset_not_found(self, reg):
+        assert reg.get_dataset("nonexistent") is None
 
-    def test_get_dataset_uri_missing_project(self, reg):
-        assert reg.get_dataset_uri("nonexistent", "p1") is None
+    def test_get_dataset_current(self, reg):
+        reg.create_dataset("ds_a")
+        ds = reg.get_dataset("ds_a")
+        assert ds["is_current"] is True
 
-    def test_list_datasets(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="p1", uri="/a.h5ad")
-        reg.register_dataset("proj", phase="p3", uri="/b.h5ad")
-        datasets = reg.list_datasets(project_name="proj")
-        assert len(datasets) == 2
-        phases = {d["phase"] for d in datasets}
-        assert phases == {"p1", "p3"}
+    def test_add_dataset_member(self, reg):
+        reg.create_dataset("ds_a")
+        _make_inventory_item(reg, name="item_rna")
+        mid = reg.add_dataset_member("ds_a", "item_rna", "rna")
+        assert isinstance(mid, int)
 
-    def test_list_datasets_phase_filter(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="p1", uri="/a.h5ad")
-        reg.register_dataset("proj", phase="p3", uri="/b.h5ad")
-        datasets = reg.list_datasets(project_name="proj", phase="p1")
-        assert len(datasets) == 1
-        assert datasets[0]["phase"] == "p1"
+    def test_add_dataset_member_nonexistent_dataset_raises(self, reg):
+        _make_inventory_item(reg, name="item_rna")
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.add_dataset_member("nonexistent_ds", "item_rna", "rna")
+
+    def test_add_dataset_member_nonexistent_inventory_raises(self, reg):
+        reg.create_dataset("ds_a")
+        with pytest.raises(ValueError, match="Inventory item.*not found"):
+            reg.add_dataset_member("ds_a", "nonexistent_item", "rna")
+
+    def test_add_dataset_member_duplicate_modality_key_raises(self, reg):
+        reg.create_dataset("ds_a")
+        _make_inventory_item(reg, name="item_rna")
+        _make_inventory_item(reg, name="item_rna2", uri="/data/rna2.h5ad")
+        reg.add_dataset_member("ds_a", "item_rna", "rna")
+        with pytest.raises(ValueError, match="Modality key.*already exists"):
+            reg.add_dataset_member("ds_a", "item_rna2", "rna")
+
+    def test_remove_dataset_member(self, reg):
+        reg.create_dataset("ds_a")
+        _make_inventory_item(reg, name="item_rna")
+        reg.add_dataset_member("ds_a", "item_rna", "rna")
+        reg.remove_dataset_member("ds_a", "rna")
+        members = reg.get_dataset_members("ds_a")
+        assert len(members) == 0
+
+    def test_remove_dataset_member_nonexistent_dataset_raises(self, reg):
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.remove_dataset_member("nonexistent_ds", "rna")
+
+    def test_remove_dataset_member_nonexistent_key_raises(self, reg):
+        reg.create_dataset("ds_a")
+        with pytest.raises(ValueError, match="Modality key.*not found"):
+            reg.remove_dataset_member("ds_a", "nonexistent_key")
+
+    def test_get_dataset_members_enriched(self, reg):
+        reg.create_dataset("ds_a")
+        _make_inventory_item(reg, name="item_rna", platform="visium", n_obs=5000, n_vars=2000)
+        reg.add_dataset_member("ds_a", "item_rna", "rna")
+        members = reg.get_dataset_members("ds_a")
+        assert len(members) == 1
+        m = members[0]
+        assert m["modality_key"] == "rna"
+        assert m["inventory_name"] == "item_rna"
+        assert m["inventory_uri"] == "/data/rna_v1.h5ad"
+        assert m["inventory_platform"] == "visium"
+        assert m["n_obs"] == 5000
+        assert m["n_vars"] == 2000
 
     def test_list_datasets_all(self, reg):
-        reg.add_project("p1", platform="visium")
-        reg.add_project("p2", platform="imc")
-        reg.register_dataset("p1", phase="p1", uri="/a.h5ad")
-        reg.register_dataset("p2", phase="p1", uri="/b.h5ad")
-        all_ds = reg.list_datasets()
-        assert len(all_ds) == 2
+        reg.create_dataset("ds_a")
+        reg.create_dataset("ds_b")
+        results = reg.list_datasets()
+        names = [d["name"] for d in results]
+        assert "ds_a" in names
+        assert "ds_b" in names
 
-    def test_update_dataset_status(self, reg):
-        reg.add_project("proj", platform="visium")
-        ds_id = reg.register_dataset("proj", phase="p1", uri="/a.h5ad", status="pending")
-        reg.update_dataset_status(ds_id, "ready")
-        datasets = reg.list_datasets(project_name="proj")
-        assert datasets[0]["status"] == "ready"
-
-    def test_update_dataset_status_missing(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.update_dataset_status(9999, "ready")
+    def test_list_datasets_by_project(self, reg):
+        _setup_project_with_dataset(reg, "proj_a", "ds_a")
+        reg.create_dataset("ds_b")  # not linked to any project
+        results = reg.list_datasets(project_name="proj_a")
+        assert len(results) == 1
+        assert results[0]["name"] == "ds_a"
 
 
 # ---------------------------------------------------------------------------
-# SLURM jobs
+# TestDatasetVersioning
 # ---------------------------------------------------------------------------
 
 
-class TestSlurmJobs:
-    def test_register_job(self, reg):
-        reg.add_project("proj", platform="visium")
-        job_id = reg.register_job(
-            "proj", sample_id="s1", phase="p0", cluster="brb", slurm_job_id="12345"
-        )
-        assert isinstance(job_id, int)
+class TestDatasetVersioning:
+    def test_bump_version_copies_members(self, reg):
+        reg.create_dataset("ds_a")
+        _make_inventory_item(reg, name="item_rna")
+        _make_inventory_item(reg, name="item_protein", uri="/data/protein.h5ad", modality="protein")
+        reg.add_dataset_member("ds_a", "item_rna", "rna")
+        reg.add_dataset_member("ds_a", "item_protein", "protein")
 
-    def test_register_job_missing_project(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.register_job("nonexistent", None, "p0", "brb", "123")
+        new_id = reg.bump_dataset_version("ds_a")
+        assert isinstance(new_id, int)
 
-    def test_update_job_status_completed(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_job("proj", None, "p0", "brb", "999")
-        reg.update_job_status("999", "completed")
-        jobs = reg.list_active_jobs()
-        assert not any(j["slurm_job_id"] == "999" for j in jobs)
+        members_v2 = reg.get_dataset_members("ds_a")
+        keys = {m["modality_key"] for m in members_v2}
+        assert keys == {"rna", "protein"}
 
-    def test_update_job_status_with_error(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_job("proj", None, "p0", "cayuga", "888")
-        reg.update_job_status("888", "failed", error="OOM")
-        # Still findable — it's not active
-        jobs = reg.list_active_jobs()
-        assert not any(j["slurm_job_id"] == "888" for j in jobs)
+    def test_old_version_not_current(self, reg):
+        reg.create_dataset("ds_a")
+        reg.bump_dataset_version("ds_a")
+        old = reg.get_dataset("ds_a", version=1)
+        assert old["is_current"] is False
 
-    def test_update_job_missing(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.update_job_status("nonexistent_id", "completed")
+    def test_new_version_is_current(self, reg):
+        reg.create_dataset("ds_a")
+        reg.bump_dataset_version("ds_a")
+        new = reg.get_dataset("ds_a", version=2)
+        assert new["is_current"] is True
 
-    def test_list_active_jobs(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_job("proj", None, "p0", "brb", "111")
-        reg.register_job("proj", None, "p0", "brb", "222")
-        active = reg.list_active_jobs()
-        slurm_ids = {j["slurm_job_id"] for j in active}
-        assert "111" in slurm_ids
-        assert "222" in slurm_ids
+    def test_get_dataset_returns_current(self, reg):
+        reg.create_dataset("ds_a")
+        reg.bump_dataset_version("ds_a")
+        ds = reg.get_dataset("ds_a")
+        assert ds["version"] == 2
+        assert ds["is_current"] is True
 
-        reg.update_job_status("111", "completed")
-        active = reg.list_active_jobs()
-        assert not any(j["slurm_job_id"] == "111" for j in active)
+    def test_get_dataset_old_version(self, reg):
+        reg.create_dataset("ds_a")
+        reg.bump_dataset_version("ds_a")
+        ds = reg.get_dataset("ds_a", version=1)
+        assert ds["version"] == 1
 
-
-# ---------------------------------------------------------------------------
-# Agent tasks
-# ---------------------------------------------------------------------------
-
-
-class TestAgentTasks:
-    def test_start_and_finish_task(self, reg):
-        reg.add_project("proj", platform="visium")
-        task_id = reg.start_task("qc_report", "proj", inputs={"adata": "/a.h5ad"})
-        assert isinstance(task_id, int)
-
-        running = reg.list_running_tasks()
-        assert any(t["id"] == task_id for t in running)
-
-        reg.finish_task(task_id, outputs={"report": "/qc.html"})
-        running = reg.list_running_tasks()
-        assert not any(t["id"] == task_id for t in running)
-
-    def test_finish_task_with_error(self, reg):
-        reg.add_project("proj", platform="visium")
-        task_id = reg.start_task("scoring", "proj")
-        reg.finish_task(task_id, error="segfault")
-        running = reg.list_running_tasks()
-        assert not any(t["id"] == task_id for t in running)
-
-    def test_start_task_missing_project(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.start_task("qc", "nonexistent")
-
-    def test_finish_task_missing(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.finish_task(9999)
+    def test_bump_nonexistent_raises(self, reg):
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.bump_dataset_version("nonexistent")
 
 
 # ---------------------------------------------------------------------------
-# Status summary
+# TestProjectDatasets
 # ---------------------------------------------------------------------------
 
 
-class TestStatus:
-    def test_status_empty(self, reg):
-        s = reg.status()
-        assert s["n_projects"] == 0
-        assert s["n_datasets"] == 0
-        assert s["active_slurm_jobs"] == 0
-        assert s["running_agent_tasks"] == 0
+class TestProjectDatasets:
+    def test_link_project_dataset(self, reg):
+        reg.add_project("proj_a", platform="visium")
+        reg.create_dataset("ds_a")
+        lid = reg.link_project_dataset("proj_a", "ds_a")
+        assert isinstance(lid, int)
 
-    def test_status_with_data(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="p1", uri="/a.h5ad")
-        reg.register_job("proj", None, "p0", "brb", "42")
-        reg.start_task("qc", "proj")
-        s = reg.status()
-        assert s["n_projects"] == 1
-        assert s["n_datasets"] == 1
-        assert s["active_slurm_jobs"] == 1
-        assert s["running_agent_tasks"] == 1
-        assert "proj" in s["active_projects"]
+    def test_link_project_dataset_idempotent(self, reg):
+        reg.add_project("proj_a", platform="visium")
+        reg.create_dataset("ds_a")
+        lid1 = reg.link_project_dataset("proj_a", "ds_a")
+        lid2 = reg.link_project_dataset("proj_a", "ds_a")
+        assert lid1 == lid2
 
+    def test_link_project_dataset_nonexistent_project_raises(self, reg):
+        reg.create_dataset("ds_a")
+        with pytest.raises(ValueError, match="Project.*not found"):
+            reg.link_project_dataset("nonexistent", "ds_a")
 
-# ---------------------------------------------------------------------------
-# Technology taxonomy
-# ---------------------------------------------------------------------------
+    def test_link_project_dataset_nonexistent_dataset_raises(self, reg):
+        reg.add_project("proj_a")
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.link_project_dataset("proj_a", "nonexistent")
 
+    def test_list_project_datasets(self, reg):
+        reg.add_project("proj_a", platform="visium")
+        reg.create_dataset("ds_a")
+        reg.create_dataset("ds_b")
+        reg.link_project_dataset("proj_a", "ds_a")
+        reg.link_project_dataset("proj_a", "ds_b", role="validation")
+        results = reg.list_project_datasets("proj_a")
+        assert len(results) == 2
+        roles = {d["link_role"] for d in results}
+        assert "primary" in roles
+        assert "validation" in roles
 
-class TestProjectTaxonomy:
-    def test_add_project_with_domain(self, reg):
-        pid = reg.add_project(
-            "ggo_visium",
-            platform="visium",
-            data_type="visium",
-            domain="spatial_transcriptomics",
-            imaging_modality="sequencing_based",
-        )
-        proj = reg.get_project("ggo_visium")
-        assert proj is not None
-        assert proj["domain"] == "spatial_transcriptomics"
-        assert proj["imaging_modality"] == "sequencing_based"
-        assert pid > 0
-
-    def test_add_project_imc_taxonomy(self, reg):
-        reg.add_project(
-            "lymph_dlbcl",
-            platform="imc",
-            domain="spatial_proteomics",
-            imaging_modality="mass_spec_imaging",
-        )
-        proj = reg.get_project("lymph_dlbcl")
-        assert proj["domain"] == "spatial_proteomics"
-        assert proj["imaging_modality"] == "mass_spec_imaging"
-
-    def test_add_project_null_domain_ok(self, reg):
-        reg.add_project("no_domain_proj", platform="visium")
-        proj = reg.get_project("no_domain_proj")
-        assert proj is not None
-        assert proj["domain"] is None
-        assert proj["imaging_modality"] is None
-
-    def test_add_project_idempotent_with_taxonomy(self, reg):
-        pid1 = reg.add_project("proj", platform="imc", domain="spatial_proteomics")
-        pid2 = reg.add_project("proj", platform="imc", domain="spatial_proteomics")
-        assert pid1 == pid2
-
-    def test_list_projects_includes_taxonomy(self, reg):
-        reg.add_project("p1", platform="visium", domain="spatial_transcriptomics")
-        reg.add_project("p2", platform="imc", domain="spatial_proteomics")
-        projects = reg.list_projects()
-        domains = {p["name"]: p["domain"] for p in projects}
-        assert domains["p1"] == "spatial_transcriptomics"
-        assert domains["p2"] == "spatial_proteomics"
+    def test_link_different_roles(self, reg):
+        reg.add_project("proj_a")
+        reg.create_dataset("ds_primary")
+        reg.create_dataset("ds_validation")
+        reg.create_dataset("ds_reference")
+        reg.link_project_dataset("proj_a", "ds_primary", role="primary")
+        reg.link_project_dataset("proj_a", "ds_validation", role="validation")
+        reg.link_project_dataset("proj_a", "ds_reference", role="reference")
+        results = reg.list_project_datasets("proj_a")
+        assert len(results) == 3
 
 
 # ---------------------------------------------------------------------------
-# Dataset file role, validated, n_obs/n_vars
-# ---------------------------------------------------------------------------
-
-
-class TestDatasetFileRole:
-    def test_register_primary_dataset(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset(
-            "proj",
-            phase="qc_filter",
-            uri="/results/adata.raw.h5ad",
-            file_role="primary",
-            n_obs=50000,
-            n_vars=3000,
-        )
-        datasets = reg.list_datasets("proj")
-        assert len(datasets) == 1
-        assert datasets[0]["file_role"] == "primary"
-        assert datasets[0]["n_obs"] == 50000
-        assert datasets[0]["n_vars"] == 3000
-
-    def test_register_supplementary_spatialdata(self, reg):
-        reg.add_project("proj", platform="visium_hd")
-        reg.register_dataset(
-            "proj",
-            phase="ingest_load",
-            uri="/data/s1/adata.h5ad",
-            file_role="primary",
-            sample_id="s1",
-        )
-        reg.register_dataset(
-            "proj",
-            phase="ingest_load",
-            uri="/data/s1/spatialdata.zarr",
-            file_role="spatialdata",
-            sample_id="s1",
-            fmt="zarr",
-        )
-        datasets = reg.list_datasets("proj")
-        assert len(datasets) == 2
-        roles = {d["file_role"] for d in datasets}
-        assert roles == {"primary", "spatialdata"}
-
-    def test_entry_point_role(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset(
-            "proj",
-            phase="celltype_manual",
-            uri="/results/adata.celltyped.h5ad",
-            file_role="entry_point",
-        )
-        ds = reg.list_datasets("proj")[0]
-        assert ds["file_role"] == "entry_point"
-
-    def test_validated_flag_default_false(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        ds = reg.list_datasets("proj")[0]
-        assert ds["validated"] is False
-
-    def test_mark_dataset_validated(self, reg):
-        reg.add_project("proj", platform="visium")
-        ds_id = reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        reg.mark_dataset_validated(ds_id)
-        ds = reg.list_datasets("proj")[0]
-        assert ds["validated"] is True
-
-    def test_mark_dataset_validated_missing(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.mark_dataset_validated(9999)
-
-    def test_register_dataset_with_all_new_fields(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset(
-            "proj",
-            phase="scoring",
-            uri="/results/adata.scored.h5ad",
-            file_role="primary",
-            validated=True,
-            n_obs=248000,
-            n_vars=38,
-        )
-        ds = reg.list_datasets("proj")[0]
-        assert ds["file_role"] == "primary"
-        assert ds["validated"] is True
-        assert ds["n_obs"] == 248000
-        assert ds["n_vars"] == 38
-
-
-# ---------------------------------------------------------------------------
-# Project phases (upsert_phase, get_phase, list_phases)
+# TestProjectPhases
 # ---------------------------------------------------------------------------
 
 
 class TestProjectPhases:
-    def test_upsert_phase_creates_new(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.upsert_phase("proj", "qc_filter", status="in_progress", n_obs=50000, n_samples=8)
-        row = reg.get_phase("proj", "qc_filter")
-        assert row is not None
-        assert row["status"] == "in_progress"
-        assert row["n_obs"] == 50000
-        assert row["n_samples"] == 8
+    def test_upsert_phase_data_processing(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter", status="in_progress")
+        phase = reg.get_phase(proj, "data_processing", "qc_filter")
+        assert phase is not None
+        assert phase["status"] == "in_progress"
+        assert phase["phase_group"] == "data_processing"
+        assert phase["subphase"] == "qc_filter"
 
-    def test_upsert_phase_updates_existing(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.upsert_phase("proj", "qc_filter", status="in_progress")
-        reg.upsert_phase("proj", "qc_filter", status="complete", n_obs=50000)
-        row = reg.get_phase("proj", "qc_filter")
-        assert row["status"] == "complete"
-        assert row["n_obs"] == 50000
+    def test_upsert_phase_discovery(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "discovery", "clustering_v1", status="in_progress")
+        phase = reg.get_phase(proj, "discovery", "clustering_v1")
+        assert phase is not None
+        assert phase["phase_group"] == "discovery"
+        assert phase["subphase"] == "clustering_v1"
 
-    def test_upsert_phase_preserves_existing_n_obs_if_not_provided(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.upsert_phase("proj", "qc_filter", status="in_progress", n_obs=50000)
-        reg.upsert_phase("proj", "qc_filter", status="complete")
-        row = reg.get_phase("proj", "qc_filter")
-        assert row["n_obs"] == 50000  # not overwritten by None
-
-    def test_get_phase_missing_returns_none(self, reg):
-        reg.add_project("proj", platform="visium")
-        assert reg.get_phase("proj", "nonexistent") is None
-
-    def test_get_phase_missing_project_returns_none(self, reg):
-        assert reg.get_phase("nonexistent", "qc_filter") is None
-
-    def test_list_phases_empty(self, reg):
-        reg.add_project("proj", platform="visium")
-        assert reg.list_phases("proj") == []
-
-    def test_list_phases_multiple(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.upsert_phase("proj", "qc_filter", status="complete")
-        reg.upsert_phase("proj", "preprocess", status="complete")
-        reg.upsert_phase("proj", "scoring", status="in_progress")
-        phases = reg.list_phases("proj")
-        assert len(phases) == 3
-        slugs = [p["phase"] for p in phases]
-        # ordered by phase slug (alphabetical)
-        assert "preprocess" in slugs
-        assert "qc_filter" in slugs
-        assert "scoring" in slugs
-
-    def test_list_phases_missing_project(self, reg):
-        assert reg.list_phases("nonexistent") == []
-
-    def test_mark_phase_complete_syncs_project_phases(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.mark_phase_complete("proj", "qc_filter")
-        row = reg.get_phase("proj", "qc_filter")
-        assert row is not None
-        assert row["status"] == "complete"
-        # Legacy phases_complete should also be updated
-        proj = reg.get_project("proj")
-        phases = json.loads(proj["phases_complete"])
-        assert "qc_filter" in phases
-
-    def test_entry_phase_flag(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.upsert_phase("proj", "celltype_manual", status="in_progress", entry_phase=True)
-        row = reg.get_phase("proj", "celltype_manual")
-        assert row["entry_phase"] is True
-
-    def test_upsert_phase_with_primary_dataset_id(self, reg):
-        reg.add_project("proj", platform="visium")
-        ds_id = reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        reg.upsert_phase("proj", "qc_filter", status="complete", primary_dataset_id=ds_id)
-        row = reg.get_phase("proj", "qc_filter")
-        assert row["primary_dataset_id"] == ds_id
-
-    def test_upsert_phase_notes(self, reg):
-        reg.add_project("proj", platform="imc")
+    def test_upsert_phase_update(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter", status="in_progress")
         reg.upsert_phase(
-            "proj",
-            "preprocess",
-            status="complete",
-            notes="9-method benchmark; Z-score+Harmony selected",
+            proj, ds, "data_processing", "qc_filter",
+            status="ready", n_obs=5000, n_vars=2000,
         )
-        row = reg.get_phase("proj", "preprocess")
-        assert "Z-score+Harmony" in row["notes"]
+        phase = reg.get_phase(proj, "data_processing", "qc_filter")
+        assert phase["status"] == "ready"
+        assert phase["n_obs"] == 5000
+        assert phase["n_vars"] == 2000
 
-    def test_upsert_phase_missing_project_raises(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.upsert_phase("nonexistent", "qc_filter")
+    def test_get_phase(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "preprocess", status="in_progress")
+        phase = reg.get_phase(proj, "data_processing", "preprocess")
+        assert phase is not None
+        assert phase["subphase"] == "preprocess"
 
-    def test_status_includes_phase_summary(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.upsert_phase("proj", "qc_filter", status="complete")
-        reg.upsert_phase("proj", "preprocess", status="in_progress")
-        s = reg.status()
-        assert "proj" in s["active_projects"]
-        summary = s.get("phase_summary", {}).get("proj", {})
-        assert summary.get("complete", 0) == 1
-        assert summary.get("in_progress", 0) == 1
+    def test_get_phase_not_found(self, reg):
+        reg.add_project("proj_a")
+        assert reg.get_phase("proj_a", "data_processing", "nonexistent") is None
+
+    def test_list_phases_all(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
+        reg.upsert_phase(proj, ds, "data_processing", "preprocess")
+        reg.upsert_phase(proj, ds, "discovery", "clustering_v1")
+        phases = reg.list_phases(proj)
+        assert len(phases) == 3
+
+    def test_list_phases_filtered_by_group(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
+        reg.upsert_phase(proj, ds, "data_processing", "preprocess")
+        reg.upsert_phase(proj, ds, "discovery", "clustering_v1")
+        dp_phases = reg.list_phases(proj, phase_group="data_processing")
+        assert len(dp_phases) == 2
+        disc_phases = reg.list_phases(proj, phase_group="discovery")
+        assert len(disc_phases) == 1
+
+    def test_mark_phase_complete(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter", status="in_progress")
+        reg.mark_phase_complete(proj, "data_processing", "qc_filter")
+        phase = reg.get_phase(proj, "data_processing", "qc_filter")
+        assert phase["status"] == "ready"
+
+    def test_mark_phase_complete_not_found_raises(self, reg):
+        reg.add_project("proj_a")
+        with pytest.raises(ValueError, match="Phase.*not found"):
+            reg.mark_phase_complete("proj_a", "data_processing", "nonexistent")
+
+    def test_upsert_phase_nonexistent_project_raises(self, reg):
+        reg.create_dataset("ds_a")
+        with pytest.raises(ValueError, match="Project.*not found"):
+            reg.upsert_phase("nonexistent", "ds_a", "data_processing", "qc_filter")
+
+    def test_upsert_phase_nonexistent_dataset_raises(self, reg):
+        reg.add_project("proj_a")
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.upsert_phase("proj_a", "nonexistent", "data_processing", "qc_filter")
 
 
 # ---------------------------------------------------------------------------
-# Subjects
+# TestPatients
 # ---------------------------------------------------------------------------
 
 
-class TestSubjects:
-    def test_add_subject(self, reg):
-        sid = reg.add_subject("PT001", organism="human", sex="M", diagnosis="DLBCL")
-        assert isinstance(sid, int)
-        assert sid > 0
+class TestPatients:
+    def test_add_patient(self, reg):
+        pid = reg.add_patient("PT001", metadata={"organism": "human", "sex": "M"})
+        assert isinstance(pid, int)
+        assert pid > 0
 
-    def test_add_subject_idempotent(self, reg):
-        sid1 = reg.add_subject("PT001")
-        sid2 = reg.add_subject("PT001")
-        assert sid1 == sid2
+    def test_add_patient_idempotent(self, reg):
+        pid1 = reg.add_patient("PT001")
+        pid2 = reg.add_patient("PT001")
+        assert pid1 == pid2
 
-    def test_get_subject(self, reg):
-        reg.add_subject("PT002", organism="mouse", sex="F", diagnosis="GGO")
-        subj = reg.get_subject("PT002")
-        assert subj is not None
-        assert subj["subject_id"] == "PT002"
-        assert subj["organism"] == "mouse"
-        assert subj["sex"] == "F"
-        assert subj["diagnosis"] == "GGO"
+    def test_get_patient(self, reg):
+        reg.add_patient("PT001", metadata={"organism": "human"})
+        pat = reg.get_patient("PT001")
+        assert pat is not None
+        assert pat["patient_id"] == "PT001"
+        assert pat["meta"]["organism"] == "human"
 
-    def test_get_subject_missing(self, reg):
-        assert reg.get_subject("NONEXISTENT") is None
+    def test_get_patient_not_found(self, reg):
+        assert reg.get_patient("NONEXISTENT") is None
 
-    def test_list_subjects_all(self, reg):
-        reg.add_subject("PT001")
-        reg.add_subject("PT002")
-        subjects = reg.list_subjects()
-        ids = [s["subject_id"] for s in subjects]
+    def test_list_patients(self, reg):
+        reg.add_patient("PT001")
+        reg.add_patient("PT002")
+        patients = reg.list_patients()
+        ids = [p["patient_id"] for p in patients]
         assert "PT001" in ids
         assert "PT002" in ids
 
-    def test_list_subjects_filter_diagnosis(self, reg):
-        reg.add_subject("PT001", diagnosis="DLBCL")
-        reg.add_subject("PT002", diagnosis="UC")
-        result = reg.list_subjects(diagnosis="DLBCL")
-        assert len(result) == 1
-        assert result[0]["subject_id"] == "PT001"
-
-    def test_list_subjects_filter_tissue(self, reg):
-        reg.add_subject("PT001", tissue_of_origin="lymph_node")
-        reg.add_subject("PT002", tissue_of_origin="colon")
-        result = reg.list_subjects(tissue="lymph")
-        assert len(result) == 1
-        assert result[0]["subject_id"] == "PT001"
-
-    def test_list_subjects_by_project(self, reg):
-        reg.add_project("proj_a", platform="visium")
-        reg.add_subject("PT001")
-        reg.add_subject("PT002")
-        reg.link_subject_to_project("PT001", "proj_a")
-        result = reg.list_subjects(project_name="proj_a")
-        assert len(result) == 1
-        assert result[0]["subject_id"] == "PT001"
-
-    def test_add_subject_with_clinical_overflow(self, reg):
-        reg.add_subject(
-            "PT003",
-            diagnosis="DLBCL",
-            clinical_metadata_json='{"response": "CR", "cycles": 6}',
-        )
-        subj = reg.get_subject("PT003")
-        assert subj["clinical_metadata_json"] is not None
-        import json
-
-        data = json.loads(subj["clinical_metadata_json"])
-        assert data["response"] == "CR"
-
-    def test_link_subject_to_project(self, reg):
-        reg.add_project("proj_a", platform="visium")
-        reg.add_subject("PT001")
-        link_id = reg.link_subject_to_project("PT001", "proj_a")
-        assert isinstance(link_id, int)
-
-    def test_link_subject_idempotent(self, reg):
-        reg.add_project("proj_a", platform="visium")
-        reg.add_subject("PT001")
-        id1 = reg.link_subject_to_project("PT001", "proj_a")
-        id2 = reg.link_subject_to_project("PT001", "proj_a")
-        assert id1 == id2
-
-    def test_link_subject_missing_subject_raises(self, reg):
-        reg.add_project("proj_a", platform="visium")
-        with pytest.raises(ValueError, match="not found"):
-            reg.link_subject_to_project("NONEXISTENT", "proj_a")
-
-    def test_link_subject_missing_project_raises(self, reg):
-        reg.add_subject("PT001")
-        with pytest.raises(ValueError, match="not found"):
-            reg.link_subject_to_project("PT001", "nonexistent_proj")
-
 
 # ---------------------------------------------------------------------------
-# Samples
+# TestSamples
 # ---------------------------------------------------------------------------
 
 
 class TestSamples:
-    def test_add_sample(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.add_subject("PT001")
-        sid = reg.add_sample("S001", subject_id="PT001", project_name="proj", tissue="colon")
+    def test_register_sample(self, reg):
+        sid = reg.register_sample("SAMPLE001", tissue="colon")
         assert isinstance(sid, int)
         assert sid > 0
 
-    def test_add_sample_without_subject(self, reg):
-        reg.add_project("proj", platform="visium")
-        sid = reg.add_sample("S002", project_name="proj")
-        assert isinstance(sid, int)
+    def test_register_sample_idempotent(self, reg):
+        sid1 = reg.register_sample("SAMPLE001")
+        sid2 = reg.register_sample("SAMPLE001")
+        assert sid1 == sid2
 
-    def test_add_sample_missing_subject_raises(self, reg):
-        reg.add_project("proj", platform="visium")
-        with pytest.raises(ValueError, match="not found"):
-            reg.add_sample("S001", subject_id="NONEXISTENT", project_name="proj")
+    def test_register_sample_with_patient(self, reg):
+        reg.add_patient("PT001")
+        reg.register_sample("PT001_biopsy1", patient_id="PT001", tissue="colon")
+        sample = reg.get_sample("PT001_biopsy1")
+        assert sample is not None
+        assert sample["sample_id"] == "PT001_biopsy1"
+        assert sample["tissue"] == "colon"
+        assert sample["patient_id"] is not None
 
-    def test_add_sample_missing_project_raises(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.add_sample("S001", project_name="nonexistent")
+    def test_register_sample_patient_not_found(self, reg):
+        with pytest.raises(ValueError, match="Patient.*not found"):
+            reg.register_sample("SAMPLE001", patient_id="NONEXISTENT")
 
     def test_get_sample(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.add_subject("PT001")
-        reg.add_sample(
-            "S001",
-            subject_id="PT001",
-            project_name="proj",
-            tissue="lymph_node",
-            fixation_method="FFPE",
-        )
-        sample = reg.get_sample("S001")
-        assert sample is not None
-        assert sample["tissue"] == "lymph_node"
-        assert sample["fixation_method"] == "FFPE"
+        reg.register_sample("SAMPLE001", tissue="liver")
+        s = reg.get_sample("SAMPLE001")
+        assert s is not None
+        assert s["tissue"] == "liver"
 
-    def test_get_sample_scoped_to_project(self, reg):
-        reg.add_project("proj_a", platform="visium")
-        reg.add_project("proj_b", platform="imc")
-        reg.add_sample("S001", project_name="proj_a")
-        reg.add_sample("S001", project_name="proj_b")
-        sample_a = reg.get_sample("S001", project_name="proj_a")
-        sample_b = reg.get_sample("S001", project_name="proj_b")
-        assert sample_a["project_id"] != sample_b["project_id"]
-
-    def test_get_sample_missing(self, reg):
+    def test_get_sample_not_found(self, reg):
         assert reg.get_sample("NONEXISTENT") is None
 
-    def test_list_samples_by_project(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.add_sample("S001", project_name="proj")
-        reg.add_sample("S002", project_name="proj")
-        samples = reg.list_samples(project_name="proj")
-        assert len(samples) == 2
+    def test_list_samples(self, reg):
+        reg.register_sample("S001")
+        reg.register_sample("S002")
+        samples = reg.list_samples()
+        ids = [s["sample_id"] for s in samples]
+        assert "S001" in ids
+        assert "S002" in ids
 
-    def test_list_samples_by_subject(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.add_subject("PT001")
-        reg.add_subject("PT002")
-        reg.add_sample("S001", subject_id="PT001", project_name="proj")
-        reg.add_sample("S002", subject_id="PT002", project_name="proj")
-        samples = reg.list_samples(subject_id="PT001")
+    def test_list_samples_by_patient(self, reg):
+        reg.add_patient("PT001")
+        reg.add_patient("PT002")
+        reg.register_sample("S001", patient_id="PT001")
+        reg.register_sample("S002", patient_id="PT002")
+        samples = reg.list_samples(patient_id="PT001")
         assert len(samples) == 1
         assert samples[0]["sample_id"] == "S001"
 
-    def test_list_samples_by_batch(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.add_sample("S001", project_name="proj", batch="batch1")
-        reg.add_sample("S002", project_name="proj", batch="batch2")
-        result = reg.list_samples(batch="batch1")
-        assert len(result) == 1
+    def test_list_samples_by_tissue(self, reg):
+        reg.register_sample("S001", tissue="colon")
+        reg.register_sample("S002", tissue="liver")
+        samples = reg.list_samples(tissue="colon")
+        assert len(samples) == 1
+        assert samples[0]["sample_id"] == "S001"
+
+    def test_inventory_item_with_sample(self, reg):
+        reg.add_patient("PT001")
+        reg.register_sample("PT001_bx1", patient_id="PT001")
+        reg.register_inventory_item(
+            "rna_pt001", uri="/data/rna.h5ad", modality="rna",
+            sample_name="PT001_bx1",
+        )
+        item = reg.get_inventory_item("rna_pt001")
+        assert item["sample_id"] is not None
+
+    def test_inventory_item_sample_not_found(self, reg):
+        with pytest.raises(ValueError, match="Sample.*not found"):
+            reg.register_inventory_item(
+                "rna_bad", uri="/data/rna.h5ad", modality="rna",
+                sample_name="NONEXISTENT",
+            )
+
+    def test_patient_to_dataset_via_sample(self, reg):
+        """Full chain: patient -> sample -> inventory -> dataset -> project."""
+        reg.add_project("proj_a")
+        reg.add_patient("PT001", metadata={"organism": "human"})
+        reg.register_sample("PT001_bx1", patient_id="PT001", tissue="colon")
+        reg.register_inventory_item(
+            "rna_pt001", uri="/data/rna.h5ad", modality="rna",
+            sample_name="PT001_bx1",
+        )
+        reg.create_dataset("ds_a")
+        reg.add_dataset_member("ds_a", "rna_pt001", "rna")
+        reg.link_project_dataset("proj_a", "ds_a")
+
+        # list_subjects with project filter should find PT001
+        subjects = reg.list_subjects(project_name="proj_a")
+        assert len(subjects) == 1
+        assert subjects[0]["patient_id"] == "PT001"
 
 
 # ---------------------------------------------------------------------------
-# BioData CRUD and polymorphism
+# TestProvenance
 # ---------------------------------------------------------------------------
 
 
-class TestBioData:
-    def test_register_spatial_seq(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata(
-            "proj",
-            "spatial_seq",
-            "visium",
-            "/results/adata.filtered.h5ad",
-            fmt="h5ad",
-            phase="qc_filter",
-            n_obs=50000,
-        )
-        assert isinstance(bd_id, int)
-
-    def test_register_image(self, reg):
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata(
-            "proj",
-            "image",
-            "imc",
-            "/data/sample1.tiff",
-            fmt="tiff",
-            image_type="multiplexed",
-            n_channels=40,
-        )
-        assert isinstance(bd_id, int)
-
-    def test_register_rnaseq(self, reg):
-        reg.add_project("proj", platform="chromium_3p")
-        bd_id = reg.register_biodata(
-            "proj",
-            "rnaseq",
-            "chromium_3p",
-            "/data/counts.h5ad",
-            fmt="h5ad",
-            chemistry="chromium_v3",
-        )
-        assert isinstance(bd_id, int)
-
-    def test_register_epigenomics(self, reg):
-        reg.add_project("proj", platform="atac_seq")
-        bd_id = reg.register_biodata(
-            "proj",
-            "epigenomics",
-            "atac_seq",
-            "/data/peaks.bed",
-            fmt="bed",
-            assay_type="atac_seq",
-            n_peaks=100000,
-        )
-        assert isinstance(bd_id, int)
-
-    def test_register_genome_seq(self, reg):
-        reg.add_project("proj", platform="illumina_wgs")
-        bd_id = reg.register_biodata(
-            "proj",
-            "genome_seq",
-            "illumina_wgs",
-            "/data/aligned.bam",
-            fmt="bam",
-            sequencing_type="wgs",
-            coverage_mean=30.0,
-        )
-        assert isinstance(bd_id, int)
-
-    def test_register_missing_project_raises(self, reg):
-        with pytest.raises(ValueError, match="not found"):
-            reg.register_biodata("nonexistent", "spatial_seq", "visium", "/a.h5ad")
-
-    def test_register_invalid_category_raises(self, reg):
-        reg.add_project("proj", platform="visium")
-        with pytest.raises(ValueError, match="Unknown BioData category"):
-            reg.register_biodata("proj", "invalid_cat", "visium", "/a.h5ad")
-
-    def test_get_biodata(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata(
-            "proj",
-            "spatial_seq",
-            "visium",
-            "/results/adata.h5ad",
-            fmt="h5ad",
-            spatial_resolution="spot",
-            panel_size=None,
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd is not None
-        assert bd["type"] == "spatial_seq"
-        assert bd["platform"] == "visium"
-        assert bd["uri"] == "/results/adata.h5ad"
-        # Check child columns are present
-        assert "spatial_resolution" in bd
-
-    def test_get_biodata_missing(self, reg):
-        assert reg.get_biodata(9999) is None
-
-    def test_list_biodata(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        reg.register_biodata("proj", "spatial_seq", "xenium", "/b.h5ad")
-        result = reg.list_biodata(project_name="proj")
-        assert len(result) == 2
-
-    def test_list_biodata_filter_category(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        reg.register_biodata("proj", "image", "imc", "/b.tiff", fmt="tiff")
-        result = reg.list_biodata(project_name="proj", category="image")
-        assert len(result) == 1
-        assert result[0]["platform"] == "imc"
-
-    def test_list_biodata_filter_platform(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        reg.register_biodata("proj", "spatial_seq", "xenium", "/b.h5ad")
-        result = reg.list_biodata(project_name="proj", platform="xenium")
-        assert len(result) == 1
-
-    def test_list_biodata_filter_phase(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad", phase="qc_filter")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/b.h5ad", phase="preprocess")
-        result = reg.list_biodata(project_name="proj", phase="qc_filter")
-        assert len(result) == 1
-
-
-class TestBioDataPolymorphism:
-    def test_image_type_specific_fields(self, reg):
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata(
-            "proj",
-            "image",
-            "imc",
-            "/data/tiff.tiff",
-            fmt="tiff",
-            image_type="multiplexed",
-            n_channels=40,
-            pixel_size_um=1.0,
-            staining_protocol="IMC",
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["image_type"] == "multiplexed"
-        assert bd["n_channels"] == 40
-        assert bd["pixel_size_um"] == 1.0
-        assert bd["staining_protocol"] == "IMC"
-
-    def test_spatial_seq_type_specific_fields(self, reg):
-        reg.add_project("proj", platform="visium_hd")
-        bd_id = reg.register_biodata(
-            "proj",
-            "spatial_seq",
-            "visium_hd",
-            "/data/bins.h5ad",
-            fmt="h5ad",
-            spatial_resolution="spot",
-            bin_size_um=8.0,
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["spatial_resolution"] == "spot"
-        assert bd["bin_size_um"] == 8.0
-
-    def test_rnaseq_type_specific_fields(self, reg):
-        reg.add_project("proj", platform="chromium_3p")
-        bd_id = reg.register_biodata(
-            "proj",
-            "rnaseq",
-            "chromium_3p",
-            "/data/counts.h5ad",
-            fmt="h5ad",
-            chemistry="chromium_v3",
-            reference_genome="GRCh38",
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["chemistry"] == "chromium_v3"
-        assert bd["reference_genome"] == "GRCh38"
-
-    def test_epigenomics_type_specific_fields(self, reg):
-        reg.add_project("proj", platform="chip_seq")
-        bd_id = reg.register_biodata(
-            "proj",
-            "epigenomics",
-            "chip_seq",
-            "/data/peaks.bed",
-            fmt="bed",
-            assay_type="chip_seq",
-            target_protein="H3K27ac",
-            n_peaks=50000,
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["assay_type"] == "chip_seq"
-        assert bd["target_protein"] == "H3K27ac"
-        assert bd["n_peaks"] == 50000
-
-    def test_genome_seq_type_specific_fields(self, reg):
-        reg.add_project("proj", platform="pacbio_hifi")
-        bd_id = reg.register_biodata(
-            "proj",
-            "genome_seq",
-            "pacbio_hifi",
-            "/data/aligned.bam",
-            fmt="bam",
-            sequencing_type="wgs",
-            coverage_mean=30.0,
-            reference_genome="GRCh38",
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["sequencing_type"] == "wgs"
-        assert bd["coverage_mean"] == 30.0
-
-    def test_auto_fill_from_platform_registry(self, reg):
-        reg.add_project("proj", platform="xenium")
-        bd_id = reg.register_biodata(
-            "proj",
-            "spatial_seq",
-            "xenium",
-            "/data/xenium.h5ad",
-            fmt="h5ad",
-        )
-        bd = reg.get_biodata(bd_id)
-        # Should have been auto-filled from KNOWN_PLATFORMS
-        assert bd["measurement"] == "rna"
-        assert bd["spatial"] is True
-        assert bd["resolution"] == "subcellular"
-
-
-class TestProjectDataSummary:
-    def test_empty_project(self, reg):
-        reg.add_project("proj", platform="visium")
-        summary = reg.project_data_summary("proj")
-        assert summary["total"] == 0
-        assert summary["by_category"] == {}
-
-    def test_missing_project(self, reg):
-        summary = reg.project_data_summary("nonexistent")
-        assert summary["total"] == 0
-
-    def test_with_mixed_data(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/b.h5ad")
-        reg.register_biodata("proj", "image", "imc", "/c.tiff", fmt="tiff")
-        summary = reg.project_data_summary("proj")
-        assert summary["total"] == 3
-        assert summary["by_category"]["spatial_seq"] == 2
-        assert summary["by_category"]["image"] == 1
-        assert summary["by_platform"]["visium"] == 2
-        assert summary["by_platform"]["imc"] == 1
-
-
-class TestMigrateDatasetsToBioData:
-    """Migration tests. Note: register_dataset now dual-writes to BioData,
-    so these tests verify that migrate_datasets_to_biodata() correctly
-    handles already-migrated (dual-written) datasets and legacy datasets
-    without bio_data_id."""
-
-    def test_migrate_already_dual_written_is_noop(self, reg):
-        """Datasets created by dual-write already have bio_data_id, so migration skips them."""
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        reg.register_dataset("proj", phase="preprocess", uri="/b.h5ad")
-        count = reg.migrate_datasets_to_biodata()
-        assert count == 0  # dual-write already handled these
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 2
-        assert all(bd["type"] == "spatial_seq" for bd in biodata)
-
-    def test_migrate_legacy_dataset_without_biodata(self, reg):
-        """Simulate a legacy dataset (pre-dual-write) by clearing bio_data_id."""
-        reg.add_project("proj", platform="imc")
-        ds_id = reg.register_dataset(
-            "proj", phase="ingest_load", uri="/img.tiff", fmt="tiff", file_role="image"
-        )
-        # Remove the dual-written BioData to simulate legacy data
+class TestProvenance:
+    def test_record_provenance_for_phase(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
         with reg._session() as sess:
-            ds = sess.get(reg._Dataset, ds_id)
-            if ds.bio_data_id is not None:
-                bd = sess.get(reg._BioData, ds.bio_data_id)
-                if bd is not None:
-                    sess.delete(bd)
-                ds.bio_data_id = None
-                sess.commit()
-        count = reg.migrate_datasets_to_biodata()
-        assert count == 1
+            phase_row = (
+                sess.query(reg._ProjectPhase)
+                .filter_by(phase_group="data_processing", subphase="qc_filter")
+                .first()
+            )
+            phase_id = phase_row.id
 
-    def test_migrate_preserves_legacy_link(self, reg):
-        """Legacy migration sets legacy_dataset_id on the new BioData row."""
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        # Dual-write already created a BioData — verify linkage
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        # Dual-write does NOT set legacy_dataset_id (only migration does)
-        # But the forward link on dataset IS set
-        datasets = reg.list_datasets(project_name="proj")
-        assert datasets[0].get("bio_data_id") is not None
+        prov_id = reg.record_provenance(
+            "sc_tools.qc",
+            tool_version="1.10.0",
+            phase_id=phase_id,
+            n_input_obs=10000,
+            n_output_obs=8000,
+        )
+        assert isinstance(prov_id, int)
 
-    def test_migrate_idempotent(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        # Dual-write already handled it, so both calls return 0
-        count1 = reg.migrate_datasets_to_biodata()
-        count2 = reg.migrate_datasets_to_biodata()
-        assert count1 == 0
-        assert count2 == 0
+    def test_record_provenance_for_dataset(self, reg):
+        ds_id = reg.create_dataset("ds_prov")
+        prov_id = reg.record_provenance("mudata_builder", dataset_id=ds_id)
+        assert isinstance(prov_id, int)
 
-    def test_dual_write_imc_h5ad_uses_platform_registry(self, reg):
-        """IMC h5ad files should be classified via platform registry as BioImage."""
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset("proj", phase="qc_filter", uri="/results/adata.filtered.h5ad")
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        assert biodata[0]["type"] == "image"
+    def test_get_provenance_by_phase_id(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
+        with reg._session() as sess:
+            phase_row = (
+                sess.query(reg._ProjectPhase)
+                .filter_by(phase_group="data_processing", subphase="qc_filter")
+                .first()
+            )
+            phase_id = phase_row.id
+        reg.record_provenance("sc_tools.qc", phase_id=phase_id)
+        reg.record_provenance("scvi-tools", phase_id=phase_id)
+        records = reg.get_provenance(phase_id=phase_id)
+        assert len(records) == 2
+        tools = {r["tool"] for r in records}
+        assert tools == {"sc_tools.qc", "scvi-tools"}
 
-    def test_dual_write_chromium_uses_platform_registry(self, reg):
-        """chromium_3p datasets should be classified as rnaseq via platform registry."""
-        reg.add_project("proj", platform="chromium_3p")
-        reg.register_dataset("proj", phase="qc_filter", uri="/results/counts.h5ad")
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        assert biodata[0]["type"] == "rnaseq"
+    def test_get_provenance_by_dataset_id(self, reg):
+        ds_id = reg.create_dataset("ds_prov")
+        reg.record_provenance("muon.concat", dataset_id=ds_id)
+        records = reg.get_provenance(dataset_id=ds_id)
+        assert len(records) == 1
+        assert records[0]["tool"] == "muon.concat"
+
+    def test_record_provenance_no_target_raises(self, reg):
+        with pytest.raises(ValueError, match="Exactly one"):
+            reg.record_provenance("scanpy")
+
+    def test_record_provenance_multiple_targets_raises(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
+        with reg._session() as sess:
+            phase_row = (
+                sess.query(reg._ProjectPhase)
+                .filter_by(phase_group="data_processing", subphase="qc_filter")
+                .first()
+            )
+            phase_id = phase_row.id
+        ds_id = reg.create_dataset("ds_multi")
+        with pytest.raises(ValueError, match="Exactly one"):
+            reg.record_provenance("scanpy", phase_id=phase_id, dataset_id=ds_id)
+
+    def test_record_provenance_params_stored(self, reg):
+        ds_id = reg.create_dataset("ds_params")
+        reg.record_provenance(
+            "scanpy",
+            dataset_id=ds_id,
+            params={"min_genes": 200, "max_genes": 5000},
+            environment={"python": "3.11"},
+        )
+        records = reg.get_provenance(dataset_id=ds_id)
+        assert records[0]["params"]["min_genes"] == 200
+        assert records[0]["environment"]["python"] == "3.11"
 
 
-class TestDeprecationAndWarnings:
-    def test_register_dataset_emits_deprecation(self, reg):
-        reg.add_project("proj", platform="visium")
+# ---------------------------------------------------------------------------
+# TestBackwardCompat
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardCompat:
+    def test_register_data_emits_deprecation(self, reg):
+        reg.add_project("proj_a")
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-            deprecation_warns = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warns) == 1
-            assert "register_biodata" in str(deprecation_warns[0].message)
+            reg.register_data("proj_a", "qc_filter", "/data/test.h5ad")
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "register_data" in str(w[0].message)
 
-    def test_register_biodata_ignores_unknown_kwargs(self, reg):
-        """Unknown type_kwargs are silently dropped (with a log warning)."""
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata(
-            "proj",
-            "spatial_seq",
-            "visium",
-            "/a.h5ad",
-            totally_bogus_field="xyz",
-        )
-        assert isinstance(bd_id, int)
-        # Verify the data was still created successfully
-        bd = reg.get_biodata(bd_id)
-        assert bd is not None
-        assert bd["platform"] == "visium"
+    def test_register_dataset_emits_deprecation(self, reg):
+        reg.add_project("proj_a")
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            reg.register_dataset("proj_a", "qc_filter", "/data/test.h5ad")
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "register_dataset" in str(w[0].message)
+
+    def test_register_biodata_emits_deprecation(self, reg):
+        reg.add_project("proj_a")
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            reg.register_biodata("proj_a", "rna", "visium", "/data/test.h5ad")
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "register_biodata" in str(w[0].message)
+
+    def test_list_biodata_emits_deprecation(self, reg):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            reg.list_biodata()
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "list_biodata" in str(w[0].message)
+
+    def test_register_data_creates_inventory_item(self, reg):
+        reg.add_project("proj_a")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            iid = reg.register_data("proj_a", "qc_filter", "/data/test.h5ad", category="rna")
+        assert isinstance(iid, int)
+        items = reg.list_inventory_items()
+        assert len(items) == 1
+
+    def test_register_biodata_creates_inventory_item(self, reg):
+        reg.add_project("proj_a")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            iid = reg.register_biodata("proj_a", "rna", "visium", "/data/test.h5ad")
+        assert isinstance(iid, int)
+        items = reg.list_inventory_items()
+        assert len(items) == 1
+        assert items[0]["modality"] == "rna"
 
 
-class TestStatusIncludesNewCounts:
-    def test_status_has_subject_sample_biodata_counts(self, reg):
+# ---------------------------------------------------------------------------
+# TestStatus
+# ---------------------------------------------------------------------------
+
+
+class TestStatus:
+    def test_status_counts(self, reg):
+        reg.add_project("proj_a")
+        _make_data_source(reg, name="src_a")
+        _make_inventory_item(reg, name="item_a")
+        reg.create_dataset("ds_a")
+        reg.add_patient("PT001")
+        reg.register_sample("S001", patient_id="PT001")
+
         s = reg.status()
-        assert "n_subjects" in s
-        assert "n_samples" in s
-        assert "n_biodata" in s
-        assert s["n_subjects"] == 0
-        assert s["n_samples"] == 0
-        assert s["n_biodata"] == 0
-
-    def test_status_counts_after_adds(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.add_subject("PT001")
-        reg.add_sample("S001", subject_id="PT001", project_name="proj")
-        reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        s = reg.status()
-        assert s["n_subjects"] == 1
+        assert s["n_projects"] == 1
+        assert s["n_data_sources"] == 1
+        assert s["n_inventory_items"] == 1
+        assert s["n_datasets"] == 1
+        assert s["n_patients"] == 1
         assert s["n_samples"] == 1
-        assert s["n_biodata"] == 1
+
+    def test_status_active_projects(self, reg):
+        reg.add_project("proj_a")
+        reg.add_project("proj_b")
+        s = reg.status()
+        assert "proj_a" in s["active_projects"]
+        assert "proj_b" in s["active_projects"]
+
+    def test_status_phase_summary(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter", status="ready")
+        reg.upsert_phase(proj, ds, "data_processing", "preprocess", status="in_progress")
+
+        s = reg.status()
+        assert proj in s["phase_summary"]
+        summary = s["phase_summary"][proj]
+        assert summary.get("ready", 0) == 1
+        assert summary.get("in_progress", 0) == 1
+
+    def test_status_empty_registry(self, reg):
+        s = reg.status()
+        assert s["n_projects"] == 0
+        assert s["n_data_sources"] == 0
+        assert s["n_inventory_items"] == 0
+        assert s["n_datasets"] == 0
+        assert s["n_patients"] == 0
+        assert s["n_samples"] == 0
+        assert s["active_projects"] == []
+        assert s["phase_summary"] == {}
 
 
 # ---------------------------------------------------------------------------
-# Modality auto-fill
+# TestEdgeCases
 # ---------------------------------------------------------------------------
 
 
-class TestModalityAutoFill:
-    def test_modality_auto_filled_from_platform(self, reg):
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata("proj", "image", "imc", "/data/x.tiff", fmt="tiff")
-        bd = reg.get_biodata(bd_id)
-        assert bd["modality"] == "Spatial Proteomics - Mass Spec"
+class TestEdgeCases:
+    def test_same_inventory_item_in_multiple_datasets(self, reg):
+        _make_inventory_item(reg, name="shared_item")
+        reg.create_dataset("ds_a")
+        reg.create_dataset("ds_b")
+        reg.add_dataset_member("ds_a", "shared_item", "rna")
+        reg.add_dataset_member("ds_b", "shared_item", "rna")
+        members_a = reg.get_dataset_members("ds_a")
+        members_b = reg.get_dataset_members("ds_b")
+        assert len(members_a) == 1
+        assert len(members_b) == 1
+        assert members_a[0]["inventory_name"] == "shared_item"
+        assert members_b[0]["inventory_name"] == "shared_item"
 
-    def test_modality_auto_filled_visium(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "visium", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["modality"] == "Spatial Transcriptomics - Sequencing"
+    def test_same_dataset_linked_to_multiple_projects(self, reg):
+        reg.add_project("proj_a")
+        reg.add_project("proj_b")
+        reg.create_dataset("shared_ds")
+        reg.link_project_dataset("proj_a", "shared_ds")
+        reg.link_project_dataset("proj_b", "shared_ds")
+        ds_a = reg.list_project_datasets("proj_a")
+        ds_b = reg.list_project_datasets("proj_b")
+        assert len(ds_a) == 1
+        assert len(ds_b) == 1
+        assert ds_a[0]["name"] == "shared_ds"
+        assert ds_b[0]["name"] == "shared_ds"
 
-    def test_modality_auto_filled_xenium(self, reg):
-        reg.add_project("proj", platform="xenium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "xenium", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["modality"] == "Spatial Transcriptomics - ISH"
+    def test_empty_dataset_no_members(self, reg):
+        reg.create_dataset("empty_ds")
+        members = reg.get_dataset_members("empty_ds")
+        assert members == []
 
-    def test_modality_none_for_unknown_platform(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "unknown_plat", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["modality"] is None
+    def test_delete_project_cascades_phases(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.upsert_phase(proj, ds, "data_processing", "qc_filter")
+        reg.delete_project(proj)
+        # Phases should be gone (CASCADE)
+        assert reg.get_phase(proj, "data_processing", "qc_filter") is None
 
+    def test_delete_project_cascades_dataset_link(self, reg):
+        proj, ds = _setup_project_with_dataset(reg)
+        reg.delete_project(proj)
+        # Dataset still exists (project_datasets CASCADE only removes the link)
+        assert reg.get_dataset(ds) is not None
 
-# ---------------------------------------------------------------------------
-# Defaults auto-fill from PlatformSpec
-# ---------------------------------------------------------------------------
+    def test_dataset_versioning_preserves_old_members(self, reg):
+        """Members of old version are preserved independently of new version."""
+        reg.create_dataset("ds_ver")
+        _make_inventory_item(reg, name="item_a")
+        _make_inventory_item(reg, name="item_b", uri="/data/b.h5ad", modality="protein")
+        reg.add_dataset_member("ds_ver", "item_a", "rna")
+        reg.add_dataset_member("ds_ver", "item_b", "protein")
 
+        reg.bump_dataset_version("ds_ver")
 
-class TestDefaultsAutoFill:
-    def test_imc_autofill_staining_protocol(self, reg):
-        """IMC should auto-fill staining_protocol and image_type from defaults."""
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata("proj", "image", "imc", "/data/x.tiff", fmt="tiff")
-        bd = reg.get_biodata(bd_id)
-        assert bd["staining_protocol"] == "IMC"
-        assert bd["image_type"] == "multiplexed"
+        # Verify old version members are still accessible
+        v1_members = reg.get_dataset_members("ds_ver", version=1)
+        assert len(v1_members) == 2
 
-    def test_explicit_overrides_default(self, reg):
-        """Explicit kwargs should override PlatformSpec defaults."""
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata(
-            "proj", "image", "imc", "/data/x.tiff", fmt="tiff", staining_protocol="custom_protocol"
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["staining_protocol"] == "custom_protocol"
+        # Add new member only to v2
+        _make_inventory_item(reg, name="item_c", uri="/data/c.h5ad", modality="spatial")
+        reg.add_dataset_member("ds_ver", "item_c", "spatial")
 
-    def test_visium_hd_autofill_bin_size(self, reg):
-        reg.add_project("proj", platform="visium_hd")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "visium_hd", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["bin_size_um"] == 8.0
-        assert bd["spatial_resolution"] == "spot"
+        v2_members = reg.get_dataset_members("ds_ver")
+        assert len(v2_members) == 3
 
-    def test_xenium_autofill_coordinate_system(self, reg):
-        reg.add_project("proj", platform="xenium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "xenium", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["spatial_resolution"] == "single_cell"
-        assert bd["coordinate_system"] == "micron"
-
-    def test_chromium_autofill_chemistry(self, reg):
-        reg.add_project("proj", platform="chromium_3p")
-        bd_id = reg.register_biodata("proj", "rnaseq", "chromium_3p", "/a.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["chemistry"] == "chromium_v3"
-        assert bd["library_type"] == "single_cell"
-
-
-# ---------------------------------------------------------------------------
-# Format inference from URI
-# ---------------------------------------------------------------------------
-
-
-class TestFormatInference:
-    def test_h5ad_inferred(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "visium", "/data/adata.h5ad")
-        bd = reg.get_biodata(bd_id)
-        assert bd["format"] == "h5ad"
-
-    def test_tiff_inferred(self, reg):
-        reg.add_project("proj", platform="imc")
-        bd_id = reg.register_biodata("proj", "image", "imc", "/data/image.tiff")
-        bd = reg.get_biodata(bd_id)
-        assert bd["format"] == "tiff"
-
-    def test_zarr_inferred(self, reg):
-        reg.add_project("proj", platform="visium_hd")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "visium_hd", "/data/sdata.zarr")
-        bd = reg.get_biodata(bd_id)
-        assert bd["format"] == "zarr"
-
-    def test_explicit_format_not_overridden(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata(
-            "proj", "spatial_seq", "visium", "/data/adata.h5ad", fmt="custom"
-        )
-        bd = reg.get_biodata(bd_id)
-        assert bd["format"] == "custom"
-
-    def test_no_extension_stays_none(self, reg):
-        reg.add_project("proj", platform="visium")
-        bd_id = reg.register_biodata("proj", "spatial_seq", "visium", "/data/noext")
-        bd = reg.get_biodata(bd_id)
-        assert bd["format"] is None
+        # v1 still has only 2
+        v1_members = reg.get_dataset_members("ds_ver", version=1)
+        assert len(v1_members) == 2
 
 
 # ---------------------------------------------------------------------------
-# Dual-write: register_dataset -> BioData
+# TestTransactionRollback
 # ---------------------------------------------------------------------------
 
 
-class TestDualWrite:
-    def test_register_dataset_creates_biodata(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        # Should have created a BioData row
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        assert biodata[0]["platform"] == "visium"
-        assert biodata[0]["type"] == "spatial_seq"
+class TestTransactionRollback:
+    def test_register_inventory_item_invalid_source_no_orphan(self, reg):
+        """If data_source_name is invalid, no inventory item should remain."""
+        with pytest.raises(ValueError, match="DataSource.*not found"):
+            reg.register_inventory_item(
+                "orphan_item",
+                uri="/data/orphan.h5ad",
+                modality="rna",
+                data_source_name="nonexistent_source",
+            )
+        assert reg.get_inventory_item("orphan_item") is None
 
-    def test_dual_write_links_forward(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset("proj", phase="qc_filter", uri="/a.h5ad")
-        # Check that dataset has bio_data_id
-        datasets = reg.list_datasets(project_name="proj")
-        assert len(datasets) == 1
-        assert datasets[0].get("bio_data_id") is not None
+    def test_add_member_invalid_inventory_no_partial(self, reg):
+        """If inventory item does not exist, no dataset_member row should remain."""
+        reg.create_dataset("ds_partial")
+        with pytest.raises(ValueError, match="Inventory item.*not found"):
+            reg.add_dataset_member("ds_partial", "nonexistent_item", "rna")
+        members = reg.get_dataset_members("ds_partial")
+        assert len(members) == 0
 
-    def test_dual_write_preserves_metadata(self, reg):
-        reg.add_project("proj", platform="visium")
-        reg.register_dataset(
-            "proj",
-            phase="scoring",
-            uri="/scored.h5ad",
-            n_obs=50000,
-            n_vars=3000,
-            file_role="primary",
-        )
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        assert biodata[0]["n_obs"] == 50000
-        assert biodata[0]["n_vars"] == 3000
-        assert biodata[0]["phase"] == "scoring"
+    def test_link_project_dataset_invalid_dataset_no_partial(self, reg):
+        """If dataset does not exist, no project_datasets row should remain."""
+        reg.add_project("proj_partial")
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.link_project_dataset("proj_partial", "nonexistent_ds")
+        results = reg.list_project_datasets("proj_partial")
+        assert len(results) == 0
 
-    def test_dual_write_imc_creates_image_type(self, reg):
-        reg.add_project("proj", platform="imc")
-        reg.register_dataset("proj", phase="ingest_load", uri="/img.h5ad")
-        biodata = reg.list_biodata(project_name="proj")
-        assert len(biodata) == 1
-        assert biodata[0]["type"] == "image"
-        assert biodata[0]["modality"] == "Spatial Proteomics - Mass Spec"
+    def test_upsert_phase_invalid_dataset_no_partial(self, reg):
+        """If dataset does not exist, no project_phases row should remain."""
+        reg.add_project("proj_partial")
+        with pytest.raises(ValueError, match="Dataset.*not found"):
+            reg.upsert_phase("proj_partial", "nonexistent_ds", "data_processing", "qc_filter")
+        phases = reg.list_phases("proj_partial")
+        assert len(phases) == 0

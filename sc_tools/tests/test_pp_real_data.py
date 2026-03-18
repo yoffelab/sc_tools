@@ -22,16 +22,10 @@ from scipy import sparse
 # Paths to real data
 # ---------------------------------------------------------------------------
 
-VISIUM_ANNOTATED = Path(
-    "projects/visium/ggo_visium/results/adata.annotated.p2.h5ad"
-)
-VISIUM_NORMALIZED = Path(
-    "projects/visium/ggo_visium/results/adata.normalized.h5ad"
-)
+VISIUM_ANNOTATED = Path("projects/visium/ggo_visium/results/adata.annotated.p2.h5ad")
+VISIUM_NORMALIZED = Path("projects/visium/ggo_visium/results/adata.normalized.h5ad")
 IMC_CELLTYPED = Path("projects/imc/ggo_human/results/celltyped.h5ad")
-COSMX_ANNOTATED = Path(
-    "projects/cosmx_1k/lymph_dlbcl/results/cosmx_rna_annotated.h5ad"
-)
+COSMX_ANNOTATED = Path("projects/cosmx_1k/lymph_dlbcl/results/cosmx_rna_annotated.h5ad")
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 
@@ -106,8 +100,10 @@ class TestNormalizeRealVisium:
         original_X = visium_sub.X.toarray() if sparse.issparse(visium_sub.X) else visium_sub.X
         nonzero_rows = original_X.sum(axis=1) > 0
         np.testing.assert_allclose(
-            row_sums[nonzero_rows], 1e4, rtol=1e-4,
-            err_msg="Non-zero rows should sum to target_sum after normalization"
+            row_sums[nonzero_rows],
+            1e4,
+            rtol=1e-4,
+            err_msg="Non-zero rows should sum to target_sum after normalization",
         )
 
     def test_backup_raw_then_normalize(self, visium_sub):

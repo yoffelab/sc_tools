@@ -33,6 +33,7 @@ from sc_tools.qc import (
 # Absolute paths to real data
 # ---------------------------------------------------------------------------
 
+
 def _find_repo_root() -> Path:
     """Walk upward from this file to find the root that contains real project data."""
     _sentinel = Path("projects/visium/ggo_visium/results/adata.annotated.p2.h5ad")
@@ -365,9 +366,7 @@ class TestHighlyVariableGenesVisium:
 
     def test_hvg_multi_sample_with_batch_key(self, normed_multi_lib):
         """HVG with batch_key='library_id' must not crash and must add column."""
-        highly_variable_genes(
-            normed_multi_lib, flavor="seurat", batch_key="library_id"
-        )
+        highly_variable_genes(normed_multi_lib, flavor="seurat", batch_key="library_id")
         assert "highly_variable" in normed_multi_lib.var.columns
 
     def test_hvg_seurat_v3_n_top_genes(self, normed_subset):

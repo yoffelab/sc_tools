@@ -189,10 +189,10 @@ def generate_pre_filter_report(
     }
 
     _PRE_FILTER_SECTIONS = [
-        {"id": "overview",      "label": "Overview"},
-        {"id": "per-sample",    "label": "Per-Sample Table"},
+        {"id": "overview", "label": "Overview"},
+        {"id": "per-sample", "label": "Per-Sample Table"},
         {"id": "distributions", "label": "QC Distributions"},
-        {"id": "segmentation",  "label": "Segmentation Quality", "key": "segmentation"},
+        {"id": "segmentation", "label": "Segmentation Quality", "key": "segmentation"},
     ]
     context["sections"] = [
         s for s in _PRE_FILTER_SECTIONS if "key" not in s or context.get(s["key"]) is not None
@@ -326,11 +326,11 @@ def generate_post_filter_report(
     }
 
     _POST_FILTER_SECTIONS = [
-        {"id": "overview",          "label": "Filter Summary"},
-        {"id": "per-sample",        "label": "Per-Sample Table",  "key": "table_rows"},
-        {"id": "comparison",        "label": "Pre vs Post Comparison"},
+        {"id": "overview", "label": "Filter Summary"},
+        {"id": "per-sample", "label": "Per-Sample Table", "key": "table_rows"},
+        {"id": "comparison", "label": "Pre vs Post Comparison"},
         {"id": "feature-selection", "label": "Feature Selection", "key": "has_feature_sel"},
-        {"id": "segmentation",      "label": "Segmentation Quality", "key": "segmentation"},
+        {"id": "segmentation", "label": "Segmentation Quality", "key": "segmentation"},
     ]
     _has_feat = bool(context.get("plots", {}).get("hvg") or context.get("plots", {}).get("svg"))
     context["has_feature_sel"] = _has_feat or None
@@ -588,13 +588,13 @@ def generate_post_integration_report(
     }
 
     _POST_INT_SECTIONS = [
-        {"id": "overview",      "label": "Integration Summary"},
-        {"id": "metrics",       "label": "Benchmark Ranking",    "key": "ranking_rows"},
-        {"id": "embeddings",    "label": "UMAP Embeddings",      "key": "umap_grid_avail"},
-        {"id": "benchmark",     "label": "Metrics Radar",        "key": "integration_plots"},
-        {"id": "clusters",      "label": "Cluster Distribution", "key": "cluster_dist_avail"},
-        {"id": "per-embedding", "label": "Per-Embedding UMAP",   "key": "embedding_umaps_avail"},
-        {"id": "segmentation",  "label": "Segmentation Quality", "key": "segmentation"},
+        {"id": "overview", "label": "Integration Summary"},
+        {"id": "metrics", "label": "Benchmark Ranking", "key": "ranking_rows"},
+        {"id": "embeddings", "label": "UMAP Embeddings", "key": "umap_grid_avail"},
+        {"id": "benchmark", "label": "Metrics Radar", "key": "integration_plots"},
+        {"id": "clusters", "label": "Cluster Distribution", "key": "cluster_dist_avail"},
+        {"id": "per-embedding", "label": "Per-Embedding UMAP", "key": "embedding_umaps_avail"},
+        {"id": "segmentation", "label": "Segmentation Quality", "key": "segmentation"},
     ]
     context["umap_grid_avail"] = context.get("plots", {}).get("umap_grid") or None
     context["embedding_umaps_avail"] = context.get("plots", {}).get("embedding_umaps") or None
@@ -977,14 +977,14 @@ def generate_post_celltyping_report(
     }
 
     _POST_CT_SECTIONS = [
-        {"id": "overview",     "label": "Celltyping Summary"},
-        {"id": "benchmark",    "label": "Integration Benchmark", "key": "ranking_rows"},
-        {"id": "umap",         "label": "UMAP",                  "key": "umap_avail"},
-        {"id": "composition",  "label": "Celltype Composition",  "key": "composition_avail"},
-        {"id": "per-sample",   "label": "Per-Sample Distribution", "key": "cluster_dist_ct_avail"},
-        {"id": "markers",      "label": "Marker Expression",     "key": "marker_dotplot_avail"},
-        {"id": "radar",        "label": "Metrics Radar",         "key": "integration_plots"},
-        {"id": "segmentation", "label": "Segmentation Quality",  "key": "segmentation"},
+        {"id": "overview", "label": "Celltyping Summary"},
+        {"id": "benchmark", "label": "Integration Benchmark", "key": "ranking_rows"},
+        {"id": "umap", "label": "UMAP", "key": "umap_avail"},
+        {"id": "composition", "label": "Celltype Composition", "key": "composition_avail"},
+        {"id": "per-sample", "label": "Per-Sample Distribution", "key": "cluster_dist_ct_avail"},
+        {"id": "markers", "label": "Marker Expression", "key": "marker_dotplot_avail"},
+        {"id": "radar", "label": "Metrics Radar", "key": "integration_plots"},
+        {"id": "segmentation", "label": "Segmentation Quality", "key": "segmentation"},
     ]
     context["umap_avail"] = context.get("plots", {}).get("umap_grid") or None
     context["composition_avail"] = (

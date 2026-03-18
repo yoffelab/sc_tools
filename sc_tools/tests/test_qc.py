@@ -1320,9 +1320,7 @@ class TestBmReportUsesSharedRenderTemplate:
 
         src = (Path(__file__).parent.parent / "bm" / "report.py").read_text()
         tree = ast.parse(src)
-        func_names = [
-            node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
-        ]
+        func_names = [node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)]
         assert "_render_template" not in func_names, (
             "bm/report.py still defines _render_template; should use shared render_template"
         )
@@ -1333,6 +1331,5 @@ class TestBmReportUsesSharedRenderTemplate:
         bm_report = importlib.import_module("sc_tools.bm.report")
         # The module must have pulled in render_template from report_utils
         assert hasattr(bm_report, "render_template") or any(
-            "render_template" in str(getattr(bm_report, attr, ""))
-            for attr in dir(bm_report)
+            "render_template" in str(getattr(bm_report, attr, "")) for attr in dir(bm_report)
         ), "bm/report.py does not import render_template from sc_tools.qc.report_utils"

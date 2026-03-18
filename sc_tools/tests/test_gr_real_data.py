@@ -34,7 +34,9 @@ pytest.importorskip("squidpy", reason="squidpy required for gr tests")
 
 _IMC_PATH = "/Users/junbumkim/Documents/sc_tools/projects/imc/ggo_human/results/celltyped.h5ad"
 _COSMX_PATH = "/Users/junbumkim/Documents/sc_tools/projects/cosmx_1k/lymph_dlbcl/results/cosmx_rna_annotated.h5ad"
-_VISIUM_PATH = "/Users/junbumkim/Documents/sc_tools/projects/visium/ggo_visium/results/adata.annotated.p2.h5ad"
+_VISIUM_PATH = (
+    "/Users/junbumkim/Documents/sc_tools/projects/visium/ggo_visium/results/adata.annotated.p2.h5ad"
+)
 
 _IMC_AVAILABLE = Path(_IMC_PATH).exists()
 _COSMX_AVAILABLE = Path(_COSMX_PATH).exists()
@@ -302,9 +304,7 @@ class TestIMCGgoHuman:
 
         # Keep only 2 cells of the rare type
         idx_rare_keep = rng.choice(idx_rare, size=min(2, len(idx_rare)), replace=False)
-        keep_idx = np.sort(
-            np.concatenate([idx_roi0_nonrare[:100], idx_rare_keep, idx_other[:200]])
-        )
+        keep_idx = np.sort(np.concatenate([idx_roi0_nonrare[:100], idx_rare_keep, idx_other[:200]]))
         adata_sparse = adata[keep_idx].copy()
         adata_sparse.obs[_IMC_CLUSTER_KEY] = pd.Categorical(
             adata_sparse.obs[_IMC_CLUSTER_KEY].astype(str)
@@ -344,9 +344,7 @@ class TestIMCGgoHuman:
 
         cropped.obs[_IMC_LIB_KEY] = roi_id
         cropped.obs[_IMC_LIB_KEY] = cropped.obs[_IMC_LIB_KEY].astype("category")
-        cropped.obs[_IMC_CLUSTER_KEY] = pd.Categorical(
-            cropped.obs[_IMC_CLUSTER_KEY].astype(str)
-        )
+        cropped.obs[_IMC_CLUSTER_KEY] = pd.Categorical(cropped.obs[_IMC_CLUSTER_KEY].astype(str))
 
         # Should not crash even with very few cells
         _run_spatial_neighbors(cropped, _IMC_LIB_KEY)
@@ -474,18 +472,14 @@ class TestCosMxLymphDLBCL:
             pytest.skip(f"No '{rare_type}' cells found in {sample_a}")
 
         idx_a_rare_keep = rng.choice(idx_a_rare, size=min(2, len(idx_a_rare)), replace=False)
-        idx_a_other_keep = rng.choice(
-            idx_a_other, size=min(148, len(idx_a_other)), replace=False
-        )
+        idx_a_other_keep = rng.choice(idx_a_other, size=min(148, len(idx_a_other)), replace=False)
 
         # From sample_b: take 200 cells normally
         mask_b = full.obs[_COSMX_LIB_KEY] == sample_b
         idx_b = np.where(mask_b.values)[0]
         idx_b_keep = rng.choice(idx_b, size=min(200, len(idx_b)), replace=False)
 
-        keep_idx = np.sort(
-            np.concatenate([idx_a_rare_keep, idx_a_other_keep, idx_b_keep])
-        )
+        keep_idx = np.sort(np.concatenate([idx_a_rare_keep, idx_a_other_keep, idx_b_keep]))
         adata = full[keep_idx].to_memory()
         adata.obsm["spatial"] = adata.obs[["x_slide_mm", "y_slide_mm"]].values.astype(np.float32)
         adata = _finalize(adata, _COSMX_LIB_KEY, _COSMX_CLUSTER_KEY)
@@ -510,9 +504,9 @@ class TestCosMxLymphDLBCL:
         mask = full.obs[_COSMX_LIB_KEY] == sample
         idx_sample = np.where(mask.values)[0]
         sample_adata = full[idx_sample].to_memory()
-        sample_adata.obsm["spatial"] = sample_adata.obs[
-            ["x_slide_mm", "y_slide_mm"]
-        ].values.astype(np.float32)
+        sample_adata.obsm["spatial"] = sample_adata.obs[["x_slide_mm", "y_slide_mm"]].values.astype(
+            np.float32
+        )
 
         # Crop to 1mm x 1mm bounding box at min coordinates
         x = sample_adata.obsm["spatial"][:, 0]
@@ -674,9 +668,7 @@ class TestVisiumGgoVisium:
         idx_lib2 = np.where(mask_lib2.values)[0]
         idx_lib2_keep = rng.choice(idx_lib2, size=min(150, len(idx_lib2)), replace=False)
 
-        keep_idx = np.sort(
-            np.concatenate([idx_rare_keep, idx_other_keep, idx_lib2_keep])
-        )
+        keep_idx = np.sort(np.concatenate([idx_rare_keep, idx_other_keep, idx_lib2_keep]))
         adata = full[keep_idx].to_memory()
         adata = _finalize(adata, _VISIUM_LIB_KEY, _VISIUM_CLUSTER_KEY)
 

@@ -26,12 +26,14 @@ from sc_tools.tl.gene_sets import load_hallmark
 # Paths to real data (relative to repo root)
 # ---------------------------------------------------------------------------
 
+
 def _find_repo_root() -> Path:
     _sentinel = Path("projects/visium/ggo_visium/results/adata.annotated.p2.h5ad")
     for parent in Path(__file__).resolve().parents:
         if (parent / _sentinel).is_file():
             return parent
     return Path(__file__).parents[2]
+
 
 REPO_ROOT = _find_repo_root()
 
@@ -113,8 +115,12 @@ def _load_imc_subset(path: Path, n_rois: int = 3) -> sc.AnnData:
 
     # Build obsm['spatial'] from centroid columns if absent
     if "spatial" not in adata.obsm:
-        x_col = next((c for c in ("X_centroid", "x_centroid", "X", "x") if c in adata.obs.columns), None)
-        y_col = next((c for c in ("Y_centroid", "y_centroid", "Y", "y") if c in adata.obs.columns), None)
+        x_col = next(
+            (c for c in ("X_centroid", "x_centroid", "X", "x") if c in adata.obs.columns), None
+        )
+        y_col = next(
+            (c for c in ("Y_centroid", "y_centroid", "Y", "y") if c in adata.obs.columns), None
+        )
         if x_col and y_col:
             adata.obsm["spatial"] = np.column_stack(
                 [adata.obs[x_col].values, adata.obs[y_col].values]
@@ -588,7 +594,9 @@ class TestColocalizationSynthetic:
         sigs = ["CatA/Sig1", "CatA/Sig2"]
         corr = pearson_correlation(adata, sig_columns=sigs)
         if corr.shape == (2, 2):
-            assert abs(corr.loc["CatA/Sig1", "CatA/Sig2"] - corr.loc["CatA/Sig2", "CatA/Sig1"]) < 1e-9
+            assert (
+                abs(corr.loc["CatA/Sig1", "CatA/Sig2"] - corr.loc["CatA/Sig2", "CatA/Sig1"]) < 1e-9
+            )
 
     def test_pearson_correlation_single_signature(self):
         """pearson_correlation with a single signature should return a 1x1 DataFrame."""
@@ -694,8 +702,7 @@ class TestHallmarkOnRealVisium:
         }
         max_overlap = max(overlap_counts.values())
         assert max_overlap > 0, (
-            "No Hallmark genes overlap with Visium var_names. "
-            "Possible species/gene-name mismatch."
+            "No Hallmark genes overlap with Visium var_names. Possible species/gene-name mismatch."
         )
 
     def test_hallmark_majority_of_sets_have_coverage(self):

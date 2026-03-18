@@ -169,9 +169,7 @@ def _build_models(Base: Any) -> SimpleNamespace:
         __tablename__ = "samples"
 
         id = Column(Integer, primary_key=True, autoincrement=True)
-        patient_id = Column(
-            Integer, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True
-        )
+        patient_id = Column(Integer, ForeignKey("patients.id", ondelete="SET NULL"), nullable=True)
         sample_id = Column(String, unique=True, nullable=False)
         tissue = Column(String)
         collection_date = Column(String)
@@ -224,9 +222,7 @@ def _build_models(Base: Any) -> SimpleNamespace:
         data_source_id = Column(
             Integer, ForeignKey("data_sources.id", ondelete="SET NULL"), nullable=True
         )
-        sample_id = Column(
-            Integer, ForeignKey("samples.id", ondelete="SET NULL"), nullable=True
-        )
+        sample_id = Column(Integer, ForeignKey("samples.id", ondelete="SET NULL"), nullable=True)
         name = Column(String, unique=True, nullable=False)
         uri = Column(Text, nullable=False)
         modality = Column(String, nullable=False)
@@ -1082,8 +1078,7 @@ class Registry:
         fk_count = sum(x is not None for x in (phase_id, dataset_id))
         if fk_count != 1:
             raise ValueError(
-                "Exactly one of phase_id or dataset_id must be provided. "
-                f"Got {fk_count}."
+                f"Exactly one of phase_id or dataset_id must be provided. Got {fk_count}."
             )
 
         if phase_id is not None:
@@ -1430,7 +1425,10 @@ class Registry:
                 patient_ids_subq = (
                     sess.query(self._Sample.patient_id)
                     .join(self._InventoryItem, self._InventoryItem.sample_id == self._Sample.id)
-                    .join(self._DatasetMember, self._DatasetMember.inventory_id == self._InventoryItem.id)
+                    .join(
+                        self._DatasetMember,
+                        self._DatasetMember.inventory_id == self._InventoryItem.id,
+                    )
                     .join(self._Dataset, self._DatasetMember.dataset_id == self._Dataset.id)
                     .join(self._ProjectDataset, self._ProjectDataset.dataset_id == self._Dataset.id)
                     .filter(self._ProjectDataset.project_id == proj.id)

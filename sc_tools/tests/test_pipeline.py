@@ -113,7 +113,7 @@ class TestGetDag:
 
         dag = get_dag()
         for slug in STANDARD_PHASES:
-            assert slug in dag
+            assert ("data_processing", slug) in dag
 
     def test_get_dag_returns_copy(self):
         from sc_tools.pipeline import get_dag
@@ -127,16 +127,16 @@ class TestGetDag:
 
         dag = get_dag()
         expected = {
-            "ingest_raw",
-            "ingest_load",
-            "qc_filter",
-            "metadata_attach",
-            "preprocess",
-            "demographics",
-            "scoring",
-            "celltype_manual",
-            "biology",
-            "meta_analysis",
+            ("data_processing", "ingest_raw"),
+            ("data_processing", "ingest_load"),
+            ("data_processing", "qc_filter"),
+            ("data_processing", "metadata_attach"),
+            ("data_processing", "preprocess"),
+            ("data_processing", "demographics"),
+            ("data_processing", "scoring"),
+            ("data_processing", "celltype_manual"),
+            ("data_processing", "biology"),
+            ("data_processing", "meta_analysis"),
         }
         assert expected.issubset(set(dag.keys()))
 
@@ -144,41 +144,42 @@ class TestGetDag:
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
-        assert dag["ingest_raw"].depends_on == []
+        assert dag[("data_processing", "ingest_raw")].depends_on == []
 
     def test_ingestion_branch(self):
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
-        assert dag["ingest_raw"].branch == "ingestion"
-        assert dag["ingest_load"].branch == "ingestion"
+        assert dag[("data_processing", "ingest_raw")].branch == "ingestion"
+        assert dag[("data_processing", "ingest_load")].branch == "ingestion"
 
     def test_parallel_branches_from_preprocess(self):
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
+        dp = "data_processing"
         # demographics and scoring both depend on preprocess
-        assert "preprocess" in dag["demographics"].depends_on
-        assert "preprocess" in dag["scoring"].depends_on
+        assert (dp, "preprocess") in dag[(dp, "demographics")].depends_on
+        assert (dp, "preprocess") in dag[(dp, "scoring")].depends_on
 
     def test_celltype_manual_is_iterative(self):
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
-        assert dag["celltype_manual"].iterative is True
-        assert dag["celltype_manual"].optional is True
+        assert dag[("data_processing", "celltype_manual")].iterative is True
+        assert dag[("data_processing", "celltype_manual")].optional is True
 
     def test_demographics_is_optional(self):
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
-        assert dag["demographics"].optional is True
+        assert dag[("data_processing", "demographics")].optional is True
 
     def test_meta_analysis_is_optional(self):
         from sc_tools.pipeline import get_dag
 
         dag = get_dag()
-        assert dag["meta_analysis"].optional is True
+        assert dag[("data_processing", "meta_analysis")].optional is True
 
 
 # ---------------------------------------------------------------------------
@@ -219,8 +220,8 @@ class TestExtendDag:
             ),
         )
         dag = get_dag()
-        assert "spatial_regulon" in dag
-        assert dag["spatial_regulon"].branch == "regulon"
+        assert ("data_processing", "spatial_regulon") in dag
+        assert dag[("data_processing", "spatial_regulon")].branch == "regulon"
 
     def test_extend_with_invalid_dep_raises(self):
         from sc_tools.pipeline import PhaseSpec, extend_dag
@@ -235,7 +236,7 @@ class TestExtendDag:
         from sc_tools.pipeline import PhaseSpec, extend_dag, get_dag
 
         extend_dag("external_data", PhaseSpec(label="External Data", depends_on=[]))
-        assert "external_data" in get_dag()
+        assert ("data_processing", "external_data") in get_dag()
 
     def test_custom_phase_available_after_dep(self):
         from sc_tools.pipeline import PhaseSpec, extend_dag, get_available_next
@@ -253,7 +254,7 @@ class TestExtendDag:
             "scoring",
         ]
         available = get_available_next(all_complete)
-        assert "regulon_analysis" in available
+        assert ("data_processing", "regulon_analysis") in available
 
 
 # ---------------------------------------------------------------------------
@@ -262,27 +263,33 @@ class TestExtendDag:
 
 
 class TestGetAvailableNext:
+    """Tests for get_available_next which now returns PhaseKey tuples."""
+
+    @staticmethod
+    def _dp(slug: str) -> tuple[str, str]:
+        return ("data_processing", slug)
+
     def test_empty_completed_returns_roots(self):
         from sc_tools.pipeline import get_available_next
 
         available = get_available_next([])
-        assert "ingest_raw" in available
+        assert self._dp("ingest_raw") in available
         # No phase with unsatisfied deps should appear
-        assert "qc_filter" not in available
+        assert self._dp("qc_filter") not in available
 
     def test_after_ingest_raw(self):
         from sc_tools.pipeline import get_available_next
 
         available = get_available_next(["ingest_raw"])
-        assert "ingest_load" in available
-        assert "qc_filter" not in available
+        assert self._dp("ingest_load") in available
+        assert self._dp("qc_filter") not in available
 
     def test_sequential_progression(self):
         from sc_tools.pipeline import get_available_next
 
         completed = ["ingest_raw", "ingest_load"]
         available = get_available_next(completed)
-        assert "qc_filter" in available
+        assert self._dp("qc_filter") in available
 
     def test_branching_at_preprocess(self):
         from sc_tools.pipeline import get_available_next
@@ -296,8 +303,8 @@ class TestGetAvailableNext:
         ]
         available = get_available_next(completed)
         # Both parallel branches should be available
-        assert "demographics" in available
-        assert "scoring" in available
+        assert self._dp("demographics") in available
+        assert self._dp("scoring") in available
 
     def test_non_iterative_complete_excluded(self):
         from sc_tools.pipeline import get_available_next
@@ -310,7 +317,7 @@ class TestGetAvailableNext:
             "metadata_attach",
         ]
         available = get_available_next(completed)
-        assert "qc_filter" not in available
+        assert self._dp("qc_filter") not in available
 
     def test_iterative_phase_re_available_after_complete(self):
         from sc_tools.pipeline import get_available_next
@@ -326,7 +333,7 @@ class TestGetAvailableNext:
         ]
         available = get_available_next(completed)
         # celltype_manual is iterative → still available
-        assert "celltype_manual" in available
+        assert self._dp("celltype_manual") in available
 
     def test_all_phases_complete(self):
         from sc_tools.pipeline import get_available_next
@@ -420,3 +427,271 @@ class TestValidateDag:
         _REGISTRY["broken"] = PhaseSpec(label="Broken", depends_on=["nonexistent_dep"])
         errors = validate_dag()
         assert any("broken" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# PhaseSpec.phase_group field
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseSpecPhaseGroup:
+    def test_default_phase_group_is_data_processing(self):
+        from sc_tools.pipeline import PhaseSpec
+
+        spec = PhaseSpec(label="Test", depends_on=[])
+        assert spec.phase_group == "data_processing"
+
+    def test_custom_phase_group(self):
+        from sc_tools.pipeline import PhaseSpec
+
+        spec = PhaseSpec(label="Discovery", depends_on=[], phase_group="discovery")
+        assert spec.phase_group == "discovery"
+
+    def test_all_standard_phases_are_data_processing(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        for slug, spec in STANDARD_PHASES.items():
+            assert spec.phase_group == "data_processing", (
+                f"Standard phase '{slug}' has phase_group='{spec.phase_group}', "
+                f"expected 'data_processing'"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Tuple-keyed DAG: get_dag() returns (phase_group, subphase) keys
+# ---------------------------------------------------------------------------
+
+
+class TestTupleDag:
+    def test_dag_keys_are_tuples(self):
+        from sc_tools.pipeline import get_dag
+
+        dag = get_dag()
+        for key in dag:
+            assert isinstance(key, tuple), f"DAG key {key!r} is not a tuple"
+            assert len(key) == 2, f"DAG key {key!r} should have 2 elements"
+
+    def test_all_standard_tuple_keys(self):
+        from sc_tools.pipeline import get_dag
+
+        dag = get_dag()
+        expected = {
+            ("data_processing", "ingest_raw"),
+            ("data_processing", "ingest_load"),
+            ("data_processing", "qc_filter"),
+            ("data_processing", "metadata_attach"),
+            ("data_processing", "preprocess"),
+            ("data_processing", "demographics"),
+            ("data_processing", "scoring"),
+            ("data_processing", "celltype_manual"),
+            ("data_processing", "biology"),
+            ("data_processing", "meta_analysis"),
+        }
+        assert expected.issubset(set(dag.keys()))
+
+    def test_dag_values_are_phase_specs(self):
+        from sc_tools.pipeline import PhaseSpec, get_dag
+
+        dag = get_dag()
+        for key, spec in dag.items():
+            assert isinstance(spec, PhaseSpec), f"Value for {key!r} is not a PhaseSpec"
+
+    def test_depends_on_are_tuples(self):
+        from sc_tools.pipeline import get_dag
+
+        dag = get_dag()
+        for key, spec in dag.items():
+            for dep in spec.depends_on:
+                assert isinstance(dep, tuple), f"Phase {key!r} has non-tuple dependency: {dep!r}"
+                assert dep in dag, f"Phase {key!r} depends on {dep!r} which is not in the DAG"
+
+    def test_root_phase_no_deps(self):
+        from sc_tools.pipeline import get_dag
+
+        dag = get_dag()
+        assert dag[("data_processing", "ingest_raw")].depends_on == []
+
+    def test_dependency_chain(self):
+        from sc_tools.pipeline import get_dag
+
+        dag = get_dag()
+        dp = "data_processing"
+        # ingest_load depends on ingest_raw
+        assert (dp, "ingest_raw") in dag[(dp, "ingest_load")].depends_on
+        # qc_filter depends on ingest_load
+        assert (dp, "ingest_load") in dag[(dp, "qc_filter")].depends_on
+        # metadata_attach depends on qc_filter
+        assert (dp, "qc_filter") in dag[(dp, "metadata_attach")].depends_on
+        # preprocess depends on metadata_attach
+        assert (dp, "metadata_attach") in dag[(dp, "preprocess")].depends_on
+        # demographics depends on preprocess
+        assert (dp, "preprocess") in dag[(dp, "demographics")].depends_on
+        # scoring depends on preprocess
+        assert (dp, "preprocess") in dag[(dp, "scoring")].depends_on
+        # celltype_manual depends on scoring
+        assert (dp, "scoring") in dag[(dp, "celltype_manual")].depends_on
+        # biology depends on scoring
+        assert (dp, "scoring") in dag[(dp, "biology")].depends_on
+        # meta_analysis depends on biology
+        assert (dp, "biology") in dag[(dp, "meta_analysis")].depends_on
+
+
+# ---------------------------------------------------------------------------
+# Tuple-based get_available_next
+# ---------------------------------------------------------------------------
+
+
+class TestTupleGetAvailableNext:
+    def test_empty_completed_returns_root_tuples(self):
+        from sc_tools.pipeline import get_available_next
+
+        available = get_available_next([])
+        assert ("data_processing", "ingest_raw") in available
+        assert ("data_processing", "qc_filter") not in available
+
+    def test_after_ingest_raw_tuple(self):
+        from sc_tools.pipeline import get_available_next
+
+        available = get_available_next([("data_processing", "ingest_raw")])
+        assert ("data_processing", "ingest_load") in available
+
+    def test_branching_at_preprocess_tuples(self):
+        from sc_tools.pipeline import get_available_next
+
+        dp = "data_processing"
+        completed = [
+            (dp, "ingest_raw"),
+            (dp, "ingest_load"),
+            (dp, "qc_filter"),
+            (dp, "metadata_attach"),
+            (dp, "preprocess"),
+        ]
+        available = get_available_next(completed)
+        assert (dp, "demographics") in available
+        assert (dp, "scoring") in available
+
+    def test_iterative_phase_re_available_tuples(self):
+        from sc_tools.pipeline import get_available_next
+
+        dp = "data_processing"
+        completed = [
+            (dp, "ingest_raw"),
+            (dp, "ingest_load"),
+            (dp, "qc_filter"),
+            (dp, "metadata_attach"),
+            (dp, "preprocess"),
+            (dp, "scoring"),
+            (dp, "celltype_manual"),
+        ]
+        available = get_available_next(completed)
+        # celltype_manual is iterative -> still available
+        assert (dp, "celltype_manual") in available
+
+    def test_all_phases_complete_tuples(self):
+        from sc_tools.pipeline import get_available_next, get_dag
+
+        dp = "data_processing"
+        all_phases = [
+            (dp, "ingest_raw"),
+            (dp, "ingest_load"),
+            (dp, "qc_filter"),
+            (dp, "metadata_attach"),
+            (dp, "preprocess"),
+            (dp, "demographics"),
+            (dp, "scoring"),
+            (dp, "celltype_manual"),
+            (dp, "biology"),
+            (dp, "meta_analysis"),
+        ]
+        available = get_available_next(all_phases)
+        dag = get_dag()
+        for p in available:
+            assert dag[p].iterative, f"Non-iterative phase {p!r} appeared after full completion"
+
+
+# ---------------------------------------------------------------------------
+# flat_slug_to_tuple / tuple_to_display helpers
+# ---------------------------------------------------------------------------
+
+
+class TestHelpers:
+    def test_flat_slug_to_tuple_standard(self):
+        from sc_tools.pipeline import flat_slug_to_tuple
+
+        assert flat_slug_to_tuple("qc_filter") == ("data_processing", "qc_filter")
+        assert flat_slug_to_tuple("ingest_raw") == ("data_processing", "ingest_raw")
+        assert flat_slug_to_tuple("meta_analysis") == ("data_processing", "meta_analysis")
+
+    def test_flat_slug_to_tuple_unknown_raises(self):
+        from sc_tools.pipeline import flat_slug_to_tuple
+
+        with pytest.raises(KeyError, match="not registered"):
+            flat_slug_to_tuple("nonexistent_slug")
+
+    def test_tuple_to_display(self):
+        from sc_tools.pipeline import tuple_to_display
+
+        assert tuple_to_display(("data_processing", "qc_filter")) == "data_processing/qc_filter"
+        assert tuple_to_display(("discovery", "clustering_v1")) == "discovery/clustering_v1"
+
+    def test_flat_slug_to_tuple_all_standard(self):
+        """All 10 standard slugs should map correctly."""
+        from sc_tools.pipeline import STANDARD_PHASES, flat_slug_to_tuple
+
+        for slug in STANDARD_PHASES:
+            result = flat_slug_to_tuple(slug)
+            assert result == ("data_processing", slug)
+
+
+# ---------------------------------------------------------------------------
+# Backward compat: flat slugs still work with get_available_next
+# ---------------------------------------------------------------------------
+
+
+class TestBackwardCompatFlatSlugs:
+    def test_get_available_next_accepts_flat_slugs(self):
+        """Old code passing flat slugs should still work."""
+        from sc_tools.pipeline import get_available_next
+
+        available = get_available_next(["ingest_raw"])
+        # Should return tuples even when given flat slugs
+        assert ("data_processing", "ingest_load") in available
+
+    def test_get_available_next_mixed_input(self):
+        """Accept both flat slugs and tuples in the same list."""
+        from sc_tools.pipeline import get_available_next
+
+        completed = [
+            "ingest_raw",
+            ("data_processing", "ingest_load"),
+        ]
+        available = get_available_next(completed)
+        assert ("data_processing", "qc_filter") in available
+
+    def test_get_phase_accepts_flat_slug(self):
+        """get_phase should still accept flat slugs for backward compat."""
+        from sc_tools.pipeline import get_phase
+
+        spec = get_phase("qc_filter")
+        assert spec.label == "QC Filtering + Concatenation"
+
+    def test_get_phase_accepts_tuple(self):
+        """get_phase should also accept tuples."""
+        from sc_tools.pipeline import get_phase
+
+        spec = get_phase(("data_processing", "qc_filter"))
+        assert spec.label == "QC Filtering + Concatenation"
+
+    def test_get_phase_checkpoint_accepts_flat_slug(self):
+        """get_phase_checkpoint should still accept flat slugs."""
+        from sc_tools.pipeline import get_phase_checkpoint
+
+        cp = get_phase_checkpoint("qc_filter")
+        assert cp == "results/adata.filtered.h5ad"
+
+    def test_get_phase_checkpoint_accepts_tuple(self):
+        """get_phase_checkpoint should also accept tuples."""
+        from sc_tools.pipeline import get_phase_checkpoint
+
+        cp = get_phase_checkpoint(("data_processing", "qc_filter"))
+        assert cp == "results/adata.filtered.h5ad"

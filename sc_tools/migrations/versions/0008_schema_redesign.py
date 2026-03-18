@@ -15,6 +15,7 @@ Changes
 * Simplify ``projects``: drop data_type, imaging_modality, project_type,
   visibility, phases_complete columns.
 """
+
 from __future__ import annotations
 
 revision = "0008"

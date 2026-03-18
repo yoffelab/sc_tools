@@ -470,8 +470,13 @@ class TestProjectPhases:
         proj, ds = _setup_project_with_dataset(reg)
         reg.upsert_phase(proj, ds, "data_processing", "qc_filter", status="in_progress")
         reg.upsert_phase(
-            proj, ds, "data_processing", "qc_filter",
-            status="ready", n_obs=5000, n_vars=2000,
+            proj,
+            ds,
+            "data_processing",
+            "qc_filter",
+            status="ready",
+            n_obs=5000,
+            n_vars=2000,
         )
         phase = reg.get_phase(proj, "data_processing", "qc_filter")
         assert phase["status"] == "ready"
@@ -631,7 +636,9 @@ class TestSamples:
         reg.add_patient("PT001")
         reg.register_sample("PT001_bx1", patient_id="PT001")
         reg.register_inventory_item(
-            "rna_pt001", uri="/data/rna.h5ad", modality="rna",
+            "rna_pt001",
+            uri="/data/rna.h5ad",
+            modality="rna",
             sample_name="PT001_bx1",
         )
         item = reg.get_inventory_item("rna_pt001")
@@ -640,7 +647,9 @@ class TestSamples:
     def test_inventory_item_sample_not_found(self, reg):
         with pytest.raises(ValueError, match="Sample.*not found"):
             reg.register_inventory_item(
-                "rna_bad", uri="/data/rna.h5ad", modality="rna",
+                "rna_bad",
+                uri="/data/rna.h5ad",
+                modality="rna",
                 sample_name="NONEXISTENT",
             )
 
@@ -650,7 +659,9 @@ class TestSamples:
         reg.add_patient("PT001", metadata={"organism": "human"})
         reg.register_sample("PT001_bx1", patient_id="PT001", tissue="colon")
         reg.register_inventory_item(
-            "rna_pt001", uri="/data/rna.h5ad", modality="rna",
+            "rna_pt001",
+            uri="/data/rna.h5ad",
+            modality="rna",
             sample_name="PT001_bx1",
         )
         reg.create_dataset("ds_a")

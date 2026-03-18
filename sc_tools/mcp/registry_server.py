@@ -688,10 +688,7 @@ def mark_phase_complete(
     try:
         reg = _registry()
         reg.mark_phase_complete(project_name, phase_group, subphase)
-        return (
-            f"Marked phase '{phase_group}/{subphase}' as complete "
-            f"for project '{project_name}'."
-        )
+        return f"Marked phase '{phase_group}/{subphase}' as complete for project '{project_name}'."
     except Exception as exc:
         return f"ERROR: {exc}"
 
@@ -724,9 +721,7 @@ def get_available_next_phases(project_name: str) -> str:
 
         reg = _registry()
         phase_rows = reg.list_phases(project_name)
-        completed = [
-            r["subphase"] for r in phase_rows if r["status"] in ("complete", "ready")
-        ]
+        completed = [r["subphase"] for r in phase_rows if r["status"] in ("complete", "ready")]
         in_progress = [r["subphase"] for r in phase_rows if r["status"] == "in_progress"]
 
         dag = get_dag()

@@ -403,7 +403,11 @@ def _recipe_imc(
             stacklevel=2,
         )
         _X[:, _nan_mask] = 0.0
-        adata.X = _X if not _issparse(adata.X) else __import__("scipy.sparse", fromlist=["csr_matrix"]).csr_matrix(_X)
+        adata.X = (
+            _X
+            if not _issparse(adata.X)
+            else __import__("scipy.sparse", fromlist=["csr_matrix"]).csr_matrix(_X)
+        )
 
     n_comps = kwargs.get("n_comps", min(20, adata.n_vars - 1))
     pca(adata, n_comps=n_comps, use_highly_variable=False)

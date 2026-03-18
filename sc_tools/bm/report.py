@@ -65,12 +65,12 @@ def _find_latest_bm_report(
         no candidates exist after exclusion.
     """
     candidates = [
-        p for p in output_dir.glob(pattern)
-        if p.name != exclude and p.name != "index.html"
+        p for p in output_dir.glob(pattern) if p.name != exclude and p.name != "index.html"
     ]
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
+
 
 _SEG_TEMPLATE = "segmentation_report_template.html"
 _INT_TEMPLATE = "integration_report_template.html"
@@ -184,14 +184,16 @@ def generate_segmentation_report(
         context["overlay_img"] = None
 
     _SEG_SECTIONS = [
-        {"id": "exec-summary",  "label": "Executive Summary"},
+        {"id": "exec-summary", "label": "Executive Summary"},
         {"id": "metrics-table", "label": "Metrics Comparison"},
         {"id": "score-ranking", "label": "Score Ranking"},
-        {"id": "morphology",    "label": "Morphology",           "key": "plot_morphology"},
-        {"id": "marker-snr",    "label": "Marker SNR",           "key": "plot_marker_snr"},
-        {"id": "overlay",       "label": "Segmentation Overlay", "key": "overlay_img"},
+        {"id": "morphology", "label": "Morphology", "key": "plot_morphology"},
+        {"id": "marker-snr", "label": "Marker SNR", "key": "plot_marker_snr"},
+        {"id": "overlay", "label": "Segmentation Overlay", "key": "overlay_img"},
     ]
-    context["sections"] = [s for s in _SEG_SECTIONS if "key" not in s or context.get(s["key"]) is not None]
+    context["sections"] = [
+        s for s in _SEG_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_SEG_TEMPLATE, context)
     output_path.write_text(html)
@@ -208,7 +210,9 @@ def generate_segmentation_report(
             combined = _wrap_with_tabs(
                 current_label="Current",
                 current_content=_extract_body_content(html),
-                previous_tabs=[("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))],
+                previous_tabs=[
+                    ("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))
+                ],
                 current_css=_extract_head_css(html),
             )
             output_path.write_text(combined)
@@ -317,10 +321,18 @@ def generate_integration_report(
         context["umap_img"] = None
 
     # Batch × bio conservation table
-    _bb_cols = [c for c in ["method", "batch_score", "bio_score", "overall_score"] if c in comparison_df.columns]
+    _bb_cols = [
+        c
+        for c in ["method", "batch_score", "bio_score", "overall_score"]
+        if c in comparison_df.columns
+    ]
     if len(_bb_cols) > 1:
-        _bb_df = comparison_df[_bb_cols].copy().sort_values(
-            "overall_score" if "overall_score" in _bb_cols else _bb_cols[-1], ascending=False
+        _bb_df = (
+            comparison_df[_bb_cols]
+            .copy()
+            .sort_values(
+                "overall_score" if "overall_score" in _bb_cols else _bb_cols[-1], ascending=False
+            )
         )
         for col in _bb_cols[1:]:
             _bb_df[col] = _bb_df[col].map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
@@ -333,14 +345,16 @@ def generate_integration_report(
         context["batch_bio_table_html"] = None
 
     _INT_SECTIONS = [
-        {"id": "exec-summary",    "label": "Executive Summary"},
+        {"id": "exec-summary", "label": "Executive Summary"},
         {"id": "batch-bio-table", "label": "Batch \u00d7 Bio Table", "key": "batch_bio_table_html"},
         {"id": "metrics-heatmap", "label": "Metrics Heatmap"},
-        {"id": "umap-grid",       "label": "UMAP Comparison",        "key": "umap_img"},
-        {"id": "ranking",         "label": "Integration Ranking"},
-        {"id": "radar",           "label": "Metrics Radar",          "key": "plot_radar"},
+        {"id": "umap-grid", "label": "UMAP Comparison", "key": "umap_img"},
+        {"id": "ranking", "label": "Integration Ranking"},
+        {"id": "radar", "label": "Metrics Radar", "key": "plot_radar"},
     ]
-    context["sections"] = [s for s in _INT_SECTIONS if "key" not in s or context.get(s["key"]) is not None]
+    context["sections"] = [
+        s for s in _INT_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_INT_TEMPLATE, context)
     output_path.write_text(html)
@@ -357,7 +371,9 @@ def generate_integration_report(
             combined = _wrap_with_tabs(
                 current_label="Current",
                 current_content=_extract_body_content(html),
-                previous_tabs=[("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))],
+                previous_tabs=[
+                    ("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))
+                ],
                 current_css=_extract_head_css(html),
             )
             output_path.write_text(combined)
@@ -424,7 +440,12 @@ def generate_benchmark_report(
     if len(by_method) > 0:
         _score_col = score_col
         if _score_col is None:
-            for candidate in ["composite_score", "overall_score", "boundary_regularity_mean", "n_cells_mean"]:
+            for candidate in [
+                "composite_score",
+                "overall_score",
+                "boundary_regularity_mean",
+                "n_cells_mean",
+            ]:
                 if candidate in by_method.columns:
                     _score_col = candidate
                     break
@@ -527,16 +548,22 @@ def generate_benchmark_report(
     context["failure_gallery_img"] = None
 
     _BM_SECTIONS = [
-        {"id": "exec-summary",        "label": "Executive Summary"},
-        {"id": "method-ranking",      "label": "Method Ranking",      "key": "plot_method_ranking"},
-        {"id": "statistics",          "label": "Statistical Tests",   "key": "stats_table"},
-        {"id": "per-dataset",         "label": "Per-Dataset Heatmap", "key": "plot_dataset_heatmap"},
-        {"id": "strategy-comparison", "label": "Strategy Comparison", "key": "plot_strategy_comparison"},
-        {"id": "tissue-analysis",     "label": "Tissue Analysis",     "key": "plot_tissue_boxplot"},
-        {"id": "generalization",      "label": "Generalization",      "key": "plot_generalization"},
-        {"id": "runtime",             "label": "Runtime",             "key": "plot_runtime"},
+        {"id": "exec-summary", "label": "Executive Summary"},
+        {"id": "method-ranking", "label": "Method Ranking", "key": "plot_method_ranking"},
+        {"id": "statistics", "label": "Statistical Tests", "key": "stats_table"},
+        {"id": "per-dataset", "label": "Per-Dataset Heatmap", "key": "plot_dataset_heatmap"},
+        {
+            "id": "strategy-comparison",
+            "label": "Strategy Comparison",
+            "key": "plot_strategy_comparison",
+        },
+        {"id": "tissue-analysis", "label": "Tissue Analysis", "key": "plot_tissue_boxplot"},
+        {"id": "generalization", "label": "Generalization", "key": "plot_generalization"},
+        {"id": "runtime", "label": "Runtime", "key": "plot_runtime"},
     ]
-    context["sections"] = [s for s in _BM_SECTIONS if "key" not in s or context.get(s["key"]) is not None]
+    context["sections"] = [
+        s for s in _BM_SECTIONS if "key" not in s or context.get(s["key"]) is not None
+    ]
 
     html = render_template(_BM_TEMPLATE, context)
     output_path.write_text(html)
@@ -553,7 +580,9 @@ def generate_benchmark_report(
             combined = _wrap_with_tabs(
                 current_label="Current",
                 current_content=_extract_body_content(html),
-                previous_tabs=[("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))],
+                previous_tabs=[
+                    ("Previous", _extract_body_content(prior_html), _extract_head_css(prior_html))
+                ],
                 current_css=_extract_head_css(html),
             )
             output_path.write_text(combined)
@@ -702,13 +731,15 @@ def generate_report_index(
         else:
             report_type = "qc"
 
-        reports.append({
-            "filename": html_file.name,
-            "title": title,
-            "date": date,
-            "best_method": best_method,
-            "report_type": report_type,
-        })
+        reports.append(
+            {
+                "filename": html_file.name,
+                "title": title,
+                "date": date,
+                "best_method": best_method,
+                "report_type": report_type,
+            }
+        )
 
     reports.sort(key=lambda r: r["date"], reverse=True)
 

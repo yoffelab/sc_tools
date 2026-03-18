@@ -335,6 +335,7 @@ def test_segmentation_report_second_run_has_tabs():
 
 def test_benchmark_report_second_run_has_tabs():
     """Second generate_benchmark_report in same dir must produce tab markup."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_benchmark_report
 
     df = pd.DataFrame(

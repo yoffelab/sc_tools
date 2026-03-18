@@ -7,6 +7,7 @@ import pathlib
 import tempfile
 
 import pandas as pd
+import pytest
 
 # ---------------------------------------------------------------------------
 # Task 1: generate_report_index
@@ -190,6 +191,7 @@ def test_generate_benchmark_report_offline_param():
 
 def test_generate_integration_report_online_has_cdn_script():
     """Default (offline=False) output must include the CDN plotly script tag."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = pd.DataFrame(
@@ -210,6 +212,7 @@ def test_generate_integration_report_online_has_cdn_script():
 
 def test_generate_integration_report_offline_no_cdn_script():
     """offline=True output must NOT include the CDN plotly script tag."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = pd.DataFrame(
@@ -234,6 +237,7 @@ def test_generate_integration_report_offline_no_cdn_script():
 
 def test_generate_integration_report_offline_embeds_plotlyjs():
     """offline=True output must include inline plotly.js content."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = pd.DataFrame(
@@ -279,6 +283,7 @@ def _make_integration_df():
 
 def test_integration_report_second_run_has_tabs():
     """Second generate_integration_report in same dir must produce tab markup."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = _make_integration_df()
@@ -294,6 +299,7 @@ def test_integration_report_second_run_has_tabs():
 
 def test_integration_report_first_run_no_tabs():
     """First generate_integration_report in empty dir must NOT add tab markup."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = _make_integration_df()
@@ -308,6 +314,7 @@ def test_integration_report_first_run_no_tabs():
 
 def test_segmentation_report_second_run_has_tabs():
     """Second generate_segmentation_report in same dir must produce tab markup."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_segmentation_report
 
     df = pd.DataFrame(
@@ -352,6 +359,7 @@ def test_benchmark_report_second_run_has_tabs():
 
 def test_tab_combination_gracefully_skipped_on_error(monkeypatch):
     """Tab combination errors must be silently swallowed; report still written."""
+    pytest.importorskip("plotly")
     from sc_tools.bm import report as bm_report
     from sc_tools.bm.report import generate_integration_report
 
@@ -377,6 +385,7 @@ def test_tab_combination_gracefully_skipped_on_error(monkeypatch):
 
 def test_integration_report_contains_batch_bio_table():
     """generate_integration_report must embed a batch × bio HTML table when scores exist."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = pd.DataFrame(
@@ -397,6 +406,7 @@ def test_integration_report_contains_batch_bio_table():
 
 def test_integration_report_batch_bio_table_sorted_by_overall():
     """batch × bio table must be sorted descending by overall_score."""
+    pytest.importorskip("plotly")
     import re as _re
 
     from sc_tools.bm.report import generate_integration_report
@@ -426,6 +436,7 @@ def test_integration_report_batch_bio_table_sorted_by_overall():
 
 def test_integration_report_batch_bio_table_section_order():
     """batch-bio-table section must appear before metrics-heatmap in the report."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     df = pd.DataFrame(
@@ -447,6 +458,7 @@ def test_integration_report_batch_bio_table_section_order():
 
 def test_integration_report_umap_before_radar():
     """umap-grid section must appear before radar section when both are present."""
+    pytest.importorskip("plotly")
     from sc_tools.bm.report import generate_integration_report
 
     # radar requires >= 3 metric cols (beyond batch/bio/overall/method)

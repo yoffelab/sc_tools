@@ -33,11 +33,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. `_stratified_subsample` preserves group proportions (no truncation bias toward low-index cells)
   4. Benchmark output includes `runtime_s` column and all parameter provenance (batch_weight, bio_weight, seed, resolution)
   5. `_recipe_targeted_panel` skips normalization when scVI integration is selected (raw counts preserved for scVI)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Fix _stratified_subsample, NaN masking, subsample_n, runtime_s, param provenance (BM-02..06, TST-01..03)
+- [ ] 01-02-PLAN.md — h5py embedding loading, bio_key parameter, targeted panel scVI fix (BM-01, BM-07)
 
 ### Phase 2: CLI Foundation
 **Goal**: `sct` is an installable, fast-starting CLI that produces structured JSON output and handles errors with actionable taxonomy
@@ -151,7 +151,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Benchmark Fixes | 0/2 | Not started | - |
+| 1. Benchmark Fixes | 0/2 | Planning complete | - |
 | 2. CLI Foundation | 0/2 | Not started | - |
 | 3. Core Commands | 0/3 | Not started | - |
 | 4. CLI Discovery | 0/1 | Not started | - |

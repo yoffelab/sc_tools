@@ -42,14 +42,14 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] NaN handling in `compare_integrations()` (per-embedding valid-cell masking)
 - [x] Fix `_recipe_targeted_panel` normalizing before scVI raw count check
 
-**CLI foundation (Phase 2):**
-- [ ] `sct` entry point registered in `pyproject.toml` `[project.scripts]`
-- [ ] Typer-based CLI framework with Pydantic CLIResult envelope (`{status, command, data, artifacts, provenance, message}`)
-- [ ] JSON stdout by default, `--human` flag for Rich-formatted stderr output
-- [ ] Semantic exit codes (0=success, 1=user error, 2=data error, 3=runtime error)
-- [ ] Structured error reporting with retryable/fixable/fatal taxonomy
-- [ ] Non-interactive by default (no prompts; all params via flags/env/config)
-- [ ] Lazy imports (heavy deps like scanpy/torch loaded at command execution, not startup; <500ms for `sct help`)
+**CLI foundation (Phase 2) — Validated 2026-03-21:**
+- [x] `sct` entry point registered in `pyproject.toml` `[project.scripts]`
+- [x] Typer-based CLI framework with Pydantic CLIResult envelope (`{status, command, data, artifacts, provenance, message}`)
+- [x] JSON stdout by default, `--human` flag for Rich-formatted stderr output
+- [x] Semantic exit codes (0=success, 1=user error, 2=data error, 3=runtime error)
+- [x] Structured error reporting with retryable/fixable/fatal taxonomy
+- [x] Non-interactive by default (no prompts; all params via flags/env/config)
+- [x] Lazy imports (heavy deps like scanpy/torch loaded at command execution, not startup; <500ms for `sct help`)
 
 **CLI core commands (Phase 3):**
 - [ ] `sct qc run`, `sct preprocess run`, `sct validate <phase>` — wrap existing operations
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-21 — Phase 1 (benchmark fixes) complete*
+*Last updated: 2026-03-21 — Phase 2 (CLI foundation) complete*

@@ -8,6 +8,7 @@ import pytest
 from anndata import AnnData
 
 from sc_tools.bm.integration import (
+    _load_embedding_h5py,
     _mask_nan_rows,
     _stratified_subsample,
     compare_integrations,
@@ -790,3 +791,200 @@ class TestRunFullIntegrationWorkflow:
 
         test_dir = tmp_path / "tmp" / "integration_test"
         assert not test_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# h5py loading fixture helper
+# ---------------------------------------------------------------------------
+
+
+def _write_test_h5ad(
+    tmp_path,
+    n_obs: int = 100,
+    n_latent: int = 10,
+    obsm_key: str = "X_scVI",
+    obs_keys: dict[str, np.ndarray] | None = None,
+) -> tuple:
+    """Write a minimal h5ad with known embedding and obs columns.
+
+    Returns (path, embedding_array, obs_dict).
+    """
+    rng = np.random.RandomState(42)
+    X = rng.randn(n_obs, 20).astype(np.float32)
+    embedding = rng.randn(n_obs, n_latent).astype(np.float32)
+
+    adata = AnnData(X=X)
+    adata.obsm[obsm_key] = embedding
+
+    if obs_keys is None:
+        obs_keys = {}
+        batch_vals = [f"batch_{i % 3}" for i in range(n_obs)]
+        adata.obs["batch"] = pd.Categorical(batch_vals)
+        obs_keys["batch"] = np.array(batch_vals)
+
+        celltype_vals = [f"type_{i % 4}" for i in range(n_obs)]
+        adata.obs["celltype"] = pd.Categorical(celltype_vals)
+        obs_keys["celltype"] = np.array(celltype_vals)
+    else:
+        for key, vals in obs_keys.items():
+            if vals.dtype.kind in ("U", "O", "S"):
+                adata.obs[key] = pd.Categorical(vals)
+            else:
+                adata.obs[key] = vals
+
+    path = tmp_path / "test.h5ad"
+    adata.write_h5ad(path)
+    return path, embedding, obs_keys
+
+
+# ---------------------------------------------------------------------------
+# TestLoadEmbeddingH5py (BM-01)
+# ---------------------------------------------------------------------------
+
+
+class TestLoadEmbeddingH5py:
+    def test_loads_categorical_obs(self, tmp_path):
+        """Load categorical batch column via h5py and verify values match."""
+        path, expected_emb, expected_obs = _write_test_h5ad(tmp_path)
+        embedding, obs_data = _load_embedding_h5py(path, "X_scVI", ["batch"])
+
+        assert embedding.shape == expected_emb.shape
+        np.testing.assert_allclose(embedding, expected_emb, rtol=1e-5)
+        np.testing.assert_array_equal(obs_data["batch"], expected_obs["batch"])
+
+    def test_loads_plain_array_obs(self, tmp_path):
+        """Load a numeric (non-categorical) obs column."""
+        rng = np.random.RandomState(42)
+        n_obs = 50
+        numeric_vals = rng.randn(n_obs).astype(np.float32)
+        path, _, _ = _write_test_h5ad(
+            tmp_path,
+            n_obs=n_obs,
+            obs_keys={"score": numeric_vals},
+        )
+        embedding, obs_data = _load_embedding_h5py(path, "X_scVI", ["score"])
+        assert "score" in obs_data
+        assert obs_data["score"].shape[0] == n_obs
+
+    def test_missing_obsm_key_raises(self, tmp_path):
+        """Missing obsm key raises KeyError."""
+        path, _, _ = _write_test_h5ad(tmp_path)
+        with pytest.raises(KeyError, match="X_foo"):
+            _load_embedding_h5py(path, "X_foo", ["batch"])
+
+    def test_missing_obs_key_raises(self, tmp_path):
+        """Missing obs key raises KeyError."""
+        path, _, _ = _write_test_h5ad(tmp_path)
+        with pytest.raises(KeyError, match="nonexistent"):
+            _load_embedding_h5py(path, "X_scVI", ["nonexistent"])
+
+    def test_memory_arithmetic(self):
+        """2.5M cells x 30 dims x 4 bytes = 300MB << 2GB."""
+        mem_bytes = 2_500_000 * 30 * 4
+        assert mem_bytes < 2 * 1024**3
+
+
+# ---------------------------------------------------------------------------
+# TestEmbeddingFilesParameter (BM-01)
+# ---------------------------------------------------------------------------
+
+
+class TestEmbeddingFilesParameter:
+    def test_from_files(self, tmp_path):
+        """Load 2 embeddings from h5ad files, get DataFrame with 2 rows."""
+        path1, _, _ = _write_test_h5ad(tmp_path / "a", obsm_key="X_scVI")
+        path2, _, _ = _write_test_h5ad(tmp_path / "b", obsm_key="X_harmony")
+
+        df = compare_integrations(
+            adata=None,
+            embeddings=None,
+            embedding_files={"scVI": str(path1), "Harmony": str(path2)},
+            batch_key="batch",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert len(df) == 2
+        assert set(df["method"]) == {"scVI", "Harmony"}
+        assert "overall_score" in df.columns
+
+    def test_mixed_adata_and_files(self, tmp_path):
+        """Mix adata-based and file-based embeddings in one call."""
+        adata = _make_batched_adata(n_obs=100)
+        path1, _, _ = _write_test_h5ad(tmp_path / "a", n_obs=100, obsm_key="X_scVI")
+
+        df = compare_integrations(
+            adata=adata,
+            embeddings={"good": "X_good"},
+            embedding_files={"scVI": str(path1)},
+            batch_key="batch",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        methods = set(df["method"])
+        assert "good" in methods
+        assert "scVI" in methods
+
+    def test_backwards_compatible(self):
+        """Calling without embedding_files works exactly as before."""
+        adata = _make_batched_adata()
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert len(df) == 1
+        assert df["method"].iloc[0] == "good"
+
+
+# ---------------------------------------------------------------------------
+# TestBioKeyParameter (BM-01)
+# ---------------------------------------------------------------------------
+
+
+class TestBioKeyParameter:
+    def test_bio_key_uses_specified_column(self):
+        """bio_key='condition' uses that column for bio conservation."""
+        adata = _make_batched_adata()
+        adata.obs["condition"] = [f"cond_{i % 2}" for i in range(adata.n_obs)]
+
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            bio_key="condition",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert "bio_score" in df.columns
+        assert df["bio_score"].iloc[0] > 0
+
+    def test_bio_key_none_celltype_none(self):
+        """bio_key=None, celltype_key=None -> no bio metrics."""
+        adata = _make_batched_adata()
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key=None,
+            bio_key=None,
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert df["bio_score"].iloc[0] == 0.0
+
+    def test_bio_key_defaults_to_celltype_key(self):
+        """bio_key not provided -> defaults to celltype_key."""
+        adata = _make_batched_adata()
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert df["bio_score"].iloc[0] > 0

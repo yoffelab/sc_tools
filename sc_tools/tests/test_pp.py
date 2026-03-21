@@ -633,7 +633,7 @@ class TestAutoUseRep:
 class TestTargetedPanelScVI:
     def test_scvi_preserves_raw_counts(self):
         """_recipe_targeted_panel with scVI should NOT normalize X."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         from sc_tools.pp.recipes import _recipe_targeted_panel
         from sc_tools.pp.strategy import SmallStrategy, SubsampleContext
@@ -647,7 +647,8 @@ class TestTargetedPanelScVI:
         strategy = SmallStrategy()
         ctx = SubsampleContext()
 
-        with patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
+        with patch.object(strategy, "select_features"), \
+             patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
              patch.object(strategy, "embed_and_cluster"):
             _recipe_targeted_panel(
                 adata,
@@ -684,7 +685,8 @@ class TestTargetedPanelScVI:
         strategy = SmallStrategy()
         ctx = SubsampleContext()
 
-        with patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
+        with patch.object(strategy, "select_features"), \
+             patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
              patch.object(strategy, "embed_and_cluster"):
             _recipe_targeted_panel(
                 adata,

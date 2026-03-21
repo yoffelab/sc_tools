@@ -15,16 +15,12 @@ from typing import Any
 
 from anndata import AnnData
 
-from .integrate import run_cytovi, run_harmony, run_scvi
 from .normalize import (
-    arcsinh_transform,
-    backup_raw,
-    filter_genes_by_pattern,
     log_transform,
     normalize_total,
-    scale,
 )
-from .reduce import cluster, pca, run_utag
+from .reduce import run_utag
+from .strategy import SmallStrategy, select_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +77,7 @@ def preprocess(
         Extra arguments passed to integration and recipe-specific steps.
         Recognized keys:
 
+        - ``strategy``: explicit ``ScaleStrategy`` instance (default: auto-select).
         - ``n_latent``, ``n_layers``, ``n_hidden``, ``max_epochs``,
           ``early_stopping``: passed to ``run_scvi``/``run_cytovi``.
         - ``n_neighbors``: passed to ``neighbors()`` (default 20).
@@ -107,6 +104,11 @@ def preprocess(
     if copy:
         adata = adata.copy()
 
+    # Extract strategy from kwargs (not a named param to keep backward compat)
+    strategy = kwargs.pop("strategy", None)
+    if strategy is None:
+        strategy = select_strategy(adata, config=kwargs.pop("config", None), platform=modality)
+
     logger.info("Preprocessing: modality=%s, integration=%s", modality, integration)
 
     if modality in ("visium", "visium_hd"):
@@ -118,10 +120,11 @@ def preprocess(
             resolution=resolution,
             filter_patterns=filter_patterns,
             use_gpu=use_gpu,
+            strategy=strategy,
             **kwargs,
         )
-    elif modality in ("xenium", "visium_hd_cell"):
-        _recipe_xenium(
+    elif modality in ("xenium", "visium_hd_cell", "cosmx"):
+        _recipe_targeted_panel(
             adata,
             batch_key=batch_key,
             integration=integration,
@@ -129,17 +132,8 @@ def preprocess(
             resolution=resolution,
             filter_patterns=filter_patterns,
             use_gpu=use_gpu,
-            **kwargs,
-        )
-    elif modality == "cosmx":
-        _recipe_cosmx(
-            adata,
-            batch_key=batch_key,
-            integration=integration,
-            n_top_genes=n_top_genes,
-            resolution=resolution,
-            filter_patterns=filter_patterns,
-            use_gpu=use_gpu,
+            strategy=strategy,
+            modality=modality,
             **kwargs,
         )
     elif modality == "imc":
@@ -149,6 +143,7 @@ def preprocess(
             integration=integration,
             resolution=resolution,
             use_gpu=use_gpu,
+            strategy=strategy,
             **kwargs,
         )
 
@@ -174,80 +169,61 @@ def _recipe_visium(
     resolution: float,
     filter_patterns: list[str] | None,
     use_gpu: str | bool,
+    strategy: SmallStrategy | None = None,
     **kwargs: Any,
 ) -> None:
     """Visium / Visium HD preprocessing recipe.
 
-    1. Backup raw
-    2. Filter MT/RP/HB genes
-    3. HVG selection (with batch_key)
-    4. Subset to HVGs
-    5. scVI integration (from raw counts)
-    6. PCA (for non-scVI visualizations)
-    7. Neighbors + Leiden + UMAP
+    1. Backup raw + filter genes (strategy.prepare)
+    2. HVG selection (strategy.select_features)
+    3. Integration / dimensionality reduction (strategy.reduce_and_integrate)
+    4. Neighbors + Leiden + UMAP (strategy.embed_and_cluster)
     """
-    import scanpy as sc
+    if strategy is None:
+        strategy = SmallStrategy()
 
-    backup_raw(adata)
-    filter_genes_by_pattern(adata, patterns=filter_patterns)
+    strategy.prepare(adata, filter_patterns=filter_patterns)
 
     hvg_batch_key = kwargs.get("hvg_batch_key", batch_key)
 
     if integration == "scvi":
-        # scVI uses raw counts; HVG with seurat_v3 works on raw counts
+        # scVI uses raw counts; HVG with seurat_v3
         hvg_flavor = kwargs.get("hvg_flavor", "seurat_v3")
-        sc.pp.highly_variable_genes(
-            adata,
-            flavor=hvg_flavor,
-            n_top_genes=n_top_genes,
-            batch_key=hvg_batch_key,
+        strategy.select_features(
+            adata, n_top_genes=n_top_genes, flavor=hvg_flavor, batch_key=hvg_batch_key
         )
-        adata._inplace_subset_var(adata.var["highly_variable"].values)
-        logger.info("Subset to %d HVGs", adata.n_vars)
-
-        scvi_kwargs = {
-            k: kwargs[k]
-            for k in ("n_latent", "n_layers", "n_hidden", "max_epochs", "early_stopping")
-            if k in kwargs
-        }
-        run_scvi(adata, batch_key=batch_key, use_gpu=use_gpu, **scvi_kwargs)
-
-        # PCA on normalized data for visualization (supplementary to scVI)
-        adata_norm = adata.copy()
-        sc.pp.normalize_total(adata_norm)
-        sc.pp.log1p(adata_norm)
-        sc.tl.pca(adata_norm)
-        adata.obsm["X_pca"] = adata_norm.obsm["X_pca"]
-        adata.varm["PCs"] = adata_norm.varm["PCs"]
-        adata.uns["pca"] = adata_norm.uns["pca"]
-        del adata_norm
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration="scvi",
+            batch_key=batch_key,
+            n_comps=kwargs.get("n_comps", 50),
+            use_gpu=use_gpu,
+            **{
+                k: kwargs[k]
+                for k in ("n_latent", "n_layers", "n_hidden", "max_epochs", "early_stopping")
+                if k in kwargs
+            },
+        )
     else:
-        # Non-scVI: normalize first, then HVG on log-normalized data
+        # Non-scVI: normalize first, then HVG
         normalize_total(adata)
         log_transform(adata)
-
         hvg_flavor = kwargs.get("hvg_flavor", "seurat")
-        sc.pp.highly_variable_genes(
+        strategy.select_features(
+            adata, n_top_genes=n_top_genes, flavor=hvg_flavor, batch_key=hvg_batch_key
+        )
+        ctx = strategy.reduce_and_integrate(
             adata,
-            flavor=hvg_flavor,
-            n_top_genes=n_top_genes,
-            batch_key=hvg_batch_key,
+            integration=integration,
+            batch_key=batch_key,
+            n_comps=kwargs.get("n_comps", 50),
         )
-        adata._inplace_subset_var(adata.var["highly_variable"].values)
-        logger.info("Subset to %d HVGs", adata.n_vars)
 
-        n_comps = kwargs.get("n_comps", 50)
-        pca(adata, n_comps=n_comps)
-
-        if integration == "harmony":
-            run_harmony(adata, batch_key=batch_key)
-
-    # Clustering
     n_neighbors = kwargs.get("n_neighbors", 20)
-    cluster(adata, resolution=resolution, n_neighbors=n_neighbors)
+    strategy.embed_and_cluster(adata, ctx=ctx, resolution=resolution, n_neighbors=n_neighbors)
 
 
-def _recipe_xenium(
+def _recipe_targeted_panel(
     adata: AnnData,
     batch_key: str,
     integration: str,
@@ -255,113 +231,45 @@ def _recipe_xenium(
     resolution: float,
     filter_patterns: list[str] | None,
     use_gpu: str | bool,
+    strategy: SmallStrategy | None = None,
+    modality: str = "xenium",
     **kwargs: Any,
 ) -> None:
-    """Xenium preprocessing recipe.
+    """Targeted panel recipe (Xenium, CosMx, Visium HD cell-seg)."""
+    if strategy is None:
+        strategy = SmallStrategy()
 
-    1. Backup raw
-    2. Filter unwanted genes
-    3. Library-size normalization
-    4. Skip log1p by default (per 2025 benchmarks; overridable)
-    5. HVG selection
-    6. Subset to HVGs
-    7. Scale
-    8. PCA
-    9. Optional integration (Harmony or scVI)
-    10. Neighbors + Leiden + UMAP
-    """
-    import scanpy as sc
+    strategy.prepare(adata, filter_patterns=filter_patterns)
 
-    backup_raw(adata)
-    filter_genes_by_pattern(adata, patterns=filter_patterns)
-
-    normalize_total(adata)
-    log_transform(adata)
-
-    # HVG on log-normalized data
-    sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
-    adata._inplace_subset_var(adata.var["highly_variable"].values)
-    logger.info("Subset to %d HVGs", adata.n_vars)
-
-    scale(adata, max_value=10)
-
-    n_comps = kwargs.get("n_comps", 50)
-    pca(adata, n_comps=n_comps)
-
-    if integration == "harmony":
-        run_harmony(adata, batch_key=batch_key)
-    elif integration == "scvi":
-        logger.warning(
-            "scVI integration with Xenium: scVI expects raw counts. "
-            "Consider using integration='harmony' or 'none' for Xenium."
-        )
+    if integration == "scvi":
+        # scVI needs raw counts -- skip normalize, use seurat_v3 for HVG selection
+        strategy.select_features(adata, n_top_genes=n_top_genes, flavor="seurat_v3")
         scvi_kwargs = {
             k: kwargs[k]
             for k in ("n_latent", "n_layers", "n_hidden", "max_epochs", "early_stopping")
             if k in kwargs
         }
-        run_scvi(adata, batch_key=batch_key, use_gpu=use_gpu, **scvi_kwargs)
-
-    n_neighbors = kwargs.get("n_neighbors", 20)
-    cluster(adata, resolution=resolution, n_neighbors=n_neighbors)
-
-
-def _recipe_cosmx(
-    adata: AnnData,
-    batch_key: str,
-    integration: str,
-    n_top_genes: int,
-    resolution: float,
-    filter_patterns: list[str] | None,
-    use_gpu: str | bool,
-    **kwargs: Any,
-) -> None:
-    """CosMx preprocessing recipe.
-
-    1. Backup raw
-    2. Filter unwanted genes
-    3. Library-size normalization
-    4. Log1p
-    5. HVG selection
-    6. Subset to HVGs
-    7. Scale
-    8. PCA
-    9. Optional integration (Harmony or scVI)
-    10. Neighbors + Leiden + UMAP
-    """
-    import scanpy as sc
-
-    backup_raw(adata)
-    filter_genes_by_pattern(adata, patterns=filter_patterns)
-
-    normalize_total(adata)
-    log_transform(adata)
-
-    sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
-    adata._inplace_subset_var(adata.var["highly_variable"].values)
-    logger.info("Subset to %d HVGs", adata.n_vars)
-
-    scale(adata, max_value=10)
-
-    n_comps = kwargs.get("n_comps", 50)
-    pca(adata, n_comps=n_comps)
-
-    if integration == "harmony":
-        run_harmony(adata, batch_key=batch_key)
-    elif integration == "scvi":
-        logger.warning(
-            "scVI integration with CosMx: scVI expects raw counts. "
-            "Consider using integration='harmony' or 'none' for CosMx."
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration="scvi",
+            batch_key=batch_key,
+            n_comps=kwargs.get("n_comps", 50),
+            use_gpu=use_gpu,
+            **scvi_kwargs,
         )
-        scvi_kwargs = {
-            k: kwargs[k]
-            for k in ("n_latent", "n_layers", "n_hidden", "max_epochs", "early_stopping")
-            if k in kwargs
-        }
-        run_scvi(adata, batch_key=batch_key, use_gpu=use_gpu, **scvi_kwargs)
+    else:
+        normalize_total(adata)
+        log_transform(adata)
+        strategy.select_features(adata, n_top_genes=n_top_genes)
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration=integration,
+            batch_key=batch_key,
+            n_comps=kwargs.get("n_comps", 50),
+        )
 
     n_neighbors = kwargs.get("n_neighbors", 20)
-    cluster(adata, resolution=resolution, n_neighbors=n_neighbors)
+    strategy.embed_and_cluster(adata, ctx=ctx, resolution=resolution, n_neighbors=n_neighbors)
 
 
 def _recipe_imc(
@@ -370,60 +278,61 @@ def _recipe_imc(
     integration: str,
     resolution: float,
     use_gpu: str | bool,
+    strategy: SmallStrategy | None = None,
     **kwargs: Any,
 ) -> None:
     """IMC (Imaging Mass Cytometry) preprocessing recipe.
 
-    1. Backup raw
-    2. Arcsinh transform (cofactor=5) -- NOT log1p
-    3. Scale
-    4. PCA (n_comps capped to n_markers - 1)
-    5. Optional integration (CytoVI or scVI fallback)
-    6. Neighbors + Leiden + UMAP
+    1. Backup raw (strategy.prepare)
+    2. Arcsinh transform (recipe owns normalization)
+    3. Scale + PCA + integration (strategy.reduce_and_integrate)
+    4. Neighbors + Leiden + UMAP (strategy.embed_and_cluster)
     """
-    backup_raw(adata)
+    if strategy is None:
+        strategy = SmallStrategy()
+
+    strategy.prepare(adata, filter_patterns=None)
+
+    # IMC normalization (recipe owns this, not strategy)
+    from .normalize import arcsinh_transform
 
     cofactor = kwargs.get("cofactor", 5)
     arcsinh_transform(adata, cofactor=cofactor)
 
-    scale(adata, max_value=10)
-
-    # scale() produces NaN for zero-variance features; replace with 0 before PCA
-    import warnings as _warnings
-
-    import numpy as _np
-    from scipy.sparse import issparse as _issparse
-
-    _X = adata.X.toarray() if _issparse(adata.X) else adata.X
-    _nan_mask = _np.any(_np.isnan(_X), axis=0)
-    if _nan_mask.any():
-        _warnings.warn(
-            f"_recipe_imc: {_nan_mask.sum()} zero-variance features after scale; replacing NaN with 0.",
-            UserWarning,
-            stacklevel=2,
-        )
-        _X[:, _nan_mask] = 0.0
-        adata.X = (
-            _X
-            if not _issparse(adata.X)
-            else __import__("scipy.sparse", fromlist=["csr_matrix"]).csr_matrix(_X)
-        )
-
+    # IMC: strategy handles scale + PCA + integration
+    # NaN cleanup after scale is handled inside strategy.reduce_and_integrate
     n_comps = kwargs.get("n_comps", min(20, adata.n_vars - 1))
-    pca(adata, n_comps=n_comps, use_highly_variable=False)
 
     if integration == "cytovi":
-        cytovi_kwargs = {k: kwargs[k] for k in ("n_latent", "max_epochs") if k in kwargs}
-        run_cytovi(adata, batch_key=batch_key, use_gpu=use_gpu, **cytovi_kwargs)
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration="cytovi",
+            batch_key=batch_key,
+            n_comps=n_comps,
+            use_gpu=use_gpu,
+            **{k: kwargs[k] for k in ("n_latent", "max_epochs") if k in kwargs},
+        )
     elif integration == "scvi":
         scvi_kwargs = {
             k: kwargs[k]
             for k in ("n_latent", "n_layers", "n_hidden", "max_epochs", "early_stopping")
             if k in kwargs
         }
-        run_scvi(adata, batch_key=batch_key, use_gpu=use_gpu, **scvi_kwargs)
-    elif integration == "harmony":
-        run_harmony(adata, batch_key=batch_key)
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration="scvi",
+            batch_key=batch_key,
+            n_comps=n_comps,
+            use_gpu=use_gpu,
+            **scvi_kwargs,
+        )
+    else:
+        ctx = strategy.reduce_and_integrate(
+            adata,
+            integration=integration,
+            batch_key=batch_key,
+            n_comps=n_comps,
+        )
 
     n_neighbors = kwargs.get("n_neighbors", 20)
-    cluster(adata, resolution=resolution, n_neighbors=n_neighbors)
+    strategy.embed_and_cluster(adata, ctx=ctx, resolution=resolution, n_neighbors=n_neighbors)

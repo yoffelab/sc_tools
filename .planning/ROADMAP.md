@@ -13,7 +13,7 @@ Transform sc_tools from a library-with-scripts into an agent-native CLI (`sct`) 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Benchmark Fixes** - Fix integration benchmark bugs and add missing features for immediate project value
-- [ ] **Phase 2: CLI Foundation** - Register `sct` entry point with Typer, CLIResult envelope, structured output, and error handling
+- [x] **Phase 2: CLI Foundation** - Register `sct` entry point with Typer, CLIResult envelope, structured output, and error handling (completed 2026-03-21)
 - [ ] **Phase 3: Core Commands** - Wrap existing sc_tools operations as CLI commands with shared Result type
 - [ ] **Phase 4: CLI Discovery** - Self-describing command catalog and schema export for agent introspection
 - [ ] **Phase 5: Provenance** - File-based provenance tracking with JSON sidecars and lineage queries
@@ -53,7 +53,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — CLIResult Pydantic model, exception hierarchy, pyproject.toml cli deps (CLI-03, CLI-05, CLI-06)
-- [ ] 02-02-PLAN.md — Typer app, stub command groups, error handler, --human, tests, MCP proof-of-concept (CLI-01, CLI-02, CLI-04, CLI-07, CLI-08, TST-04)
+- [x] 02-02-PLAN.md — Typer app, stub command groups, error handler, --human, tests, MCP proof-of-concept (CLI-01, CLI-02, CLI-04, CLI-07, CLI-08, TST-04)
 
 ### Phase 3: Core Commands
 **Goal**: Agents can run QC, preprocessing, validation, benchmarking, status checks, and report generation through `sct` commands instead of ad-hoc scripts
@@ -152,7 +152,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Benchmark Fixes | 0/2 | Planning complete | - |
-| 2. CLI Foundation | 0/2 | Planning complete | - |
+| 2. CLI Foundation | 2/2 | Complete   | 2026-03-21 |
 | 3. Core Commands | 0/3 | Not started | - |
 | 4. CLI Discovery | 0/1 | Not started | - |
 | 5. Provenance | 0/2 | Not started | - |

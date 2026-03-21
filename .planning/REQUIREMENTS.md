@@ -19,14 +19,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CLI Foundation
 
-- [ ] **CLI-01**: Register `sct` entry point in `pyproject.toml` `[project.scripts]` section
-- [ ] **CLI-02**: Typer-based CLI app with command groups mapping to pipeline phases (qc, preprocess, integrate, benchmark, celltype)
+- [x] **CLI-01**: Register `sct` entry point in `pyproject.toml` `[project.scripts]` section
+- [x] **CLI-02**: Typer-based CLI app with command groups mapping to pipeline phases (qc, preprocess, integrate, benchmark, celltype)
 - [x] **CLI-03**: Pydantic CLIResult envelope for all commands: `{status, command, data, artifacts, provenance, message}`
-- [ ] **CLI-04**: JSON output to stdout by default; `--human` flag renders Rich-formatted tables/text to stderr
+- [x] **CLI-04**: JSON output to stdout by default; `--human` flag renders Rich-formatted tables/text to stderr
 - [x] **CLI-05**: Semantic exit codes: 0=success, 1=user error (bad args/missing file), 2=data error (validation failed), 3=runtime error (OOM/failed computation)
 - [x] **CLI-06**: Structured error reporting with error taxonomy (retryable, fixable, fatal) and actionable suggestion field
-- [ ] **CLI-07**: Non-interactive by default — no prompts, all params via flags/env/config. Fail fast on missing required params
-- [ ] **CLI-08**: Lazy imports — heavy dependencies (scanpy, torch, scvi-tools) loaded at command execution, not startup. `sct help` returns in <500ms
+- [x] **CLI-07**: Non-interactive by default — no prompts, all params via flags/env/config. Fail fast on missing required params
+- [x] **CLI-08**: Lazy imports — heavy dependencies (scanpy, torch, scvi-tools) loaded at command execution, not startup. `sct help` returns in <500ms
 
 ### CLI Core Commands
 
@@ -78,7 +78,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **TST-01**: Unit tests for `compute_integration_metrics` (synthetic data, single batch, no celltype)
 - [x] **TST-02**: Unit tests for `compare_integrations` (NaN embeddings, single method, subsampling)
 - [x] **TST-03**: Unit tests for `_stratified_subsample` (proportionality check, n > n_obs, single group)
-- [ ] **TST-04**: CLI argument parsing tests (no data loaded, fast)
+- [x] **TST-04**: CLI argument parsing tests (no data loaded, fast)
 - [ ] **TST-05**: CLI integration tests with small fixtures (100-cell AnnData)
 - [ ] **TST-06**: End-to-end test with real data on HPC (skipif guard)
 
@@ -128,14 +128,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BM-05 | Phase 1 | Complete |
 | BM-06 | Phase 1 | Complete |
 | BM-07 | Phase 1 | Complete |
-| CLI-01 | Phase 2 | Pending |
-| CLI-02 | Phase 2 | Pending |
+| CLI-01 | Phase 2 | Complete |
+| CLI-02 | Phase 2 | Complete |
 | CLI-03 | Phase 2 | Complete |
-| CLI-04 | Phase 2 | Pending |
+| CLI-04 | Phase 2 | Complete |
 | CLI-05 | Phase 2 | Complete |
 | CLI-06 | Phase 2 | Complete |
-| CLI-07 | Phase 2 | Pending |
-| CLI-08 | Phase 2 | Pending |
+| CLI-07 | Phase 2 | Complete |
+| CLI-08 | Phase 2 | Complete |
 | CMD-01 | Phase 3 | Pending |
 | CMD-02 | Phase 3 | Pending |
 | CMD-03 | Phase 3 | Pending |
@@ -166,7 +166,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TST-01 | Phase 1 | Complete |
 | TST-02 | Phase 1 | Complete |
 | TST-03 | Phase 1 | Complete |
-| TST-04 | Phase 2 | Pending |
+| TST-04 | Phase 2 | Complete |
 | TST-05 | Phase 3 | Pending |
 | TST-06 | Phase 3 | Pending |
 

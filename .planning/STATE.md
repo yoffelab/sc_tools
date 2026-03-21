@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-21T18:13:48.375Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-21T18:21:24.434Z"
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -49,6 +49,7 @@ Plan: 2 of 2
 | Phase 01 P01 | 13min | 1 tasks | 2 files |
 | Phase 01 P02 | 16min | 2 tasks | 4 files |
 | Phase 02 P01 | 2min | 2 tasks | 4 files |
+| Phase 02 P02 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase 02]: _get_version() uses importlib.metadata with fallback to 'unknown'
 - [Phase 02]: ConfigDict(use_enum_values=True) on CLIResult for JSON string enum serialization
 - [Phase 02]: timezone.utc with noqa UP017 for Python 3.10 compat
+- [Phase 02]: is_eager=True on --version callback for pre-command execution
+- [Phase 02]: invoke_without_command=True on stub group callbacks so they appear in help
+- [Phase 02]: pyproject.toml [project.scripts] moved after dependencies to fix TOML parse error
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T18:13:48.372Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-03-21T18:21:24.432Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

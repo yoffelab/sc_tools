@@ -33,6 +33,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
+[project.scripts]
+sct = "sc_tools.cli:app"
+
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -77,6 +80,12 @@ registry = [
 # MCP servers (Model Context Protocol)
 mcp = [
     "mcp>=1.0",
+]
+# CLI interface (sct command)
+cli = [
+    "typer>=0.24",
+    "rich>=14.0",
+    "pydantic>=2.10",
 ]
 # Full pipeline: integration and deconvolution
 deconvolution = [

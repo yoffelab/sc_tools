@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Fix _stratified_subsample, NaN masking, subsample_n, runtime_s, param provenance (BM-02..06, TST-01..03)
-- [ ] 01-02-PLAN.md — h5py embedding loading, bio_key parameter, targeted panel scVI fix (BM-01, BM-07)
+- [x] 01-02-PLAN.md — h5py embedding loading, bio_key parameter, targeted panel scVI fix (BM-01, BM-07)
 
 ### Phase 2: CLI Foundation
 **Goal**: `sct` is an installable, fast-starting CLI that produces structured JSON output and handles errors with actionable taxonomy

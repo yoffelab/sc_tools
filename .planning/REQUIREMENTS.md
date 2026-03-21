@@ -9,13 +9,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Benchmark Fixes
 
-- [ ] **BM-01**: Load pre-computed integration embeddings from separate per-method h5ad files using h5py (no full AnnData load; memory <2GB for 2.5M cells)
+- [x] **BM-01**: Load pre-computed integration embeddings from separate per-method h5ad files using h5py (no full AnnData load; memory <2GB for 2.5M cells)
 - [x] **BM-02**: Filter NaN rows per-embedding before metric computation in `compare_integrations()` (resolVI produces NaN for cells with <5 HVG counts)
 - [x] **BM-03**: Configurable subsampling via `subsample_n` parameter in `compare_integrations()` (default 50K, using `_stratified_subsample`)
 - [x] **BM-04**: Fix `_stratified_subsample` truncation bias — replace `sorted(indices)[:n]` with proportional group downsampling
 - [x] **BM-05**: Add `runtime_s` column to `run_integration_benchmark` output for method comparison
 - [x] **BM-06**: Store benchmark parameters (batch_weight, bio_weight, seed, resolution, scib backend) alongside results
-- [ ] **BM-07**: Fix `_recipe_targeted_panel` — skip normalization when scVI integration is selected (currently normalizes then warns about raw counts)
+- [x] **BM-07**: Fix `_recipe_targeted_panel` — skip normalization when scVI integration is selected (currently normalizes then warns about raw counts)
 
 ### CLI Foundation
 
@@ -121,13 +121,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BM-01 | Phase 1 | Pending |
+| BM-01 | Phase 1 | Complete |
 | BM-02 | Phase 1 | Complete |
 | BM-03 | Phase 1 | Complete |
 | BM-04 | Phase 1 | Complete |
 | BM-05 | Phase 1 | Complete |
 | BM-06 | Phase 1 | Complete |
-| BM-07 | Phase 1 | Pending |
+| BM-07 | Phase 1 | Complete |
 | CLI-01 | Phase 2 | Pending |
 | CLI-02 | Phase 2 | Pending |
 | CLI-03 | Phase 2 | Pending |

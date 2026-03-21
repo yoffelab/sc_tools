@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import logging
 
+from sc_tools.models.result import CLIResult, Provenance, Status
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -61,13 +63,26 @@ def validate_checkpoint(uri: str, phase: str, fix: bool = False) -> str:
     """
     from sc_tools.validate import validate_file
 
+    cmd = f"validate {phase} {uri}"
     try:
         issues = validate_file(uri, phase=phase, fix=fix)
-        if not issues:
-            return f"PASS: {uri} is valid for phase {phase}."
-        return "ISSUES:\n" + "\n".join(f"  - {i}" for i in issues)
+        result = CLIResult(
+            status=Status.success if not issues else Status.error,
+            command=cmd,
+            data={"issues": issues, "phase": phase, "uri": uri},
+            provenance=Provenance(command=cmd),
+            message=f"Validation {'passed' if not issues else 'failed'}: {len(issues)} issues found",
+        )
+        return result.model_dump_json()
     except Exception as exc:
-        return f"ERROR: {exc}"
+        result = CLIResult(
+            status=Status.error,
+            command=cmd,
+            data={"phase": phase, "uri": uri},
+            provenance=Provenance(command=cmd),
+            message=f"Validation error: {exc}",
+        )
+        return result.model_dump_json()
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +97,14 @@ def generate_qc_report(
     figures_dir: str,
     adata_integrated_uri: str = "",
     batch_key: str = "sample",
+    viable_min_counts: int = 10,
+    viable_min_genes: int = 5,
+    soft_min_counts: int = 2,
+    neighborhood_k: int = 8,
+    tpm_min_counts: int = 100,
+    tpm_min_genes: int = 20,
+    tpm_min_area_mm2: float = 0.05,
+    min_tpm_spots: int = 1000,
 ) -> str:
     """Generate a date-versioned QC HTML report.
 
@@ -97,6 +120,30 @@ def generate_qc_report(
         Optional path to integrated AnnData (for post_integration report).
     batch_key
         Observation column used as batch identifier.
+    viable_min_counts
+        Minimum total counts per spot to be considered viable (Tier 1, default 10).
+        Used for viable region assessment in pre_filter and post_filter reports.
+    viable_min_genes
+        Minimum genes detected per spot to be considered viable (Tier 1, default 5).
+        Used for viable region assessment in pre_filter and post_filter reports.
+    soft_min_counts
+        Lower bound for contextual (stromal) spot classification (default 2).
+        Applied when spatial coordinates are present. Spots with counts between
+        soft_min_counts and viable_min_counts whose k-NN neighborhood median
+        counts >= viable_min_counts are classified as stromal-contextual (amber).
+    neighborhood_k
+        Number of spatial nearest neighbors for contextual classification (default 8).
+    tpm_min_counts
+        Minimum total counts per spot to be considered TPM-worthy (Tier 2, default 100).
+    tpm_min_genes
+        Minimum genes detected per spot to be considered TPM-worthy (Tier 2, default 20).
+    tpm_min_area_mm2
+        Minimum TPM-worthy tissue area in mm² for the insufficient_area failure mode
+        (default 0.05).
+    min_tpm_spots
+        Minimum number of TPM-worthy spots to pass QC (default 1000). Samples below
+        this threshold hard-fail; samples above this threshold are rescued from
+        median-based failures.
 
     Returns
     -------
@@ -112,6 +159,15 @@ def generate_qc_report(
     ]
     if adata_integrated_uri:
         cmd_parts.append(f"--adata-integrated {adata_integrated_uri}")
+    if report_type in ("pre_filter", "post_filter"):
+        cmd_parts.append(f"--viable-min-counts {viable_min_counts}")
+        cmd_parts.append(f"--viable-min-genes {viable_min_genes}")
+        cmd_parts.append(f"--soft-min-counts {soft_min_counts}")
+        cmd_parts.append(f"--neighborhood-k {neighborhood_k}")
+        cmd_parts.append(f"--tpm-min-counts {tpm_min_counts}")
+        cmd_parts.append(f"--tpm-min-genes {tpm_min_genes}")
+        cmd_parts.append(f"--tpm-min-area-mm2 {tpm_min_area_mm2}")
+        cmd_parts.append(f"--min-tpm-spots {min_tpm_spots}")
     cmd = " \\\n    ".join(cmd_parts)
     return f"Run the following command to generate the QC report:\n\n{cmd}"
 

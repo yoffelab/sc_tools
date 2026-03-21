@@ -10,11 +10,11 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Benchmark Fixes
 
 - [ ] **BM-01**: Load pre-computed integration embeddings from separate per-method h5ad files using h5py (no full AnnData load; memory <2GB for 2.5M cells)
-- [ ] **BM-02**: Filter NaN rows per-embedding before metric computation in `compare_integrations()` (resolVI produces NaN for cells with <5 HVG counts)
-- [ ] **BM-03**: Configurable subsampling via `subsample_n` parameter in `compare_integrations()` (default 50K, using `_stratified_subsample`)
-- [ ] **BM-04**: Fix `_stratified_subsample` truncation bias — replace `sorted(indices)[:n]` with proportional group downsampling
-- [ ] **BM-05**: Add `runtime_s` column to `run_integration_benchmark` output for method comparison
-- [ ] **BM-06**: Store benchmark parameters (batch_weight, bio_weight, seed, resolution, scib backend) alongside results
+- [x] **BM-02**: Filter NaN rows per-embedding before metric computation in `compare_integrations()` (resolVI produces NaN for cells with <5 HVG counts)
+- [x] **BM-03**: Configurable subsampling via `subsample_n` parameter in `compare_integrations()` (default 50K, using `_stratified_subsample`)
+- [x] **BM-04**: Fix `_stratified_subsample` truncation bias — replace `sorted(indices)[:n]` with proportional group downsampling
+- [x] **BM-05**: Add `runtime_s` column to `run_integration_benchmark` output for method comparison
+- [x] **BM-06**: Store benchmark parameters (batch_weight, bio_weight, seed, resolution, scib backend) alongside results
 - [ ] **BM-07**: Fix `_recipe_targeted_panel` — skip normalization when scVI integration is selected (currently normalizes then warns about raw counts)
 
 ### CLI Foundation
@@ -75,9 +75,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TST-01**: Unit tests for `compute_integration_metrics` (synthetic data, single batch, no celltype)
-- [ ] **TST-02**: Unit tests for `compare_integrations` (NaN embeddings, single method, subsampling)
-- [ ] **TST-03**: Unit tests for `_stratified_subsample` (proportionality check, n > n_obs, single group)
+- [x] **TST-01**: Unit tests for `compute_integration_metrics` (synthetic data, single batch, no celltype)
+- [x] **TST-02**: Unit tests for `compare_integrations` (NaN embeddings, single method, subsampling)
+- [x] **TST-03**: Unit tests for `_stratified_subsample` (proportionality check, n > n_obs, single group)
 - [ ] **TST-04**: CLI argument parsing tests (no data loaded, fast)
 - [ ] **TST-05**: CLI integration tests with small fixtures (100-cell AnnData)
 - [ ] **TST-06**: End-to-end test with real data on HPC (skipif guard)
@@ -122,11 +122,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BM-01 | Phase 1 | Pending |
-| BM-02 | Phase 1 | Pending |
-| BM-03 | Phase 1 | Pending |
-| BM-04 | Phase 1 | Pending |
-| BM-05 | Phase 1 | Pending |
-| BM-06 | Phase 1 | Pending |
+| BM-02 | Phase 1 | Complete |
+| BM-03 | Phase 1 | Complete |
+| BM-04 | Phase 1 | Complete |
+| BM-05 | Phase 1 | Complete |
+| BM-06 | Phase 1 | Complete |
 | BM-07 | Phase 1 | Pending |
 | CLI-01 | Phase 2 | Pending |
 | CLI-02 | Phase 2 | Pending |
@@ -163,9 +163,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOM-02 | Phase 8 | Pending |
 | MOM-03 | Phase 8 | Pending |
 | MOM-04 | Phase 8 | Pending |
-| TST-01 | Phase 1 | Pending |
-| TST-02 | Phase 1 | Pending |
-| TST-03 | Phase 1 | Pending |
+| TST-01 | Phase 1 | Complete |
+| TST-02 | Phase 1 | Complete |
+| TST-03 | Phase 1 | Complete |
 | TST-04 | Phase 2 | Pending |
 | TST-05 | Phase 3 | Pending |
 | TST-06 | Phase 3 | Pending |

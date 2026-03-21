@@ -49,11 +49,11 @@ Plans:
   3. Every command outputs a valid JSON CLIResult envelope to stdout with status, command, data, artifacts, provenance, and message fields
   4. `sct --human <cmd>` renders Rich-formatted output to stderr while keeping JSON on stdout
   5. Commands exit with semantic codes (0/1/2/3) and errors include retryable/fixable/fatal classification with actionable suggestions
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — CLIResult Pydantic model, exception hierarchy, pyproject.toml cli deps (CLI-03, CLI-05, CLI-06)
+- [ ] 02-02-PLAN.md — Typer app, stub command groups, error handler, --human, tests, MCP proof-of-concept (CLI-01, CLI-02, CLI-04, CLI-07, CLI-08, TST-04)
 
 ### Phase 3: Core Commands
 **Goal**: Agents can run QC, preprocessing, validation, benchmarking, status checks, and report generation through `sct` commands instead of ad-hoc scripts
@@ -152,7 +152,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Benchmark Fixes | 0/2 | Planning complete | - |
-| 2. CLI Foundation | 0/2 | Not started | - |
+| 2. CLI Foundation | 0/2 | Planning complete | - |
 | 3. Core Commands | 0/3 | Not started | - |
 | 4. CLI Discovery | 0/1 | Not started | - |
 | 5. Provenance | 0/2 | Not started | - |

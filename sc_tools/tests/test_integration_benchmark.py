@@ -8,6 +8,8 @@ import pytest
 from anndata import AnnData
 
 from sc_tools.bm.integration import (
+    _mask_nan_rows,
+    _stratified_subsample,
     compare_integrations,
     compute_composite_score,
     compute_integration_metrics,
@@ -486,6 +488,238 @@ class TestResolveBestMethod:
             }
         )
         assert _resolve_best_method(df) == "B"
+
+
+# ---------------------------------------------------------------------------
+# NaN embedding fixture helper
+# ---------------------------------------------------------------------------
+
+
+def _make_nan_embedding_adata(n_obs: int = 200, nan_fraction: float = 0.1) -> tuple[AnnData, np.ndarray]:
+    """AnnData with NaN rows in one embedding (simulates resolVI)."""
+    adata = _make_batched_adata(n_obs=n_obs)
+    rng = np.random.RandomState(99)
+    emb = rng.randn(n_obs, 10).astype(np.float32)
+    nan_rows = rng.choice(n_obs, int(n_obs * nan_fraction), replace=False)
+    emb[nan_rows] = np.nan
+    adata.obsm["X_resolvi"] = emb
+    return adata, nan_rows
+
+
+# ---------------------------------------------------------------------------
+# TestStratifiedSubsampleFix (BM-04 + TST-03)
+# ---------------------------------------------------------------------------
+
+
+class TestStratifiedSubsampleFix:
+    def test_proportional_allocation(self):
+        """1000 cells, 3 groups [500, 300, 200], subsample to 100 -> proportions within 5%."""
+        rng = np.random.RandomState(42)
+        n_obs = 1000
+        X = rng.randn(n_obs, 20).astype(np.float32)
+        adata = AnnData(X=X)
+        # Assign groups with specific sizes: 500, 300, 200
+        groups = ["A"] * 500 + ["B"] * 300 + ["C"] * 200
+        adata.obs["group"] = groups
+        adata.obsm["X_pca"] = rng.randn(n_obs, 10).astype(np.float32)
+
+        result = _stratified_subsample(adata, "group", n=100)
+        counts = result.obs["group"].value_counts()
+        total = result.n_obs
+
+        for grp, expected_frac in [("A", 0.5), ("B", 0.3), ("C", 0.2)]:
+            actual_frac = counts.get(grp, 0) / total
+            assert abs(actual_frac - expected_frac) <= 0.05, (
+                f"Group {grp}: expected ~{expected_frac}, got {actual_frac}"
+            )
+
+    def test_exact_count(self):
+        """Subsample returns exactly n cells."""
+        rng = np.random.RandomState(42)
+        n_obs = 1000
+        X = rng.randn(n_obs, 20).astype(np.float32)
+        adata = AnnData(X=X)
+        groups = ["A"] * 500 + ["B"] * 300 + ["C"] * 200
+        adata.obs["group"] = groups
+
+        result = _stratified_subsample(adata, "group", n=100)
+        assert result.n_obs == 100
+
+    def test_n_greater_than_nobs(self):
+        """n > n_obs returns full copy."""
+        adata = _make_batched_adata(n_obs=200)
+        result = _stratified_subsample(adata, "batch", n=5000)
+        assert result.n_obs == 200
+
+    def test_single_group(self):
+        """All cells same batch, n=50 -> returns 50 cells."""
+        rng = np.random.RandomState(42)
+        n_obs = 200
+        X = rng.randn(n_obs, 20).astype(np.float32)
+        adata = AnnData(X=X)
+        adata.obs["batch"] = "single"
+
+        result = _stratified_subsample(adata, "batch", n=50)
+        assert result.n_obs == 50
+
+    def test_tiny_group_preserved(self):
+        """Groups [990, 9, 1], n=100 -> smallest group has >= 1 cell."""
+        rng = np.random.RandomState(42)
+        n_obs = 1000
+        X = rng.randn(n_obs, 20).astype(np.float32)
+        adata = AnnData(X=X)
+        groups = ["A"] * 990 + ["B"] * 9 + ["C"] * 1
+        adata.obs["group"] = groups
+
+        result = _stratified_subsample(adata, "group", n=100)
+        assert result.n_obs == 100
+        assert "C" in result.obs["group"].values
+
+
+# ---------------------------------------------------------------------------
+# TestNaNHandling (BM-02 + TST-02)
+# ---------------------------------------------------------------------------
+
+
+class TestNaNHandling:
+    def test_mask_nan_rows_filters_correctly(self):
+        """200 cells, 20 NaN -> returns 180 valid rows."""
+        rng = np.random.RandomState(42)
+        X = rng.randn(200, 10).astype(np.float32)
+        X[:20] = np.nan
+        batch = np.array([f"b_{i % 3}" for i in range(200)])
+
+        X_clean, batch_clean = _mask_nan_rows(X, batch)
+        assert X_clean.shape[0] == 180
+        assert batch_clean.shape[0] == 180
+        assert not np.isnan(X_clean).any()
+
+    def test_mask_nan_rows_no_nans(self):
+        """No NaN -> arrays unchanged."""
+        rng = np.random.RandomState(42)
+        X = rng.randn(100, 10).astype(np.float32)
+        batch = np.array([f"b_{i % 3}" for i in range(100)])
+
+        X_out, batch_out = _mask_nan_rows(X, batch)
+        assert X_out.shape[0] == 100
+        np.testing.assert_array_equal(X_out, X)
+
+    def test_mask_nan_rows_all_nans(self):
+        """All NaN -> empty arrays."""
+        X = np.full((50, 10), np.nan, dtype=np.float32)
+        batch = np.array([f"b_{i}" for i in range(50)])
+
+        X_out, batch_out = _mask_nan_rows(X, batch)
+        assert X_out.shape[0] == 0
+        assert batch_out.shape[0] == 0
+
+    def test_compare_integrations_with_nan_embedding(self):
+        """adata with X_good (clean) and X_resolvi (10% NaN) -> both produce valid metrics."""
+        adata, _ = _make_nan_embedding_adata(n_obs=200, nan_fraction=0.1)
+        df = compare_integrations(
+            adata,
+            {"good": "X_good", "resolvi": "X_resolvi"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert len(df) == 2
+        # No NaN values in output
+        assert not df.select_dtypes(include="number").isna().any().any()
+
+
+# ---------------------------------------------------------------------------
+# TestCompareIntegrationsExtended (BM-03 + BM-06 + TST-01)
+# ---------------------------------------------------------------------------
+
+
+class TestCompareIntegrationsExtended:
+    def test_subsample_n_parameter(self):
+        """compare_integrations with subsample_n=50 on 200-cell adata."""
+        adata = _make_batched_adata(n_obs=200)
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            subsample_n=50,
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert len(df) == 1
+        assert "overall_score" in df.columns
+
+    def test_subsample_n_none_default(self):
+        """subsample_n=None (default) -> all cells used."""
+        adata = _make_batched_adata(n_obs=200)
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+        )
+        assert len(df) == 1
+        assert "overall_score" in df.columns
+
+    def test_benchmark_params_in_attrs(self):
+        """df.attrs['benchmark_params'] has required keys with correct values."""
+        adata = _make_batched_adata(n_obs=200)
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+            seed=42,
+            resolution=1.0,
+        )
+        params = df.attrs["benchmark_params"]
+        assert "batch_weight" in params
+        assert "bio_weight" in params
+        assert "subsample_n" in params
+        assert "seed" in params
+        assert "resolution" in params
+        assert "use_scib" in params
+        assert params["seed"] == 42
+        assert params["resolution"] == 1.0
+        assert params["use_scib"] == "sklearn"
+
+    def test_benchmark_params_custom_resolution(self):
+        """Custom resolution=0.5 stored in benchmark_params."""
+        adata = _make_batched_adata(n_obs=200)
+        df = compare_integrations(
+            adata,
+            {"good": "X_good"},
+            batch_key="batch",
+            celltype_key="celltype",
+            include_unintegrated=False,
+            use_scib="sklearn",
+            resolution=0.5,
+        )
+        assert df.attrs["benchmark_params"]["resolution"] == 0.5
+
+    def test_single_batch_metrics(self):
+        """Single batch -> asw_batch returns 0.0."""
+        adata = _make_batched_adata(n_obs=200, n_batches=1)
+        metrics = compute_integration_metrics(
+            adata, "X_good", "batch", "celltype", use_scib="sklearn"
+        )
+        assert metrics["asw_batch"] == 0.0
+
+    def test_no_celltype_metrics(self):
+        """celltype_key=None -> no bio keys in dict."""
+        adata = _make_batched_adata(n_obs=200)
+        metrics = compute_integration_metrics(
+            adata, "X_good", "batch", celltype_key=None, use_scib="sklearn"
+        )
+        assert "nmi" not in metrics
+        assert "ari" not in metrics
+        assert "asw_celltype" not in metrics
+        assert "asw_batch" in metrics
 
 
 class TestRunFullIntegrationWorkflow:

@@ -52,7 +52,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — CLIResult Pydantic model, exception hierarchy, pyproject.toml cli deps (CLI-03, CLI-05, CLI-06)
+- [x] 02-01-PLAN.md — CLIResult Pydantic model, exception hierarchy, pyproject.toml cli deps (CLI-03, CLI-05, CLI-06)
 - [ ] 02-02-PLAN.md — Typer app, stub command groups, error handler, --human, tests, MCP proof-of-concept (CLI-01, CLI-02, CLI-04, CLI-07, CLI-08, TST-04)
 
 ### Phase 3: Core Commands

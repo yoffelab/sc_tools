@@ -21,10 +21,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **CLI-01**: Register `sct` entry point in `pyproject.toml` `[project.scripts]` section
 - [ ] **CLI-02**: Typer-based CLI app with command groups mapping to pipeline phases (qc, preprocess, integrate, benchmark, celltype)
-- [ ] **CLI-03**: Pydantic CLIResult envelope for all commands: `{status, command, data, artifacts, provenance, message}`
+- [x] **CLI-03**: Pydantic CLIResult envelope for all commands: `{status, command, data, artifacts, provenance, message}`
 - [ ] **CLI-04**: JSON output to stdout by default; `--human` flag renders Rich-formatted tables/text to stderr
-- [ ] **CLI-05**: Semantic exit codes: 0=success, 1=user error (bad args/missing file), 2=data error (validation failed), 3=runtime error (OOM/failed computation)
-- [ ] **CLI-06**: Structured error reporting with error taxonomy (retryable, fixable, fatal) and actionable suggestion field
+- [x] **CLI-05**: Semantic exit codes: 0=success, 1=user error (bad args/missing file), 2=data error (validation failed), 3=runtime error (OOM/failed computation)
+- [x] **CLI-06**: Structured error reporting with error taxonomy (retryable, fixable, fatal) and actionable suggestion field
 - [ ] **CLI-07**: Non-interactive by default — no prompts, all params via flags/env/config. Fail fast on missing required params
 - [ ] **CLI-08**: Lazy imports — heavy dependencies (scanpy, torch, scvi-tools) loaded at command execution, not startup. `sct help` returns in <500ms
 
@@ -130,10 +130,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BM-07 | Phase 1 | Complete |
 | CLI-01 | Phase 2 | Pending |
 | CLI-02 | Phase 2 | Pending |
-| CLI-03 | Phase 2 | Pending |
+| CLI-03 | Phase 2 | Complete |
 | CLI-04 | Phase 2 | Pending |
-| CLI-05 | Phase 2 | Pending |
-| CLI-06 | Phase 2 | Pending |
+| CLI-05 | Phase 2 | Complete |
+| CLI-06 | Phase 2 | Complete |
 | CLI-07 | Phase 2 | Pending |
 | CLI-08 | Phase 2 | Pending |
 | CMD-01 | Phase 3 | Pending |

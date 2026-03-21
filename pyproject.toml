@@ -33,9 +33,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
-[project.scripts]
-sct = "sc_tools.cli:app"
-
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -55,6 +52,9 @@ dependencies = [
     "dask>=2024.1",
     "dask-expr>=1.0",
 ]
+
+[project.scripts]
+sct = "sc_tools.cli:app"
 
 [project.optional-dependencies]
 # Remote storage backends (S3, SFTP, GCS, Azure, Zarr)

@@ -832,6 +832,8 @@ def _write_test_h5ad(
             else:
                 adata.obs[key] = vals
 
+    # Ensure parent directory exists (for subdirectory paths like tmp_path / "a")
+    tmp_path.mkdir(parents=True, exist_ok=True)
     path = tmp_path / "test.h5ad"
     adata.write_h5ad(path)
     return path, embedding, obs_keys

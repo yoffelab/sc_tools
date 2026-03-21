@@ -23,6 +23,7 @@ __all__ = [
     "run_integration_benchmark",
     "run_full_integration_workflow",
     "_mask_nan_rows",
+    "_load_embedding_h5py",
 ]
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,63 @@ def _mask_nan_rows(X: np.ndarray, *arrays: np.ndarray) -> tuple[np.ndarray, ...]
             int(valid.sum()),
         )
     return (X[valid], *(a[valid] for a in arrays))
+
+
+# ---------------------------------------------------------------------------
+# h5py embedding loader
+# ---------------------------------------------------------------------------
+
+
+def _load_embedding_h5py(
+    path: str | Path,
+    obsm_key: str,
+    obs_keys: list[str],
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Load embedding + obs columns from h5ad via h5py (no full AnnData).
+
+    Parameters
+    ----------
+    path
+        Path to an h5ad file.
+    obsm_key
+        Key in ``obsm`` group (e.g. ``"X_scVI"``).
+    obs_keys
+        List of obs column names to load (e.g. ``["batch", "celltype"]``).
+
+    Returns
+    -------
+    tuple of (embedding_array, obs_dict)
+        embedding_array has shape (n_obs, n_latent).
+        obs_dict maps column name to 1-D array.
+    """
+    import h5py
+
+    with h5py.File(path, "r") as f:
+        # Load embedding
+        obsm_path = f"obsm/{obsm_key}"
+        if obsm_path not in f:
+            raise KeyError(f"Embedding {obsm_key!r} not found in {path}")
+        embedding = f[obsm_path][:]
+
+        # Load obs columns
+        obs_data: dict[str, np.ndarray] = {}
+        for key in obs_keys:
+            obs_path = f"obs/{key}"
+            if obs_path not in f:
+                raise KeyError(f"obs column {key!r} not found in {path}")
+            grp = f[obs_path]
+            if isinstance(grp, h5py.Group) and "categories" in grp:
+                # Categorical column: reconstruct from codes + categories
+                codes = grp["codes"][:]
+                cats = grp["categories"][:]
+                if cats.dtype.kind in ("O", "S", "U"):
+                    cats = cats.astype(str)
+                obs_data[key] = cats[codes]
+            else:
+                # Plain array (numeric or string dataset)
+                obs_data[key] = grp[:]
+
+    return embedding, obs_data
 
 
 # ---------------------------------------------------------------------------
@@ -379,10 +437,11 @@ def compute_composite_score(
 
 
 def compare_integrations(
-    adata: AnnData,
-    embeddings: dict[str, str],
-    batch_key: str,
+    adata: AnnData | None = None,
+    embeddings: dict[str, str] | None = None,
+    batch_key: str = "batch",
     celltype_key: str | None = None,
+    bio_key: str | None = None,
     batch_weight: float = 0.4,
     bio_weight: float = 0.6,
     include_unintegrated: bool = True,
@@ -390,13 +449,15 @@ def compare_integrations(
     subsample_n: int | None = None,
     seed: int = 42,
     resolution: float = 1.0,
+    embedding_files: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Compare multiple integration methods side-by-side.
 
     Parameters
     ----------
     adata
-        AnnData with multiple embeddings in ``obsm``.
+        AnnData with multiple embeddings in ``obsm``. Can be ``None`` when
+        ``embedding_files`` provides all methods.
     embeddings
         Dict mapping method name to ``obsm`` key
         (e.g. ``{"scVI": "X_scVI", "Harmony": "X_pca_harmony"}``).
@@ -405,6 +466,10 @@ def compare_integrations(
     celltype_key
         Column in ``obs`` with cell type labels. If ``None`` or not
         present in ``adata.obs``, bio conservation metrics are skipped.
+    bio_key
+        Column to use for bio conservation metrics. Defaults to
+        ``celltype_key`` when not provided. Allows using any clinically
+        relevant variable (e.g. ``"condition"``, ``"disease_status"``).
     batch_weight
         Weight for batch removal in composite score.
     bio_weight
@@ -420,43 +485,109 @@ def compare_integrations(
         Random seed for subsampling reproducibility.
     resolution
         Leiden clustering resolution for ARI/NMI bio conservation metrics.
+    embedding_files
+        Dict mapping method name to h5ad file path. Embeddings are loaded
+        via h5py without reading the full AnnData, enabling benchmarking
+        of datasets too large to fit in memory.
 
     Returns
     -------
     DataFrame with rows=methods, sorted by ``overall_score`` descending.
     """
-    if include_unintegrated and "X_pca" in adata.obsm and "Unintegrated" not in embeddings:
+    # Validate inputs
+    if adata is None and not embedding_files:
+        raise ValueError("Either adata or embedding_files must be provided")
+
+    if embeddings is None:
+        embeddings = {}
+
+    # Resolve bio_key -- defaults to celltype_key for backwards compatibility
+    effective_bio_key = bio_key if bio_key is not None else celltype_key
+
+    if adata is not None and include_unintegrated and "X_pca" in adata.obsm and "Unintegrated" not in embeddings:
         embeddings = {"Unintegrated": "X_pca", **embeddings}
 
     # Optional subsampling before metric computation
-    if subsample_n is not None and subsample_n < adata.n_obs:
+    if adata is not None and subsample_n is not None and subsample_n < adata.n_obs:
         adata = _stratified_subsample(adata, batch_key, n=subsample_n, seed=seed)
 
     rows = []
-    for name, key in embeddings.items():
-        if key not in adata.obsm:
-            logger.warning("Embedding %r (%s) not in adata.obsm, skipping", name, key)
-            continue
 
-        # Per-embedding NaN masking (BM-02)
-        X_emb = np.asarray(adata.obsm[key])
-        valid = ~np.isnan(X_emb).any(axis=1)
-        n_dropped = int((~valid).sum())
-        if n_dropped > 0:
-            logger.warning("Method %s: dropped %d cells with NaN embeddings", name, n_dropped)
-            adata_clean = adata[valid].copy()
-        else:
-            adata_clean = adata
+    # --- adata-based embeddings ---
+    if adata is not None:
+        for name, key in embeddings.items():
+            if key not in adata.obsm:
+                logger.warning("Embedding %r (%s) not in adata.obsm, skipping", name, key)
+                continue
 
-        metrics = compute_integration_metrics(
-            adata_clean, key, batch_key, celltype_key, use_scib=use_scib, resolution=resolution
-        )
-        composite = compute_composite_score(metrics, batch_weight, bio_weight)
+            # Per-embedding NaN masking (BM-02)
+            X_emb = np.asarray(adata.obsm[key])
+            valid = ~np.isnan(X_emb).any(axis=1)
+            n_dropped = int((~valid).sum())
+            if n_dropped > 0:
+                logger.warning("Method %s: dropped %d cells with NaN embeddings", name, n_dropped)
+                adata_clean = adata[valid].copy()
+            else:
+                adata_clean = adata
 
-        row = {"method": name, "embedding_key": key}
-        row.update(metrics)
-        row.update(composite)
-        rows.append(row)
+            metrics = compute_integration_metrics(
+                adata_clean, key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution
+            )
+            composite = compute_composite_score(metrics, batch_weight, bio_weight)
+
+            row = {"method": name, "embedding_key": key}
+            row.update(metrics)
+            row.update(composite)
+            rows.append(row)
+
+    # --- file-based embeddings (BM-01) ---
+    if embedding_files:
+        import h5py as _h5py
+
+        obs_keys_needed = [batch_key]
+        if effective_bio_key:
+            obs_keys_needed.append(effective_bio_key)
+
+        for name, fpath in embedding_files.items():
+            try:
+                # Discover obsm key from file (use the first/only one)
+                with _h5py.File(fpath, "r") as f:
+                    available_obsm = list(f["obsm"].keys())
+                if not available_obsm:
+                    logger.warning("No obsm keys in %s, skipping %s", fpath, name)
+                    continue
+                obsm_key = available_obsm[0]
+
+                emb_array, obs_arrays = _load_embedding_h5py(fpath, obsm_key, obs_keys_needed)
+
+                # Build minimal AnnData for metric computation
+                file_adata = AnnData(X=np.zeros((emb_array.shape[0], 1), dtype=np.float32))
+                file_adata.obsm[obsm_key] = emb_array
+                for k, v in obs_arrays.items():
+                    if v.dtype.kind in ("U", "O", "S"):
+                        file_adata.obs[k] = pd.Categorical(v)
+                    else:
+                        file_adata.obs[k] = v
+
+                # Per-embedding NaN masking
+                valid = ~np.isnan(emb_array).any(axis=1)
+                n_dropped = int((~valid).sum())
+                if n_dropped > 0:
+                    logger.warning("Method %s: dropped %d cells with NaN embeddings", name, n_dropped)
+                    file_adata = file_adata[valid].copy()
+
+                metrics = compute_integration_metrics(
+                    file_adata, obsm_key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution
+                )
+                composite = compute_composite_score(metrics, batch_weight, bio_weight)
+
+                row = {"method": name, "embedding_key": obsm_key}
+                row.update(metrics)
+                row.update(composite)
+                rows.append(row)
+
+            except Exception:
+                logger.warning("Failed to load embedding from %s for %s", fpath, name, exc_info=True)
 
     df = pd.DataFrame(rows)
     if len(df) > 0:

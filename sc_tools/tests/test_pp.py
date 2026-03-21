@@ -517,6 +517,89 @@ class TestPreprocessRecipe:
         assert "leiden" in adata_counts.obs.columns
 
 
+class TestRecipeUsesStrategy:
+    """Verify recipes accept and use strategy parameter."""
+
+    def test_preprocess_uses_strategy_internally(self, adata_counts):
+        """preprocess() should work exactly as before (behavioral regression test)."""
+        from sc_tools.pp import preprocess
+
+        result = preprocess(
+            adata_counts,
+            modality="visium",
+            integration="none",
+            n_top_genes=100,
+            resolution=0.5,
+            copy=True,
+        )
+        assert result.raw is not None
+        assert "leiden" in result.obs.columns
+        assert "X_umap" in result.obsm
+        assert "X_pca" in result.obsm
+
+    def test_recipe_accepts_strategy_kwarg(self, adata_counts):
+        """Recipes should accept an explicit strategy parameter."""
+        from sc_tools.pp import preprocess
+        from sc_tools.pp.strategy import SmallStrategy
+
+        result = preprocess(
+            adata_counts,
+            modality="visium",
+            integration="none",
+            n_top_genes=100,
+            resolution=0.5,
+            strategy=SmallStrategy(),
+            copy=True,
+        )
+        assert result.raw is not None
+        assert "leiden" in result.obs.columns
+
+    def test_targeted_panel_xenium(self, adata_counts):
+        """Xenium should still work after merge into targeted panel."""
+        from sc_tools.pp import preprocess
+
+        result = preprocess(
+            adata_counts,
+            modality="xenium",
+            integration="none",
+            n_top_genes=100,
+            resolution=0.5,
+            copy=True,
+        )
+        assert result.raw is not None
+        assert "leiden" in result.obs.columns
+
+    def test_targeted_panel_cosmx(self, adata_counts):
+        """CosMx should still work after merge into targeted panel."""
+        from sc_tools.pp import preprocess
+
+        result = preprocess(
+            adata_counts,
+            modality="cosmx",
+            integration="none",
+            n_top_genes=100,
+            resolution=0.5,
+            copy=True,
+        )
+        assert result.raw is not None
+        assert "leiden" in result.obs.columns
+
+    def test_imc_recipe_with_strategy(self, adata_imc):
+        """IMC recipe should work with strategy pattern."""
+        from sc_tools.pp import preprocess
+
+        result = preprocess(
+            adata_imc,
+            modality="imc",
+            integration="none",
+            resolution=0.5,
+            copy=True,
+        )
+        assert result.raw is not None
+        assert "leiden" in result.obs.columns
+        assert "X_pca" in result.obsm
+
+
 class TestAutoUseRep:
     def test_priority_order(self):
         from sc_tools.pp.reduce import _auto_use_rep
@@ -540,3 +623,115 @@ class TestAutoUseRep:
 
         # Explicit override
         assert _auto_use_rep(adata, "X_custom") == "X_custom"
+
+
+# ---------------------------------------------------------------------------
+# TestTargetedPanelScVI (BM-07)
+# ---------------------------------------------------------------------------
+
+
+class TestTargetedPanelScVI:
+    def test_scvi_preserves_raw_counts(self):
+        """_recipe_targeted_panel with scVI should NOT normalize X."""
+        from unittest.mock import MagicMock, patch
+
+        from sc_tools.pp.recipes import _recipe_targeted_panel
+        from sc_tools.pp.strategy import SmallStrategy, SubsampleContext
+
+        rng = np.random.RandomState(42)
+        n_obs, n_vars = 100, 50
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X.copy())
+        adata.obs["batch"] = [f"batch_{i % 3}" for i in range(n_obs)]
+
+        strategy = SmallStrategy()
+        ctx = SubsampleContext()
+
+        with patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
+             patch.object(strategy, "embed_and_cluster"):
+            _recipe_targeted_panel(
+                adata,
+                batch_key="batch",
+                integration="scvi",
+                n_top_genes=20,
+                resolution=0.5,
+                filter_patterns=None,
+                use_gpu=False,
+                strategy=strategy,
+            )
+
+        # Raw counts should be preserved (non-negative integers)
+        assert np.all(adata.X >= 0), "X has negative values after scVI path"
+        # Check values are close to integers (raw counts are integers)
+        assert np.allclose(adata.X[adata.X > 0], np.round(adata.X[adata.X > 0]), atol=0.01), (
+            "X values are not integers after scVI path -- normalization ran incorrectly"
+        )
+
+    def test_harmony_normalizes(self):
+        """_recipe_targeted_panel with harmony should normalize X."""
+        from unittest.mock import patch
+
+        from sc_tools.pp.recipes import _recipe_targeted_panel
+        from sc_tools.pp.strategy import SmallStrategy, SubsampleContext
+
+        rng = np.random.RandomState(42)
+        n_obs, n_vars = 100, 50
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X.copy())
+        adata.obs["batch"] = [f"batch_{i % 3}" for i in range(n_obs)]
+        original_X = adata.X.copy()
+
+        strategy = SmallStrategy()
+        ctx = SubsampleContext()
+
+        with patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
+             patch.object(strategy, "embed_and_cluster"):
+            _recipe_targeted_panel(
+                adata,
+                batch_key="batch",
+                integration="harmony",
+                n_top_genes=20,
+                resolution=0.5,
+                filter_patterns=None,
+                use_gpu=False,
+                strategy=strategy,
+            )
+
+        # X should have been normalized (log1p -> non-integer values)
+        assert not np.array_equal(adata.X, original_X), "X unchanged after harmony path"
+
+    def test_scvi_uses_seurat_v3_features(self):
+        """scVI path should call select_features with flavor='seurat_v3'."""
+        from unittest.mock import MagicMock, patch
+
+        from sc_tools.pp.recipes import _recipe_targeted_panel
+        from sc_tools.pp.strategy import SmallStrategy, SubsampleContext
+
+        rng = np.random.RandomState(42)
+        n_obs, n_vars = 100, 50
+        X = rng.negative_binomial(5, 0.3, (n_obs, n_vars)).astype(np.float32)
+        adata = AnnData(X=X.copy())
+        adata.obs["batch"] = [f"batch_{i % 3}" for i in range(n_obs)]
+
+        strategy = SmallStrategy()
+        ctx = SubsampleContext()
+
+        with patch.object(strategy, "select_features") as mock_select, \
+             patch.object(strategy, "reduce_and_integrate", return_value=ctx), \
+             patch.object(strategy, "embed_and_cluster"):
+            _recipe_targeted_panel(
+                adata,
+                batch_key="batch",
+                integration="scvi",
+                n_top_genes=20,
+                resolution=0.5,
+                filter_patterns=None,
+                use_gpu=False,
+                strategy=strategy,
+            )
+
+        mock_select.assert_called_once()
+        call_kwargs = mock_select.call_args
+        assert call_kwargs[1].get("flavor") == "seurat_v3" or \
+               (len(call_kwargs[0]) > 2 and call_kwargs[0][2] == "seurat_v3"), \
+            f"select_features not called with flavor='seurat_v3': {call_kwargs}"

@@ -65,12 +65,13 @@ Plans:
   3. `sct validate <phase> <file>` checks checkpoint against PhaseSpec and returns pass/fail with specific failures listed
   4. `sct status` shows pipeline DAG state (completed phases, available next, checkpoint paths) from registry
   5. CLI commands and MCP tools share the same Result type (single implementation, dual serialization verified by test)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Migrate cli.py to cli/ package, add _check_deps utility, create test fixtures (CMD-08, TST-05)
+- [ ] 03-02-PLAN.md — Implement validate, status, qc run, and report commands (CMD-01, CMD-03, CMD-05, CMD-06)
+- [ ] 03-03-PLAN.md — Implement preprocess run and benchmark integration commands (CMD-02, CMD-04)
+- [ ] 03-04-PLAN.md — CLI integration tests, E2E test scaffold, shared Result verification (CMD-07, TST-05, TST-06)
 
 ### Phase 4: CLI Discovery
 **Goal**: Agents can programmatically discover all available commands, their parameters, and output schemas without parsing help text
@@ -153,7 +154,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 |-------|----------------|--------|-----------|
 | 1. Benchmark Fixes | 0/2 | Planning complete | - |
 | 2. CLI Foundation | 2/2 | Complete   | 2026-03-21 |
-| 3. Core Commands | 0/3 | Not started | - |
+| 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Not started | - |
 | 5. Provenance | 0/2 | Not started | - |
 | 6. Scientific Gaps | 0/2 | Not started | - |

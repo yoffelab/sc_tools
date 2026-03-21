@@ -9,6 +9,7 @@ sklearn for core metrics (ASW, ARI, NMI, PCR).
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ __all__ = [
     "compare_integrations",
     "run_integration_benchmark",
     "run_full_integration_workflow",
+    "_mask_nan_rows",
 ]
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,24 @@ try:
     _HAS_SCIB = True
 except ImportError:
     _HAS_SCIB = False
+
+
+# ---------------------------------------------------------------------------
+# NaN masking helper
+# ---------------------------------------------------------------------------
+
+
+def _mask_nan_rows(X: np.ndarray, *arrays: np.ndarray) -> tuple[np.ndarray, ...]:
+    """Remove rows where X has any NaN; apply same mask to companion arrays."""
+    valid = ~np.isnan(X).any(axis=1)
+    n_dropped = int((~valid).sum())
+    if n_dropped > 0:
+        logger.warning(
+            "Dropped %d cells with NaN embeddings (%d remain)",
+            n_dropped,
+            int(valid.sum()),
+        )
+    return (X[valid], *(a[valid] for a in arrays))
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +172,7 @@ def compute_integration_metrics(
     batch_key: str,
     celltype_key: str | None = None,
     use_scib: str = "auto",
+    resolution: float = 1.0,
 ) -> dict[str, float]:
     """Compute integration quality metrics for one embedding.
 
@@ -213,8 +234,8 @@ def compute_integration_metrics(
 
             # Bio conservation metrics
             metrics["asw_celltype"] = _asw_celltype_sklearn(X, celltype)
-            metrics["ari"] = _ari_sklearn(X, celltype)
-            metrics["nmi"] = _nmi_sklearn(X, celltype)
+            metrics["ari"] = _ari_sklearn(X, celltype, resolution=resolution)
+            metrics["nmi"] = _nmi_sklearn(X, celltype, resolution=resolution)
 
     # Clamp to [0, 1]
     for k, v in metrics.items():
@@ -366,6 +387,9 @@ def compare_integrations(
     bio_weight: float = 0.6,
     include_unintegrated: bool = True,
     use_scib: str = "auto",
+    subsample_n: int | None = None,
+    seed: int = 42,
+    resolution: float = 1.0,
 ) -> pd.DataFrame:
     """Compare multiple integration methods side-by-side.
 
@@ -389,6 +413,13 @@ def compare_integrations(
         If True and ``"X_pca"`` exists, add unintegrated PCA as baseline.
     use_scib
         Passed to ``compute_integration_metrics``.
+    subsample_n
+        If set, subsample to this many cells (stratified by ``batch_key``)
+        before computing metrics.
+    seed
+        Random seed for subsampling reproducibility.
+    resolution
+        Leiden clustering resolution for ARI/NMI bio conservation metrics.
 
     Returns
     -------
@@ -397,14 +428,28 @@ def compare_integrations(
     if include_unintegrated and "X_pca" in adata.obsm and "Unintegrated" not in embeddings:
         embeddings = {"Unintegrated": "X_pca", **embeddings}
 
+    # Optional subsampling before metric computation
+    if subsample_n is not None and subsample_n < adata.n_obs:
+        adata = _stratified_subsample(adata, batch_key, n=subsample_n, seed=seed)
+
     rows = []
     for name, key in embeddings.items():
         if key not in adata.obsm:
             logger.warning("Embedding %r (%s) not in adata.obsm, skipping", name, key)
             continue
 
+        # Per-embedding NaN masking (BM-02)
+        X_emb = np.asarray(adata.obsm[key])
+        valid = ~np.isnan(X_emb).any(axis=1)
+        n_dropped = int((~valid).sum())
+        if n_dropped > 0:
+            logger.warning("Method %s: dropped %d cells with NaN embeddings", name, n_dropped)
+            adata_clean = adata[valid].copy()
+        else:
+            adata_clean = adata
+
         metrics = compute_integration_metrics(
-            adata, key, batch_key, celltype_key, use_scib=use_scib
+            adata_clean, key, batch_key, celltype_key, use_scib=use_scib, resolution=resolution
         )
         composite = compute_composite_score(metrics, batch_weight, bio_weight)
 
@@ -423,8 +468,15 @@ def compare_integrations(
     _sklearn_forced = use_scib == "sklearn"
     df.attrs["scib_fallback"] = _sklearn_forced or not _HAS_SCIB
 
-    # TODO: When unintegrated baseline wins, consider emitting a warning.
-    # This usually indicates insufficient batch effect or benchmark misconfiguration.
+    # Store benchmark parameters for provenance (BM-06)
+    df.attrs["benchmark_params"] = {
+        "batch_weight": batch_weight,
+        "bio_weight": bio_weight,
+        "subsample_n": subsample_n,
+        "seed": seed,
+        "resolution": resolution,
+        "use_scib": use_scib,
+    }
 
     return df
 
@@ -503,8 +555,10 @@ def run_integration_benchmark(
         logger.info("Computed PCA with %d components", n_comps)
 
     embedding_keys: dict[str, str] = {}
+    runtimes: dict[str, float] = {}
 
     for method in methods:
+        t0 = time.perf_counter()
         try:
             if method == "harmony":
                 from sc_tools.pp.integrate import run_harmony
@@ -588,6 +642,12 @@ def run_integration_benchmark(
             logger.warning("Skipping %s: %s", method, e)
         except Exception:
             logger.warning("Failed to run %s", method, exc_info=True)
+        finally:
+            runtime = time.perf_counter() - t0
+            # Record runtime for any display names added during this iteration
+            for display_name in list(embedding_keys):
+                if display_name not in runtimes:
+                    runtimes[display_name] = runtime
 
     # Try scib-metrics Benchmarker first
     comparison_df = _try_scib_benchmarker(
@@ -608,6 +668,10 @@ def run_integration_benchmark(
             include_unintegrated=False,
             use_scib=use_scib,
         )
+
+    # Add runtime column (BM-05)
+    if "method" in comparison_df.columns:
+        comparison_df["runtime_s"] = comparison_df["method"].map(runtimes).fillna(0.0)
 
     logger.info("Integration benchmark complete: %d methods evaluated", len(comparison_df))
     return adata, comparison_df
@@ -734,7 +798,9 @@ def _stratified_subsample(
         chosen = rng.choice(group_idx, size=group_n, replace=False)
         indices.extend(chosen.tolist())
 
-    indices = sorted(indices)[:n]
+    # Trim to exactly n cells randomly (not by index) to avoid truncation bias (BM-04)
+    if len(indices) > n:
+        indices = rng.choice(indices, size=n, replace=False).tolist()
     logger.info("Subsampled %d -> %d cells (stratified by %s)", adata.n_obs, len(indices), key)
     return adata[indices].copy()
 

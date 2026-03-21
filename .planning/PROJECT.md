@@ -34,13 +34,13 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 
 <!-- Current scope. Building toward these. -->
 
-**sc_tools internals fixes (Phase 1):**
-- [ ] Pre-computed integration benchmark loading (h5py selective reads, NaN filtering per-embedding, configurable subsampling)
-- [ ] Fix `_stratified_subsample` truncation bias (proportional downsampling, not `sorted()[:n]`)
-- [ ] Benchmark parameter provenance (batch_weight, bio_weight, seed, resolution stored in output)
-- [ ] Runtime tracking in integration benchmarks (`runtime_s` column)
-- [ ] NaN handling in `compare_integrations()` (per-embedding valid-cell masking)
-- [ ] Fix `_recipe_targeted_panel` normalizing before scVI raw count check
+**sc_tools internals fixes (Phase 1) — Validated 2026-03-21:**
+- [x] Pre-computed integration benchmark loading (h5py selective reads, NaN filtering per-embedding, configurable subsampling)
+- [x] Fix `_stratified_subsample` truncation bias (proportional downsampling, not `sorted()[:n]`)
+- [x] Benchmark parameter provenance (batch_weight, bio_weight, seed, resolution stored in output)
+- [x] Runtime tracking in integration benchmarks (`runtime_s` column)
+- [x] NaN handling in `compare_integrations()` (per-embedding valid-cell masking)
+- [x] Fix `_recipe_targeted_panel` normalizing before scVI raw count check
 
 **CLI foundation (Phase 2):**
 - [ ] `sct` entry point registered in `pyproject.toml` `[project.scripts]`
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-20 after research + expert review (SWE, evaluator, systems biologist)*
+*Last updated: 2026-03-21 — Phase 1 (benchmark fixes) complete*

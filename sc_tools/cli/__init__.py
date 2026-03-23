@@ -256,13 +256,14 @@ def version() -> None:
 # Register subcommands (after all helpers are defined)
 # ---------------------------------------------------------------------------
 
-from sc_tools.cli.qc import qc_app  # noqa: E402
+from sc_tools.cli.qc import qc_app, report_app  # noqa: E402
 from sc_tools.cli.preprocess import preprocess_app  # noqa: E402
 from sc_tools.cli.validate import validate_app  # noqa: E402
 from sc_tools.cli.benchmark import benchmark_app  # noqa: E402
 from sc_tools.cli.status import status_app  # noqa: E402
 
 app.add_typer(qc_app, name="qc")
+app.add_typer(report_app, name="report")
 app.add_typer(preprocess_app, name="preprocess")
 app.add_typer(validate_app, name="validate")
 app.add_typer(status_app, name="status")

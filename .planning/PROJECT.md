@@ -51,12 +51,12 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] Non-interactive by default (no prompts; all params via flags/env/config)
 - [x] Lazy imports (heavy deps like scanpy/torch loaded at command execution, not startup; <500ms for `sct help`)
 
-**CLI core commands (Phase 3):**
-- [ ] `sct qc run`, `sct preprocess run`, `sct validate <phase>` — wrap existing operations
-- [ ] `sct benchmark integration --from-dir <dir>` — pre-computed benchmark comparison
-- [ ] `sct status` — pipeline phase status from registry/DAG
-- [ ] Shared Result type used by both CLI and MCP tools
-- [ ] Fast-fail for missing optional dependencies at command dispatch
+**CLI core commands (Phase 3) — Validated 2026-03-22:**
+- [x] `sct qc run`, `sct preprocess run`, `sct validate <phase>` — wrap existing operations
+- [x] `sct benchmark integration --from-dir <dir>` — pre-computed benchmark comparison
+- [x] `sct status` — pipeline phase status from registry/DAG
+- [x] Shared Result type used by both CLI and MCP tools
+- [x] Fast-fail for missing optional dependencies at command dispatch
 
 **CLI self-discovery (Phase 4):**
 - [ ] `sct list-commands --json` — machine-readable command catalog
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-21 — Phase 2 (CLI foundation) complete*
+*Last updated: 2026-03-22 — Phase 3 (core commands) complete*

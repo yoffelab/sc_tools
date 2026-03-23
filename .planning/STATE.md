@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-23T15:00:15.264Z"
+status: Ready to execute
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-23T19:25:19.057Z"
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** Phase 04 — cli-discovery
+**Current focus:** Phase 05 — provenance
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (provenance) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Plan: Not started
 | Phase 03 P03 | 3min | 2 tasks | 3 files |
 | Phase 03 P04 | 4min | 2 tasks | 3 files |
 | Phase 04 P01 | 2min | 2 tasks | 3 files |
+| Phase 05 P01 | 12min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,10 @@ Recent decisions affecting current work:
 - [Phase 03]: E2E tests guarded by SCT_TEST_DATA_DIR and SCT_TEST_EMBEDDING_DIR env vars
 - [Phase 04]: register_discovery(app) pattern avoids circular import
 - [Phase 04]: Commands keyed by space-separated names matching CLI invocation syntax
+- [Phase 05]: ProvenanceRecord separate from Provenance for backwards compat
+- [Phase 05]: _input_files convention key popped before _emit for clean JSON output
+- [Phase 05]: h5py append mode for uns embedding avoids full AnnData load
+- [Phase 05]: random_state=0 default for deterministic Leiden clustering (D-14)
 
 ### Pending Todos
 
@@ -99,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T15:00:15.260Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-provenance/05-CONTEXT.md
+Last session: 2026-03-23T19:25:19.054Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None

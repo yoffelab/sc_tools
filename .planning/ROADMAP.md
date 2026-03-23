@@ -98,7 +98,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Provenance model, utilities, sidecar hook in cli_handler, Leiden random_state (PRV-01, PRV-02, PRV-05)
+- [x] 05-01-PLAN.md — Provenance model, utilities, sidecar hook in cli_handler, Leiden random_state (PRV-01, PRV-02, PRV-05)
 - [ ] 05-02-PLAN.md — Provenance show and trace CLI commands, lineage trace engine (PRV-03, PRV-04)
 
 ### Phase 6: Scientific Gaps
@@ -156,7 +156,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 2. CLI Foundation | 2/2 | Complete   | 2026-03-21 |
 | 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Planning complete | - |
-| 5. Provenance | 0/2 | Planning complete | - |
+| 5. Provenance | 1/2 | In Progress|  |
 | 6. Scientific Gaps | 0/2 | Not started | - |
 | 7. Memory Safety | 0/2 | Not started | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

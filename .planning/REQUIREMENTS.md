@@ -41,17 +41,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CLI Discovery
 
-- [ ] **DSC-01**: `sct list-commands --json` — machine-readable catalog of all commands with params, types, defaults
-- [ ] **DSC-02**: `sct describe <cmd>` — JSON schema for specific command's params and output format
-- [ ] **DSC-03**: `sct schema` — full CLI contract as JSON document (Typer command tree + Pydantic output schemas)
+- [x] **DSC-01**: `sct list-commands --json` — machine-readable catalog of all commands with params, types, defaults
+- [x] **DSC-02**: `sct describe <cmd>` — JSON schema for specific command's params and output format
+- [x] **DSC-03**: `sct schema` — full CLI contract as JSON document (Typer command tree + Pydantic output schemas)
 
 ### Provenance
 
-- [ ] **PRV-01**: JSON sidecar `.provenance.json` written alongside every CLI output file
-- [ ] **PRV-02**: Sidecar includes: command, params, input files with SHA256 checksums, sc_tools version, timestamp, runtime_s, peak_memory_mb
+- [x] **PRV-01**: JSON sidecar `.provenance.json` written alongside every CLI output file
+- [x] **PRV-02**: Sidecar includes: command, params, input files with SHA256 checksums, sc_tools version, timestamp, runtime_s, peak_memory_mb
 - [ ] **PRV-03**: `sct provenance show <file>` — display provenance for a single output
 - [ ] **PRV-04**: `sct provenance trace <file>` — trace full lineage DAG via input file references
-- [ ] **PRV-05**: Reproducible Leiden clustering — configurable resolution and random_state propagation through all benchmark/clustering functions
+- [x] **PRV-05**: Reproducible Leiden clustering — configurable resolution and random_state propagation through all benchmark/clustering functions
 
 ### Scientific Gaps
 
@@ -144,14 +144,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMD-06 | Phase 3 | Complete |
 | CMD-07 | Phase 3 | Complete |
 | CMD-08 | Phase 3 | Complete |
-| DSC-01 | Phase 4 | Pending |
-| DSC-02 | Phase 4 | Pending |
-| DSC-03 | Phase 4 | Pending |
-| PRV-01 | Phase 5 | Pending |
-| PRV-02 | Phase 5 | Pending |
+| DSC-01 | Phase 4 | Complete |
+| DSC-02 | Phase 4 | Complete |
+| DSC-03 | Phase 4 | Complete |
+| PRV-01 | Phase 5 | Complete |
+| PRV-02 | Phase 5 | Complete |
 | PRV-03 | Phase 5 | Pending |
 | PRV-04 | Phase 5 | Pending |
-| PRV-05 | Phase 5 | Pending |
+| PRV-05 | Phase 5 | Complete |
 | SCI-01 | Phase 6 | Pending |
 | SCI-02 | Phase 6 | Pending |
 | SCI-03 | Phase 6 | Pending |

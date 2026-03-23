@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-03-21T19:01:51.878Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-23T02:57:16.860Z"
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** Phase 02 — cli-foundation
+**Current focus:** Phase 03 — core-commands
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 03 (core-commands) — EXECUTING
+Plan: 2 of 4
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: Not started
 | Phase 01 P02 | 16min | 2 tasks | 4 files |
 | Phase 02 P01 | 2min | 2 tasks | 4 files |
 | Phase 02 P02 | 5min | 2 tasks | 5 files |
+| Phase 03 P01 | 2min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 02]: is_eager=True on --version callback for pre-command execution
 - [Phase 02]: invoke_without_command=True on stub group callbacks so they appear in help
 - [Phase 02]: pyproject.toml [project.scripts] moved after dependencies to fix TOML parse error
+- [Phase 03]: integrate_app and celltype_app kept in __init__.py (no Phase 3 commands for them)
+- [Phase 03]: Submodule imports at bottom of __init__.py with noqa E402 for clean separation
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T18:21:24.432Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-03-23T02:57:16.858Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

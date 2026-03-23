@@ -58,10 +58,10 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] Shared Result type used by both CLI and MCP tools
 - [x] Fast-fail for missing optional dependencies at command dispatch
 
-**CLI self-discovery (Phase 4):**
-- [ ] `sct list-commands --json` — machine-readable command catalog
-- [ ] `sct describe <cmd>` — JSON schema for command params and output
-- [ ] `sct schema` — full CLI contract as JSON (Typer introspection + Pydantic schemas)
+**CLI self-discovery (Phase 4) — Validated 2026-03-23:**
+- [x] `sct list-commands --json` — machine-readable command catalog
+- [x] `sct describe <cmd>` — JSON schema for command params and output
+- [x] `sct schema` — full CLI contract as JSON (Typer introspection + Pydantic schemas)
 
 **Provenance & reproducibility (Phase 5):**
 - [ ] JSON sidecar provenance files (`.provenance.json` alongside every output)
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-22 — Phase 3 (core commands) complete*
+*Last updated: 2026-03-23 — Phase 4 (CLI discovery) complete*

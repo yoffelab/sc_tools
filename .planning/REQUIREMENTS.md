@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CMD-04**: `sct benchmark integration --from-dir <dir>` — load pre-computed h5ad files, compute comparison metrics, output ranked JSON
 - [x] **CMD-05**: `sct status` — pipeline phase status from registry DAG (completed phases, available next, checkpoint paths)
 - [x] **CMD-06**: `sct report <type>` — generate HTML report (pre-filter, post-filter, post-integration, post-celltyping)
-- [ ] **CMD-07**: Shared Result type used by both CLI commands and MCP tools (single implementation, dual serialization)
+- [x] **CMD-07**: Shared Result type used by both CLI commands and MCP tools (single implementation, dual serialization)
 - [x] **CMD-08**: Fast-fail dependency check at command dispatch — report missing optional deps with install instructions before loading data
 
 ### CLI Discovery
@@ -80,7 +80,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **TST-03**: Unit tests for `_stratified_subsample` (proportionality check, n > n_obs, single group)
 - [x] **TST-04**: CLI argument parsing tests (no data loaded, fast)
 - [x] **TST-05**: CLI integration tests with small fixtures (100-cell AnnData)
-- [ ] **TST-06**: End-to-end test with real data on HPC (skipif guard)
+- [x] **TST-06**: End-to-end test with real data on HPC (skipif guard)
 
 ## v2 Requirements
 
@@ -142,7 +142,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMD-04 | Phase 3 | Complete |
 | CMD-05 | Phase 3 | Complete |
 | CMD-06 | Phase 3 | Complete |
-| CMD-07 | Phase 3 | Pending |
+| CMD-07 | Phase 3 | Complete |
 | CMD-08 | Phase 3 | Complete |
 | DSC-01 | Phase 4 | Pending |
 | DSC-02 | Phase 4 | Pending |
@@ -168,7 +168,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TST-03 | Phase 1 | Complete |
 | TST-04 | Phase 2 | Complete |
 | TST-05 | Phase 3 | Complete |
-| TST-06 | Phase 3 | Pending |
+| TST-06 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 48 total

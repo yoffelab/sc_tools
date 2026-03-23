@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-03-23T03:02:38.955Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-03-23T03:09:36.654Z"
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -53,6 +53,7 @@ Plan: 4 of 4
 | Phase 03 P01 | 2min | 2 tasks | 7 files |
 | Phase 03 P02 | 3min | 2 tasks | 4 files |
 | Phase 03 P03 | 3min | 2 tasks | 3 files |
+| Phase 03 P04 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 03]: report_app colocated in qc.py but registered as separate top-level report subcommand
 - [Phase 03]: Removed CLIResult return type annotation to avoid Typer get_type_hints NameError on Python 3.10
 - [Phase 03]: benchmark_params rendered as HTML table card in generate_benchmark_report context
+- [Phase 03]: qc_run uses sc_tools.qc.metrics.calculate_qc_metrics for proper mt/hb var column creation
+- [Phase 03]: E2E tests guarded by SCT_TEST_DATA_DIR and SCT_TEST_EMBEDDING_DIR env vars
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T03:02:38.951Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-03-23T03:09:36.651Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None

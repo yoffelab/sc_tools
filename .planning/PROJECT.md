@@ -63,11 +63,11 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] `sct describe <cmd>` — JSON schema for command params and output
 - [x] `sct schema` — full CLI contract as JSON (Typer introspection + Pydantic schemas)
 
-**Provenance & reproducibility (Phase 5):**
-- [ ] JSON sidecar provenance files (`.provenance.json` alongside every output)
-- [ ] Provenance includes: command, params, input files with checksums, sc_tools version, timestamp, runtime, peak memory
-- [ ] `sct provenance show <file>` and `sct provenance trace <file>` for lineage queries
-- [ ] Reproducible Leiden resolution (configurable, with random_state propagation)
+**Provenance & reproducibility (Phase 5) — Validated 2026-03-23:**
+- [x] JSON sidecar provenance files (`.provenance.json` alongside every output)
+- [x] Provenance includes: command, params, input files with checksums, sc_tools version, timestamp, runtime, peak memory
+- [x] `sct provenance show <file>` and `sct provenance trace <file>` for lineage queries
+- [x] Reproducible Leiden resolution (configurable, with random_state propagation)
 
 **Scientific gaps (Phase 6):**
 - [ ] Pseudobulk DE module (`sc_tools.tl.de`) wrapping PyDESeq2 with automatic aggregation by subject_id + celltype
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-23 — Phase 4 (CLI discovery) complete*
+*Last updated: 2026-03-23 — Phase 5 (provenance) complete*

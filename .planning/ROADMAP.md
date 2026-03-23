@@ -81,10 +81,10 @@ Plans:
   1. `sct list-commands --json` returns a machine-readable catalog with every command's name, params, types, and defaults
   2. `sct describe <cmd>` returns JSON schema for a specific command's input params and output format
   3. `sct schema` exports the full CLI contract as a single JSON document (command tree + Pydantic output schemas)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Discovery commands: list-commands, describe, schema with Typer/Click introspection (DSC-01, DSC-02, DSC-03)
 
 ### Phase 5: Provenance
 **Goal**: Every CLI output has a traceable lineage back to its inputs, parameters, and environment
@@ -155,7 +155,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 1. Benchmark Fixes | 0/2 | Planning complete | - |
 | 2. CLI Foundation | 2/2 | Complete   | 2026-03-21 |
 | 3. Core Commands | 0/4 | Planning complete | - |
-| 4. CLI Discovery | 0/1 | Not started | - |
+| 4. CLI Discovery | 0/1 | Planning complete | - |
 | 5. Provenance | 0/2 | Not started | - |
 | 6. Scientific Gaps | 0/2 | Not started | - |
 | 7. Memory Safety | 0/2 | Not started | - |

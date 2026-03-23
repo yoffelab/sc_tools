@@ -303,8 +303,8 @@ class TestSHA256Relocation:
         steps = trace_lineage(str(output), project_dir=str(tmp_path))
 
         assert len(steps) == 2
-        # The relocated file should be found
+        # The relocated file should be found and marked with relocation note
         relocated_step = steps[0]
-        assert "relocated" in (relocated_step.get("note") or "").lower() or relocated_step["note"] == "origin (no provenance)"
+        assert "relocated" in relocated_step["note"]
         # The main output step
         assert steps[1]["command"] == "process"

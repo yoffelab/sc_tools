@@ -48,9 +48,10 @@ def qc_run(
     adata = sc.read_h5ad(path)
     logger.info("Loaded %d cells x %d genes", adata.n_obs, adata.n_vars)
 
-    # Ensure QC metrics exist
+    # Ensure QC metrics exist (use sc_tools wrapper that creates mt/hb boolean columns first)
     if "n_genes_by_counts" not in adata.obs.columns:
-        sc.pp.calculate_qc_metrics(adata, qc_vars=["MT-", "mt-"], percent_top=None, log1p=False, inplace=True)
+        from sc_tools.qc.metrics import calculate_qc_metrics
+        calculate_qc_metrics(adata, modality=modality, inplace=True, log1p=False)
 
     metrics = compute_sample_metrics(adata, sample_col=sample_col, modality=modality)
     classified = classify_samples(metrics, modality=modality)

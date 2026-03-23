@@ -95,11 +95,11 @@ Plans:
   2. Sidecar contains command, params, input files with SHA256 checksums, sc_tools version, timestamp, runtime_s, and peak_memory_mb
   3. `sct provenance show <file>` displays the provenance record; `sct provenance trace <file>` walks input references to build a full lineage DAG
   4. Leiden clustering results include resolution and random_state in provenance, and identical parameters produce identical results
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — Provenance model, utilities, sidecar hook in cli_handler, Leiden random_state (PRV-01, PRV-02, PRV-05)
+- [ ] 05-02-PLAN.md — Provenance show and trace CLI commands, lineage trace engine (PRV-03, PRV-04)
 
 ### Phase 6: Scientific Gaps
 **Goal**: sc_tools supports pseudobulk DE, marker validation, subject-level metadata, and panel-aware cell typing for rigorous multi-sample analysis
@@ -156,7 +156,7 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 2. CLI Foundation | 2/2 | Complete   | 2026-03-21 |
 | 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Planning complete | - |
-| 5. Provenance | 0/2 | Not started | - |
+| 5. Provenance | 0/2 | Planning complete | - |
 | 6. Scientific Gaps | 0/2 | Not started | - |
 | 7. Memory Safety | 0/2 | Not started | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

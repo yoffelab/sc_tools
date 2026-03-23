@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-23T02:57:16.860Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-03-23T03:02:06.328Z"
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 03 (core-commands) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: 2 of 4
 | Phase 02 P01 | 2min | 2 tasks | 4 files |
 | Phase 02 P02 | 5min | 2 tasks | 5 files |
 | Phase 03 P01 | 2min | 2 tasks | 7 files |
+| Phase 03 P02 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 02]: pyproject.toml [project.scripts] moved after dependencies to fix TOML parse error
 - [Phase 03]: integrate_app and celltype_app kept in __init__.py (no Phase 3 commands for them)
 - [Phase 03]: Submodule imports at bottom of __init__.py with noqa E402 for clean separation
+- [Phase 03]: validate_run skips @cli_handler for custom exit code 2 on data errors
+- [Phase 03]: Return type -> None instead of -> CLIResult to avoid Typer forward-reference resolution
+- [Phase 03]: report_app colocated in qc.py but registered as separate top-level report subcommand
 
 ### Pending Todos
 
@@ -86,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T02:57:16.858Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-03-23T03:02:06.325Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None

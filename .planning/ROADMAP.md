@@ -70,7 +70,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Migrate cli.py to cli/ package, add _check_deps utility, create test fixtures (CMD-08, TST-05)
 - [x] 03-02-PLAN.md — Implement validate, status, qc run, and report commands (CMD-01, CMD-03, CMD-05, CMD-06)
-- [ ] 03-03-PLAN.md — Implement preprocess run and benchmark integration commands (CMD-02, CMD-04)
+- [x] 03-03-PLAN.md — Implement preprocess run and benchmark integration commands (CMD-02, CMD-04)
 - [ ] 03-04-PLAN.md — CLI integration tests, E2E test scaffold, shared Result verification (CMD-07, TST-05, TST-06)
 
 ### Phase 4: CLI Discovery

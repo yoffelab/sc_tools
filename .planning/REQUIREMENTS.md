@@ -31,9 +31,9 @@ Requirements for initial release. Each maps to roadmap phases.
 ### CLI Core Commands
 
 - [x] **CMD-01**: `sct qc run` — run QC metrics on a checkpoint file, output JSON metrics summary
-- [ ] **CMD-02**: `sct preprocess run` — run preprocessing recipe (modality-aware dispatch via `recipes.py`)
+- [x] **CMD-02**: `sct preprocess run` — run preprocessing recipe (modality-aware dispatch via `recipes.py`)
 - [x] **CMD-03**: `sct validate <phase> <file>` — validate checkpoint against phase spec, return pass/fail JSON
-- [ ] **CMD-04**: `sct benchmark integration --from-dir <dir>` — load pre-computed h5ad files, compute comparison metrics, output ranked JSON
+- [x] **CMD-04**: `sct benchmark integration --from-dir <dir>` — load pre-computed h5ad files, compute comparison metrics, output ranked JSON
 - [x] **CMD-05**: `sct status` — pipeline phase status from registry DAG (completed phases, available next, checkpoint paths)
 - [x] **CMD-06**: `sct report <type>` — generate HTML report (pre-filter, post-filter, post-integration, post-celltyping)
 - [ ] **CMD-07**: Shared Result type used by both CLI commands and MCP tools (single implementation, dual serialization)
@@ -137,9 +137,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-07 | Phase 2 | Complete |
 | CLI-08 | Phase 2 | Complete |
 | CMD-01 | Phase 3 | Complete |
-| CMD-02 | Phase 3 | Pending |
+| CMD-02 | Phase 3 | Complete |
 | CMD-03 | Phase 3 | Complete |
-| CMD-04 | Phase 3 | Pending |
+| CMD-04 | Phase 3 | Complete |
 | CMD-05 | Phase 3 | Complete |
 | CMD-06 | Phase 3 | Complete |
 | CMD-07 | Phase 3 | Pending |

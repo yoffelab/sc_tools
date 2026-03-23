@@ -352,6 +352,62 @@ def test_write_provenance_sidecars_calls_embed_for_h5ad() -> None:
         mock_embed.assert_called_once()
 
 
+# ---------------------------------------------------------------------------
+# Leiden random_state (PRV-05)
+# ---------------------------------------------------------------------------
+
+
+def test_leiden_random_state_passed() -> None:
+    """_leiden_cluster passes random_state to sc.tl.leiden."""
+    import numpy as np
+
+    def _fake_leiden(adata, **kwargs):
+        """Mock leiden that creates the expected obs column."""
+        adata.obs["leiden"] = ["0"] * adata.n_obs
+
+    with patch("scanpy.tl.leiden", side_effect=_fake_leiden) as mock_leiden, \
+         patch("scanpy.pp.neighbors"):
+        from sc_tools.bm.integration import _leiden_cluster
+
+        X = np.random.rand(20, 5)
+        _leiden_cluster(X, resolution=1.0, random_state=42)
+        mock_leiden.assert_called_once()
+        call_kwargs = mock_leiden.call_args
+        assert call_kwargs.kwargs.get("random_state") == 42 or call_kwargs[1].get("random_state") == 42
+
+
+def test_leiden_random_state_default() -> None:
+    """_leiden_cluster defaults to random_state=0."""
+    import inspect
+
+    from sc_tools.bm.integration import _leiden_cluster
+
+    sig = inspect.signature(_leiden_cluster)
+    assert sig.parameters["random_state"].default == 0
+
+
+def test_compute_integration_metrics_has_random_state() -> None:
+    """compute_integration_metrics accepts random_state parameter."""
+    import inspect
+
+    from sc_tools.bm.integration import compute_integration_metrics
+
+    sig = inspect.signature(compute_integration_metrics)
+    assert "random_state" in sig.parameters
+    assert sig.parameters["random_state"].default == 0
+
+
+def test_cluster_has_random_state() -> None:
+    """pp.reduce.cluster accepts random_state parameter and defaults to 0."""
+    import inspect
+
+    from sc_tools.pp.reduce import cluster
+
+    sig = inspect.signature(cluster)
+    assert "random_state" in sig.parameters
+    assert sig.parameters["random_state"].default == 0
+
+
 def test_write_provenance_sidecars_skips_embed_for_non_h5ad() -> None:
     """_write_provenance_sidecars does NOT call embed_provenance_in_adata for non-h5ad artifacts."""
     from sc_tools.cli import _write_provenance_sidecars

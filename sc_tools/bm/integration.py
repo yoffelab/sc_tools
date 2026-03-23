@@ -165,19 +165,23 @@ def _pcr_sklearn(X: np.ndarray, batch: np.ndarray) -> float:
     return float(1 - max(0, r2))
 
 
-def _ari_sklearn(X: np.ndarray, celltype: np.ndarray, resolution: float = 1.0) -> float:
+def _ari_sklearn(
+    X: np.ndarray, celltype: np.ndarray, resolution: float = 1.0, random_state: int = 0,
+) -> float:
     """ARI: cluster (Leiden) vs cell type labels."""
     from sklearn.metrics import adjusted_rand_score
 
-    clusters = _leiden_cluster(X, resolution=resolution)
+    clusters = _leiden_cluster(X, resolution=resolution, random_state=random_state)
     return float(adjusted_rand_score(celltype, clusters))
 
 
-def _nmi_sklearn(X: np.ndarray, celltype: np.ndarray, resolution: float = 1.0) -> float:
+def _nmi_sklearn(
+    X: np.ndarray, celltype: np.ndarray, resolution: float = 1.0, random_state: int = 0,
+) -> float:
     """NMI: cluster (Leiden) vs cell type labels."""
     from sklearn.metrics import normalized_mutual_info_score
 
-    clusters = _leiden_cluster(X, resolution=resolution)
+    clusters = _leiden_cluster(X, resolution=resolution, random_state=random_state)
     return float(normalized_mutual_info_score(celltype, clusters, average_method="arithmetic"))
 
 
@@ -208,14 +212,24 @@ def _graph_connectivity(X: np.ndarray, celltype: np.ndarray) -> float:
     return float(np.mean(fractions))
 
 
-def _leiden_cluster(X: np.ndarray, resolution: float = 1.0) -> np.ndarray:
-    """Run Leiden clustering on an embedding."""
+def _leiden_cluster(X: np.ndarray, resolution: float = 1.0, random_state: int = 0) -> np.ndarray:
+    """Run Leiden clustering on an embedding.
+
+    Parameters
+    ----------
+    X
+        Embedding array (n_cells, n_dims).
+    resolution
+        Leiden clustering resolution.
+    random_state
+        Random state for reproducibility (D-14, PRV-05).
+    """
     import scanpy as sc
 
     tmp = AnnData(X=np.zeros((X.shape[0], 1)))
     tmp.obsm["X_emb"] = X
     sc.pp.neighbors(tmp, use_rep="X_emb", n_neighbors=15)
-    sc.tl.leiden(tmp, resolution=resolution, key_added="leiden")
+    sc.tl.leiden(tmp, resolution=resolution, key_added="leiden", random_state=random_state)
     return tmp.obs["leiden"].values
 
 
@@ -231,6 +245,7 @@ def compute_integration_metrics(
     celltype_key: str | None = None,
     use_scib: str = "auto",
     resolution: float = 1.0,
+    random_state: int = 0,
 ) -> dict[str, float]:
     """Compute integration quality metrics for one embedding.
 
@@ -278,7 +293,7 @@ def compute_integration_metrics(
     metrics: dict[str, float] = {}
 
     if should_use_scib and has_celltype:
-        metrics.update(_compute_scib_metrics(adata, embedding_key, batch_key, celltype_key))
+        metrics.update(_compute_scib_metrics(adata, embedding_key, batch_key, celltype_key, resolution=resolution, random_state=random_state))
     elif should_use_scib and not has_celltype:
         # Batch-only via scib path
         metrics.update(_compute_scib_metrics_batch_only(adata, embedding_key, batch_key))
@@ -292,8 +307,8 @@ def compute_integration_metrics(
 
             # Bio conservation metrics
             metrics["asw_celltype"] = _asw_celltype_sklearn(X, celltype)
-            metrics["ari"] = _ari_sklearn(X, celltype, resolution=resolution)
-            metrics["nmi"] = _nmi_sklearn(X, celltype, resolution=resolution)
+            metrics["ari"] = _ari_sklearn(X, celltype, resolution=resolution, random_state=random_state)
+            metrics["nmi"] = _nmi_sklearn(X, celltype, resolution=resolution, random_state=random_state)
 
     # Clamp to [0, 1]
     for k, v in metrics.items():
@@ -307,6 +322,8 @@ def _compute_scib_metrics(
     embedding_key: str,
     batch_key: str,
     celltype_key: str,
+    resolution: float = 1.0,
+    random_state: int = 0,
 ) -> dict[str, float]:
     """Compute metrics using scib-metrics library."""
     import scib_metrics
@@ -346,8 +363,8 @@ def _compute_scib_metrics(
     except Exception:
         metrics["asw_celltype"] = _asw_celltype_sklearn(X, celltype)
 
-    metrics["ari"] = _ari_sklearn(X, celltype)
-    metrics["nmi"] = _nmi_sklearn(X, celltype)
+    metrics["ari"] = _ari_sklearn(X, celltype, resolution=resolution, random_state=random_state)
+    metrics["nmi"] = _nmi_sklearn(X, celltype, resolution=resolution, random_state=random_state)
 
     try:
         metrics["clisi"] = float(scib_metrics.clisi_knn(X, celltype))
@@ -400,8 +417,8 @@ def _compute_scib_metrics_batch_only(
 
 def compute_composite_score(
     metrics: dict[str, float],
-    batch_weight: float = 0.4,
-    bio_weight: float = 0.6,
+    batch_weight: float = 0.2,
+    bio_weight: float = 0.8,
 ) -> dict[str, float]:
     """Compute composite integration score from individual metrics.
 
@@ -410,9 +427,9 @@ def compute_composite_score(
     metrics
         Output from ``compute_integration_metrics``.
     batch_weight
-        Weight for batch removal score (default 0.4).
+        Weight for batch removal score (default 0.2).
     bio_weight
-        Weight for bio conservation score (default 0.6).
+        Weight for bio conservation score (default 0.8).
 
     Returns
     -------
@@ -442,13 +459,14 @@ def compare_integrations(
     batch_key: str = "batch",
     celltype_key: str | None = None,
     bio_key: str | None = None,
-    batch_weight: float = 0.4,
-    bio_weight: float = 0.6,
+    batch_weight: float = 0.2,
+    bio_weight: float = 0.8,
     include_unintegrated: bool = True,
     use_scib: str = "auto",
     subsample_n: int | None = None,
     seed: int = 42,
     resolution: float = 1.0,
+    random_state: int = 0,
     embedding_files: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Compare multiple integration methods side-by-side.
@@ -531,7 +549,7 @@ def compare_integrations(
                 adata_clean = adata
 
             metrics = compute_integration_metrics(
-                adata_clean, key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution
+                adata_clean, key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution, random_state=random_state
             )
             composite = compute_composite_score(metrics, batch_weight, bio_weight)
 
@@ -577,7 +595,7 @@ def compare_integrations(
                     file_adata = file_adata[valid].copy()
 
                 metrics = compute_integration_metrics(
-                    file_adata, obsm_key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution
+                    file_adata, obsm_key, batch_key, effective_bio_key, use_scib=use_scib, resolution=resolution, random_state=random_state
                 )
                 composite = compute_composite_score(metrics, batch_weight, bio_weight)
 
@@ -599,13 +617,14 @@ def compare_integrations(
     _sklearn_forced = use_scib == "sklearn"
     df.attrs["scib_fallback"] = _sklearn_forced or not _HAS_SCIB
 
-    # Store benchmark parameters for provenance (BM-06)
+    # Store benchmark parameters for provenance (BM-06, D-15)
     df.attrs["benchmark_params"] = {
         "batch_weight": batch_weight,
         "bio_weight": bio_weight,
         "subsample_n": subsample_n,
         "seed": seed,
         "resolution": resolution,
+        "random_state": random_state,
         "use_scib": use_scib,
     }
 

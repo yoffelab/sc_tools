@@ -157,6 +157,7 @@ def cluster(
     n_neighbors: int = 20,
     key_added: str = "leiden",
     run_umap: bool = True,
+    random_state: int = 0,
     **kwargs: Any,
 ) -> None:
     """Convenience: neighbors + leiden + umap in one call.
@@ -175,11 +176,13 @@ def cluster(
         Key for cluster labels in ``adata.obs``.
     run_umap
         If True (default), compute UMAP embedding.
+    random_state
+        Random state for Leiden reproducibility (D-14, PRV-05).
     **kwargs
         Extra kwargs passed to ``neighbors()``.
     """
     neighbors(adata, n_neighbors=n_neighbors, use_rep=use_rep, **kwargs)
-    leiden(adata, resolution=resolution, key_added=key_added)
+    leiden(adata, resolution=resolution, key_added=key_added, random_state=random_state)
     if run_umap:
         umap(adata)
 

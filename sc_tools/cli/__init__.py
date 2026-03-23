@@ -1,10 +1,11 @@
 """Typer CLI application for sc_tools.
 
-Single module (D-01) providing the ``sct`` command with:
+cli/ package (D-01) providing the ``sct`` command with:
 
 - Global ``--human`` flag for Rich output to stderr (D-04, CLI-04)
 - Error handler mapping exceptions to exit codes 0/1/2/3 (D-12, D-15)
-- Five stub command groups: qc, preprocess, integrate, benchmark, celltype (CLI-02)
+- Dependency check utility _check_deps (CMD-08, D-11)
+- Seven command groups: qc, preprocess, validate, status, integrate, benchmark, celltype
 
 No heavy imports (scanpy, torch, scvi) at module level (CLI-08).
 """
@@ -120,6 +121,35 @@ def _render_rich(result: CLIResult) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Dependency check utility (CMD-08, D-11)
+# ---------------------------------------------------------------------------
+
+_DEP_INSTALL: dict[str, str] = {
+    "scanpy": "pip install scanpy",
+    "scvi-tools": "pip install scvi-tools",
+    "scib_metrics": "pip install scib-metrics",
+    "h5py": "pip install h5py",
+    "rapids_singlecell": "pip install rapids-singlecell (requires CUDA)",
+}
+
+
+def _check_deps(deps: list[str]) -> None:
+    """Check optional dependencies before loading data (CMD-08). Raises SCToolsUserError."""
+    missing = []
+    for dep in deps:
+        try:
+            __import__(dep.replace("-", "_"))
+        except ImportError:
+            install = _DEP_INSTALL.get(dep, f"pip install {dep}")
+            missing.append(f"  {dep}: {install}")
+    if missing:
+        raise SCToolsUserError(
+            "Missing required dependencies:\n" + "\n".join(missing),
+            suggestion="Install missing packages and retry",
+        )
+
+
+# ---------------------------------------------------------------------------
 # Error handler decorator
 # ---------------------------------------------------------------------------
 
@@ -184,40 +214,16 @@ def cli_handler(func):  # noqa: ANN001, ANN201
 
 
 # ---------------------------------------------------------------------------
-# Stub command groups (CLI-02, Pattern 5)
+# Stub command groups kept in __init__.py (no Phase 3 commands for these)
 # ---------------------------------------------------------------------------
 
-qc_app = typer.Typer(help="Quality control commands")
-preprocess_app = typer.Typer(help="Preprocessing commands")
 integrate_app = typer.Typer(help="Integration commands")
-benchmark_app = typer.Typer(help="Benchmarking commands")
 celltype_app = typer.Typer(help="Cell typing commands")
-
-
-@qc_app.callback(invoke_without_command=True)
-def qc_callback(ctx: typer.Context) -> None:
-    """Quality control commands. Run 'sct qc --help' for available subcommands."""
-    if ctx.invoked_subcommand is None:
-        typer.echo(ctx.get_help())
-
-
-@preprocess_app.callback(invoke_without_command=True)
-def preprocess_callback(ctx: typer.Context) -> None:
-    """Preprocessing commands. Run 'sct preprocess --help' for available subcommands."""
-    if ctx.invoked_subcommand is None:
-        typer.echo(ctx.get_help())
 
 
 @integrate_app.callback(invoke_without_command=True)
 def integrate_callback(ctx: typer.Context) -> None:
     """Integration commands. Run 'sct integrate --help' for available subcommands."""
-    if ctx.invoked_subcommand is None:
-        typer.echo(ctx.get_help())
-
-
-@benchmark_app.callback(invoke_without_command=True)
-def benchmark_callback(ctx: typer.Context) -> None:
-    """Benchmarking commands. Run 'sct benchmark --help' for available subcommands."""
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
 
@@ -228,12 +234,6 @@ def celltype_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
 
-
-app.add_typer(qc_app, name="qc")
-app.add_typer(preprocess_app, name="preprocess")
-app.add_typer(integrate_app, name="integrate")
-app.add_typer(benchmark_app, name="benchmark")
-app.add_typer(celltype_app, name="celltype")
 
 # ---------------------------------------------------------------------------
 # Version command
@@ -250,3 +250,22 @@ def version() -> None:
     except Exception:
         v = "unknown"
     typer.echo(v)
+
+
+# ---------------------------------------------------------------------------
+# Register subcommands (after all helpers are defined)
+# ---------------------------------------------------------------------------
+
+from sc_tools.cli.qc import qc_app  # noqa: E402
+from sc_tools.cli.preprocess import preprocess_app  # noqa: E402
+from sc_tools.cli.validate import validate_app  # noqa: E402
+from sc_tools.cli.benchmark import benchmark_app  # noqa: E402
+from sc_tools.cli.status import status_app  # noqa: E402
+
+app.add_typer(qc_app, name="qc")
+app.add_typer(preprocess_app, name="preprocess")
+app.add_typer(validate_app, name="validate")
+app.add_typer(status_app, name="status")
+app.add_typer(integrate_app, name="integrate")
+app.add_typer(benchmark_app, name="benchmark")
+app.add_typer(celltype_app, name="celltype")

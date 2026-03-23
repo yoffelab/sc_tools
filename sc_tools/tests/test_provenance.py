@@ -335,7 +335,7 @@ def test_embed_provenance_in_adata(tmp_path: Path) -> None:
 def test_write_provenance_sidecars_calls_embed_for_h5ad() -> None:
     """_write_provenance_sidecars calls embed_provenance_in_adata for h5ad artifacts (D-04)."""
     from sc_tools.cli import _write_provenance_sidecars
-    from sc_tools.models.result import CLIResult, Provenance, Status
+    from sc_tools.models.result import CLIResult, Provenance, ProvenanceRecord, Status
 
     result = CLIResult(
         status=Status.success,
@@ -344,10 +344,9 @@ def test_write_provenance_sidecars_calls_embed_for_h5ad() -> None:
         provenance=Provenance(command="preprocess run"),
     )
 
-    with patch("sc_tools.cli.embed_provenance_in_adata") as mock_embed, \
-         patch("sc_tools.cli.write_sidecar"), \
-         patch("sc_tools.cli.build_provenance_record") as mock_build:
-        from sc_tools.models.result import ProvenanceRecord
+    with patch("sc_tools.provenance.sidecar.embed_provenance_in_adata") as mock_embed, \
+         patch("sc_tools.provenance.sidecar.write_sidecar"), \
+         patch("sc_tools.provenance.sidecar.build_provenance_record") as mock_build:
         mock_build.return_value = ProvenanceRecord(command="preprocess run", params={})
         _write_provenance_sidecars(result, {}, [], 1.0, 100.0)
         mock_embed.assert_called_once()
@@ -356,7 +355,7 @@ def test_write_provenance_sidecars_calls_embed_for_h5ad() -> None:
 def test_write_provenance_sidecars_skips_embed_for_non_h5ad() -> None:
     """_write_provenance_sidecars does NOT call embed_provenance_in_adata for non-h5ad artifacts."""
     from sc_tools.cli import _write_provenance_sidecars
-    from sc_tools.models.result import CLIResult, Provenance, Status
+    from sc_tools.models.result import CLIResult, Provenance, ProvenanceRecord, Status
 
     result = CLIResult(
         status=Status.success,
@@ -365,10 +364,9 @@ def test_write_provenance_sidecars_skips_embed_for_non_h5ad() -> None:
         provenance=Provenance(command="report generate"),
     )
 
-    with patch("sc_tools.cli.embed_provenance_in_adata") as mock_embed, \
-         patch("sc_tools.cli.write_sidecar"), \
-         patch("sc_tools.cli.build_provenance_record") as mock_build:
-        from sc_tools.models.result import ProvenanceRecord
+    with patch("sc_tools.provenance.sidecar.embed_provenance_in_adata") as mock_embed, \
+         patch("sc_tools.provenance.sidecar.write_sidecar"), \
+         patch("sc_tools.provenance.sidecar.build_provenance_record") as mock_build:
         mock_build.return_value = ProvenanceRecord(command="report generate", params={})
         _write_provenance_sidecars(result, {}, [], 1.0, 100.0)
         mock_embed.assert_not_called()

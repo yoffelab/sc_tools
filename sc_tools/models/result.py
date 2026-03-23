@@ -48,10 +48,43 @@ class ErrorInfo(BaseModel):
     details: str | None = None
 
 
+class InputFile(BaseModel):
+    """Input file record for provenance tracking (D-08).
+
+    Records the path, type, SHA256 checksum, and size of each input file
+    consumed by a CLI command.
+    """
+
+    path: str
+    path_type: str = "relative"
+    sha256: str
+    size_bytes: int
+
+
+class ProvenanceRecord(BaseModel):
+    """Full provenance sidecar content (D-06).
+
+    Used for .provenance.json sidecar files and adata.uns embedding.
+    Separate from the minimal Provenance class used in CLIResult for
+    backwards compatibility.
+    """
+
+    command: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    inputs: list[InputFile] = Field(default_factory=list)
+    sc_tools_version: str = Field(default_factory=_get_version)
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),  # noqa: UP017
+    )
+    runtime_s: float | None = None
+    peak_memory_mb: float | None = None
+
+
 class Provenance(BaseModel):
     """Minimal provenance metadata (D-10).
 
-    Full provenance (checksums, runtime, peak memory) deferred to Phase 5.
+    Kept for backwards compatibility in CLIResult. Full provenance uses
+    ProvenanceRecord for sidecars.
     """
 
     command: str

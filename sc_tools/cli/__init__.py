@@ -13,7 +13,9 @@ No heavy imports (scanpy, torch, scvi) at module level (CLI-08).
 from __future__ import annotations
 
 import functools
+import logging
 import sys
+import time
 
 import typer
 
@@ -24,6 +26,8 @@ from sc_tools.errors import (
     SCToolsUserError,
 )
 from sc_tools.models.result import CLIResult, ErrorInfo, Provenance, Status
+
+_cli_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # App
@@ -175,14 +179,72 @@ def _make_error_result(exc: Exception, command: str) -> CLIResult:
     )
 
 
+def _write_provenance_sidecars(
+    result: CLIResult,
+    kwargs: dict,
+    input_files: list[str],
+    runtime_s: float,
+    peak_mb: float,
+) -> None:
+    """Write .provenance.json sidecars for each artifact (D-01).
+
+    Additionally embeds provenance in adata.uns for h5ad artifacts (D-04).
+    """
+    from sc_tools.provenance.sidecar import (
+        build_provenance_record,
+        embed_provenance_in_adata,
+        write_sidecar,
+    )
+
+    # Clean kwargs: remove typer internals
+    params = {k: v for k, v in kwargs.items() if not k.startswith("_")}
+
+    record = build_provenance_record(
+        command=result.command,
+        params=params,
+        input_files=input_files,
+        runtime_s=runtime_s,
+        peak_memory_mb=peak_mb,
+    )
+
+    for artifact in result.artifacts:
+        try:
+            write_sidecar(artifact, record)
+            # D-04: embed in adata.uns for h5ad artifacts
+            if str(artifact).endswith(".h5ad"):
+                embed_provenance_in_adata(artifact, record)
+        except Exception:
+            _cli_logger.warning(
+                "Failed to write provenance sidecar for %s", artifact, exc_info=True
+            )
+
+
 def cli_handler(func):  # noqa: ANN001, ANN201
     """Wrap a CLI command with error handling and JSON output."""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        start_time = time.monotonic()
         try:
             result = func(*args, **kwargs)
+
+            runtime_s = time.monotonic() - start_time
+
+            # Extract _input_files convention key before emitting (D-07)
+            input_files = result.data.pop("_input_files", [])
+
             _emit(result)
+
+            # Sidecar writing: only on success with artifacts (D-01, D-03)
+            if result.status == Status.success and result.artifacts:
+                try:
+                    from sc_tools.provenance.sidecar import get_peak_memory_mb
+
+                    peak_mb = get_peak_memory_mb()
+                    _write_provenance_sidecars(result, kwargs, input_files, runtime_s, peak_mb)
+                except Exception:
+                    _cli_logger.warning("Provenance sidecar writing failed", exc_info=True)
+
             raise SystemExit(0)
         except SystemExit:
             raise

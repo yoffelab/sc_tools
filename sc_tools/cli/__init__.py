@@ -270,3 +270,6 @@ app.add_typer(status_app, name="status")
 app.add_typer(integrate_app, name="integrate")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(celltype_app, name="celltype")
+
+from sc_tools.cli.discovery import register_discovery  # noqa: E402
+register_discovery(app)

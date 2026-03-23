@@ -326,6 +326,10 @@ def generate_integration_report(
         for c in ["method", "batch_score", "bio_score", "overall_score"]
         if c in comparison_df.columns
     ]
+    bio_unavailable = (
+        "bio_score" in comparison_df.columns
+        and (comparison_df["bio_score"] == 0.0).all()
+    )
     if len(_bb_cols) > 1:
         _bb_df = (
             comparison_df[_bb_cols]
@@ -335,21 +339,22 @@ def generate_integration_report(
             )
         )
         for col in _bb_cols[1:]:
-            _bb_df[col] = _bb_df[col].map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+            if bio_unavailable and col == "bio_score":
+                _bb_df[col] = "N/A"
+            else:
+                _bb_df[col] = _bb_df[col].map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
         context["batch_bio_table_html"] = _bb_df.to_html(
             index=False,
             classes="table table-striped table-hover table-sm",
             border=0,
-        )
+        ).replace('style="text-align: right;"', "")
     else:
         context["batch_bio_table_html"] = None
 
     _INT_SECTIONS = [
         {"id": "exec-summary", "label": "Executive Summary"},
         {"id": "batch-bio-table", "label": "Batch \u00d7 Bio Table", "key": "batch_bio_table_html"},
-        {"id": "metrics-heatmap", "label": "Metrics Heatmap"},
         {"id": "umap-grid", "label": "UMAP Comparison", "key": "umap_img"},
-        {"id": "ranking", "label": "Integration Ranking"},
         {"id": "radar", "label": "Metrics Radar", "key": "plot_radar"},
     ]
     context["sections"] = [
@@ -391,6 +396,8 @@ def generate_benchmark_report(
     title: str = "IMC Segmentation Benchmark Report",
     score_col: str | None = None,
     offline: bool = False,
+    *,
+    benchmark_params: dict | None = None,
 ) -> Path:
     """Generate a comprehensive HTML benchmark report.
 
@@ -408,6 +415,14 @@ def generate_benchmark_report(
         Where to write the HTML report.
     title
         Report title.
+    score_col
+        Column to use for ranking methods. Auto-detected if not provided.
+    offline
+        Embed Plotly JS for offline viewing.
+    benchmark_params
+        Dict of benchmark parameters (subsampling, seed, weights, etc.)
+        to render in the report header. Used by the CLI ``--report`` flag
+        to satisfy D-12 item 3 (subsampling transparency).
 
     Returns
     -------
@@ -472,6 +487,25 @@ def generate_benchmark_report(
         "best_method": best_method,
         "offline": offline,
     }
+
+    # D-12 item 3: render benchmark_params in the report header
+    if benchmark_params:
+        context["benchmark_params"] = benchmark_params
+        # Build an HTML table for the benchmark parameters section
+        params_rows = []
+        for k, v in benchmark_params.items():
+            display_val = ", ".join(str(x) for x in v) if isinstance(v, list) else str(v)
+            params_rows.append(f"<tr><td><strong>{k}</strong></td><td>{display_val}</td></tr>")
+        context["benchmark_params_html"] = (
+            '<div class="card mb-3"><div class="card-header">Benchmark Parameters</div>'
+            '<div class="card-body"><table class="table table-sm table-striped">'
+            "<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>"
+            + "\n".join(params_rows)
+            + "</tbody></table></div></div>"
+        )
+    else:
+        context["benchmark_params"] = None
+        context["benchmark_params_html"] = None
 
     # Strategy comparison plot
     try:

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-23T05:26:41.942Z"
+status: Ready to plan
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-23T06:05:28.929Z"
 progress:
   total_phases: 8
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  completed_phases: 4
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** Phase 03 — core-commands
+**Current focus:** Phase 04 — cli-discovery
 
 ## Current Position
 
-Phase: 4
+Phase: 5
 Plan: Not started
 
 ## Performance Metrics
@@ -54,6 +54,7 @@ Plan: Not started
 | Phase 03 P02 | 3min | 2 tasks | 4 files |
 | Phase 03 P03 | 3min | 2 tasks | 3 files |
 | Phase 03 P04 | 4min | 2 tasks | 3 files |
+| Phase 04 P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 03]: benchmark_params rendered as HTML table card in generate_benchmark_report context
 - [Phase 03]: qc_run uses sc_tools.qc.metrics.calculate_qc_metrics for proper mt/hb var column creation
 - [Phase 03]: E2E tests guarded by SCT_TEST_DATA_DIR and SCT_TEST_EMBEDDING_DIR env vars
+- [Phase 04]: register_discovery(app) pattern avoids circular import
+- [Phase 04]: Commands keyed by space-separated names matching CLI invocation syntax
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T05:26:41.939Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-cli-discovery/04-CONTEXT.md
+Last session: 2026-03-23T06:02:19.033Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None

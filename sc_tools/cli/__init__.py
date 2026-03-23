@@ -335,3 +335,6 @@ app.add_typer(celltype_app, name="celltype")
 
 from sc_tools.cli.discovery import register_discovery  # noqa: E402
 register_discovery(app)
+
+from sc_tools.cli.provenance import register_provenance  # noqa: E402
+register_provenance(app)

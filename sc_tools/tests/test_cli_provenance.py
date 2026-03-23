@@ -308,3 +308,119 @@ class TestSHA256Relocation:
         assert "relocated" in relocated_step["note"]
         # The main output step
         assert steps[1]["command"] == "process"
+
+
+# ---------------------------------------------------------------------------
+# CLI integration tests for sct provenance show / trace
+# ---------------------------------------------------------------------------
+
+from typer.testing import CliRunner
+
+from sc_tools.cli import app
+
+runner = CliRunner()
+
+
+class TestProvenanceShow:
+    """sct provenance show displays sidecar content."""
+
+    def test_show_returns_provenance_from_sidecar(self, tmp_path: Path) -> None:
+        f = tmp_path / "output.h5ad"
+        f.write_bytes(b"data")
+        sidecar = Path(str(f) + ".provenance.json")
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "command": "qc run",
+                    "timestamp": "2026-03-23T10:00:00Z",
+                    "params": {"min_genes": 200},
+                    "inputs": [],
+                }
+            )
+        )
+
+        result = runner.invoke(app, ["provenance", "show", str(f)])
+        assert result.exit_code == 0, f"exit={result.exit_code}, out={result.output}"
+        data = json.loads(result.output)
+        assert data["status"] == "success"
+        assert data["data"]["command"] == "qc run"
+
+    def test_show_no_provenance_returns_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "no_prov.csv"
+        f.write_text("data")
+
+        result = runner.invoke(app, ["provenance", "show", str(f)])
+        assert result.exit_code == 1
+        data = json.loads(result.output)
+        assert data["status"] == "error"
+        assert "No provenance found" in data["message"]
+
+    def test_show_uns_fallback(self, tmp_path: Path) -> None:
+        h5py = pytest.importorskip("h5py")
+
+        h5ad_path = tmp_path / "embedded.h5ad"
+        prov_data = {
+            "command": "preprocess run",
+            "timestamp": "2026-03-23T09:00:00Z",
+            "params": {},
+            "inputs": [],
+        }
+        with h5py.File(h5ad_path, "w") as f:
+            uns = f.create_group("uns")
+            uns.create_dataset("sct_provenance", data=json.dumps(prov_data))
+
+        result = runner.invoke(app, ["provenance", "show", str(h5ad_path)])
+        assert result.exit_code == 0, f"exit={result.exit_code}, out={result.output}"
+        data = json.loads(result.output)
+        assert data["data"]["command"] == "preprocess run"
+
+
+class TestProvenanceTrace:
+    """sct provenance trace returns lineage steps."""
+
+    def test_trace_returns_lineage(self, tmp_path: Path) -> None:
+        # Create a 2-step chain: A -> B
+        file_a = tmp_path / "raw.csv"
+        file_a.write_text("raw")
+
+        file_b = tmp_path / "processed.h5ad"
+        file_b.write_bytes(b"processed")
+
+        sidecar_b = Path(str(file_b) + ".provenance.json")
+        sidecar_b.write_text(
+            json.dumps(
+                {
+                    "command": "qc run",
+                    "timestamp": "2026-03-23T10:00:00Z",
+                    "params": {},
+                    "inputs": [{"path": str(file_a), "sha256": "abc", "size_bytes": 3, "path_type": "absolute"}],
+                }
+            )
+        )
+
+        result = runner.invoke(app, ["provenance", "trace", str(file_b)])
+        assert result.exit_code == 0, f"exit={result.exit_code}, out={result.output}"
+        data = json.loads(result.output)
+        assert data["status"] == "success"
+        assert data["data"]["depth"] == 2
+        lineage = data["data"]["lineage"]
+        assert len(lineage) == 2
+
+    def test_trace_with_project_dir(self, tmp_path: Path) -> None:
+        f = tmp_path / "output.csv"
+        f.write_text("data")
+
+        result = runner.invoke(
+            app, ["provenance", "trace", str(f), "--project-dir", str(tmp_path)]
+        )
+        assert result.exit_code == 0, f"exit={result.exit_code}, out={result.output}"
+        data = json.loads(result.output)
+        assert data["data"]["depth"] == 1
+
+
+class TestProvenanceInHelp:
+    """provenance command group appears in sct --help."""
+
+    def test_provenance_in_help(self) -> None:
+        result = runner.invoke(app, ["--help"])
+        assert "provenance" in result.output.lower()

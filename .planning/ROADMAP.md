@@ -110,11 +110,12 @@ Plans:
   2. After cell typing, a marker validation report (dotplot/heatmap) shows top markers per assigned type and flags types with low canonical marker expression
   3. `subject_id` is enforced as distinct from `library_id` at ingestion for multi-sample projects, and batch-condition confounding is validated at registration
   4. When `n_vars < 1000` (targeted panels), cell typing dispatch restricts to panel-validated methods and warns if a whole-transcriptome model is applied
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Subject metadata validation and panel-aware cell typing dispatch (SCI-03, SCI-04)
+- [ ] 06-02-PLAN.md — Pseudobulk DE module with PyDESeq2 and sct de run CLI command (SCI-01)
+- [ ] 06-03-PLAN.md — Marker validation report integrated into post-celltyping QC (SCI-02)
 
 ### Phase 7: Memory Safety
 **Goal**: Large datasets (2.5M cells, 25G h5ad) can be processed without OOM through tiered loading, pre-execution estimation, and dry-run validation
@@ -157,6 +158,6 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Planning complete | - |
 | 5. Provenance | 1/2 | In Progress|  |
-| 6. Scientific Gaps | 0/2 | Not started | - |
+| 6. Scientific Gaps | 0/3 | Planning complete | - |
 | 7. Memory Safety | 0/2 | Not started | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

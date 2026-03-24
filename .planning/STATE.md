@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-24T14:29:08.503Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-24T14:38:27.836Z"
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 ## Current Position
 
 Phase: 06 (scientific-gaps) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Plan: 2 of 3
 | Phase 05 P01 | 12min | 2 tasks | 8 files |
 | Phase 05 P02 | 7min | 2 tasks | 4 files |
 | Phase 06 P01 | 7min | 2 tasks | 6 files |
+| Phase 06 P02 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - [Phase 06]: validate_subject_metadata returns warning list (never raises) per D-08/D-09 warn-dont-block
 - [Phase 06]: Panel detection uses adata.raw.n_vars when available to avoid HVG false positives
 - [Phase 06]: panel_dispatch stored in adata.uns as canonical provenance record for CLIResult bridging
+- [Phase 06]: Raw count extraction priority: layers[layer] > layers['counts'] > raw.X > X
+- [Phase 06]: Collinear batch covariates (1:1 with subject_id) excluded from auto-formula to prevent rank-deficient design
+- [Phase 06]: PyDESeq2 per-celltype failures logged and skipped (not fatal to pipeline)
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T14:29:08.500Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-03-24T14:38:27.833Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None

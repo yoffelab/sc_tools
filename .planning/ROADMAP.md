@@ -114,7 +114,7 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md — Subject metadata validation and panel-aware cell typing dispatch (SCI-03, SCI-04)
-- [ ] 06-02-PLAN.md — Pseudobulk DE module with PyDESeq2 and sct de run CLI command (SCI-01)
+- [x] 06-02-PLAN.md — Pseudobulk DE module with PyDESeq2 and sct de run CLI command (SCI-01)
 - [ ] 06-03-PLAN.md — Marker validation report integrated into post-celltyping QC (SCI-02)
 
 ### Phase 7: Memory Safety

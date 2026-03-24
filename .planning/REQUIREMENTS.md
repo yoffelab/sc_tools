@@ -55,7 +55,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Scientific Gaps
 
-- [ ] **SCI-01**: Pseudobulk DE module (`sc_tools.tl.de`) — aggregate counts by subject_id + celltype, run PyDESeq2 with batch covariates in design formula
+- [x] **SCI-01**: Pseudobulk DE module (`sc_tools.tl.de`) — aggregate counts by subject_id + celltype, run PyDESeq2 with batch covariates in design formula
 - [ ] **SCI-02**: Marker validation report — after cell typing, compute top N marker genes per assigned type, generate dotplot, flag types with low canonical marker expression
 - [x] **SCI-03**: Subject-level metadata model — `subject_id` distinct from `library_id`, enforced at ingestion for multi-sample projects. Validate batch-condition confounding at registration
 - [x] **SCI-04**: Panel-aware cell typing dispatch — when `n_vars < 1000` (targeted panels), restrict to panel-validated methods and warn if whole-transcriptome model is applied
@@ -152,7 +152,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PRV-03 | Phase 5 | Complete |
 | PRV-04 | Phase 5 | Complete |
 | PRV-05 | Phase 5 | Complete |
-| SCI-01 | Phase 6 | Pending |
+| SCI-01 | Phase 6 | Complete |
 | SCI-02 | Phase 6 | Pending |
 | SCI-03 | Phase 6 | Complete |
 | SCI-04 | Phase 6 | Complete |

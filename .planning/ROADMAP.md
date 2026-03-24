@@ -158,6 +158,6 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Planning complete | - |
 | 5. Provenance | 1/2 | In Progress|  |
-| 6. Scientific Gaps | 1/3 | In Progress|  |
+| 6. Scientific Gaps | 2/3 | In Progress|  |
 | 7. Memory Safety | 0/2 | Not started | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

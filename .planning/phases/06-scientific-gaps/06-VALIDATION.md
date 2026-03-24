@@ -19,8 +19,8 @@ created: 2026-03-24
 |----------|-------|
 | **Framework** | pytest 7.x |
 | **Config file** | pyproject.toml `[tool.pytest]` |
-| **Quick run command** | `python -m pytest sc_tools/tests/test_de.py sc_tools/tests/test_subject_metadata.py sc_tools/tests/test_panel_celltype.py -x -q` |
-| **Full suite command** | `python -m pytest sc_tools/tests/test_de.py sc_tools/tests/test_subject_metadata.py sc_tools/tests/test_panel_celltype.py sc_tools/tests/test_marker_report.py -v` |
+| **Quick run command** | `python -m pytest sc_tools/tests/test_subject_metadata.py sc_tools/tests/test_panel_dispatch.py sc_tools/tests/test_de.py -x -q` |
+| **Full suite command** | `python -m pytest sc_tools/tests/test_subject_metadata.py sc_tools/tests/test_panel_dispatch.py sc_tools/tests/test_de.py sc_tools/tests/test_marker_validation.py -v` |
 | **Estimated runtime** | ~15 seconds |
 
 ---
@@ -38,22 +38,23 @@ created: 2026-03-24
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 06-01-01 | 01 | 1 | SCI-01 | unit | `pytest sc_tools/tests/test_de.py -x` | ❌ W0 | ⬜ pending |
-| 06-01-02 | 01 | 1 | SCI-01 | unit | `pytest sc_tools/tests/test_de.py -x` | ❌ W0 | ⬜ pending |
-| 06-02-01 | 02 | 2 | SCI-03 | unit | `pytest sc_tools/tests/test_subject_metadata.py -x` | ❌ W0 | ⬜ pending |
-| 06-02-02 | 02 | 2 | SCI-04 | unit | `pytest sc_tools/tests/test_panel_celltype.py -x` | ❌ W0 | ⬜ pending |
-| 06-02-03 | 02 | 2 | SCI-02 | unit | `pytest sc_tools/tests/test_marker_report.py -x` | ❌ W0 | ⬜ pending |
+| 06-01-01 | 01 | 1 | SCI-03 | unit | `pytest sc_tools/tests/test_subject_metadata.py -x` | W0 | pending |
+| 06-01-02 | 01 | 1 | SCI-04 | unit | `pytest sc_tools/tests/test_panel_dispatch.py -x` | W0 | pending |
+| 06-02-01 | 02 | 2 | SCI-01 | unit | `pytest sc_tools/tests/test_de.py -x` | W0 | pending |
+| 06-02-02 | 02 | 2 | SCI-01 | unit | `pytest sc_tools/tests/test_de.py -x` | W0 | pending |
+| 06-03-01 | 03 | 2 | SCI-02 | unit | `pytest sc_tools/tests/test_marker_validation.py -x` | W0 | pending |
+| 06-03-02 | 03 | 2 | SCI-02 | unit | `pytest sc_tools/tests/test_marker_validation.py -x` | W0 | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending / green / red / flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `sc_tools/tests/test_de.py` — test stubs for pseudobulk DE aggregation, PyDESeq2 wrapper, CLI command
 - [ ] `sc_tools/tests/test_subject_metadata.py` — test stubs for subject_id validation, confounding checks
-- [ ] `sc_tools/tests/test_panel_celltype.py` — test stubs for panel detection, method restriction
-- [ ] `sc_tools/tests/test_marker_report.py` — test stubs for marker validation report generation
+- [ ] `sc_tools/tests/test_panel_dispatch.py` — test stubs for panel detection, method restriction
+- [ ] `sc_tools/tests/test_de.py` — test stubs for pseudobulk DE aggregation, PyDESeq2 wrapper, CLI command
+- [ ] `sc_tools/tests/test_marker_validation.py` — test stubs for marker validation compute and report integration
 
 ---
 

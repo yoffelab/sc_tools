@@ -1,0 +1,46 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/rapidsai/base:25.12-cuda13-py3.12
+
+%labels
+    Maintainer Junbum Kim
+    Description sc_tools GPU-accelerated
+
+%files
+    /athena/elementolab/scratch/juk4007/projects/visium_hd/robin/sc_tools_src/pyproject.toml /opt/sc_tools/pyproject.toml
+    /athena/elementolab/scratch/juk4007/projects/visium_hd/robin/sc_tools_src/README.md /opt/sc_tools/README.md
+    /athena/elementolab/scratch/juk4007/projects/visium_hd/robin/sc_tools_src/sc_tools /opt/sc_tools/sc_tools
+
+%post
+    # System deps (RAPIDS image is Ubuntu-based)
+    apt-get update
+    apt-get install -y build-essential gfortran libhdf5-dev git curl ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    # Install uv (fast pip)
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="/root/.local/bin:$PATH"
+
+    # Verify compiler
+    which g++ && g++ --version
+
+    cd /opt/sc_tools
+
+    # PyTorch with CUDA 13.0 (matching RAPIDS 25.12 CUDA 13 + host driver 580/CUDA 13.0)
+    uv pip install --python /opt/conda/bin/python \
+        torch --index-url https://download.pytorch.org/whl/cu130
+
+    # rapids-singlecell: GPU-accelerated scanpy drop-in
+    uv pip install --python /opt/conda/bin/python rapids-singlecell
+
+    # sc_tools with full pipeline deps (bbknn needs annoy -> g++)
+    uv pip install --python /opt/conda/bin/python -e ".[pipeline]"
+
+    # Verify
+    /opt/conda/bin/python -c "import sc_tools; print('sc_tools OK')"
+    /opt/conda/bin/python -c "import rapids_singlecell; print('rapids_singlecell OK')" || echo "needs GPU runtime"
+
+%environment
+    export PATH="/opt/conda/bin:$PATH"
+
+%runscript
+    exec python "$@"

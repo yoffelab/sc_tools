@@ -75,10 +75,10 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] Subject-level metadata model (`subject_id` distinct from `library_id`, enforced at ingestion for multi-sample projects)
 - [x] Panel-aware cell typing dispatch (restrict methods when `n_vars < 1000`)
 
-**Memory safety (Phase 7):**
-- [ ] IO Gateway with tiered loading strategy (h5py for metadata, backed for summaries, full for compute)
-- [ ] `sct estimate <command>` — pre-execution memory/time estimation
-- [ ] Dry-run mode for all data-touching commands
+**Memory safety (Phase 7) — Validated 2026-03-24:**
+- [x] IO Gateway with tiered loading strategy (h5py for metadata, backed for summaries, full for compute)
+- [x] `sct estimate <command>` — pre-execution memory/time estimation
+- [x] Dry-run mode for all data-touching commands
 
 **Multi-omic assembly (Phase 8):**
 - [ ] Patient/subject metadata join across modalities

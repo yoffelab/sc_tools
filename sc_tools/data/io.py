@@ -155,19 +155,14 @@ def _coerce_arrow_strings(adata) -> None:
     for df in [adata.obs, adata.var]:
         for col in df.columns:
             if isinstance(df[col].dtype, pd.CategoricalDtype):
-                # Categories may themselves be Arrow-backed
-                cats = df[col].cat.categories
-                if hasattr(cats, "dtype") and "arrow" in str(cats.dtype).lower():
-                    df[col] = df[col].astype(str).astype("category")
-            elif pd.api.types.is_string_dtype(df[col]):
-                dtype_str = str(df[col].dtype).lower()
-                if "arrow" in dtype_str or "string" in dtype_str:
-                    df[col] = df[col].astype(object)
-        # Index can also be Arrow-backed
-        if hasattr(df.index, "dtype"):
-            idx_dtype = str(df.index.dtype).lower()
-            if "arrow" in idx_dtype or "string" in idx_dtype:
-                df.index = df.index.astype(object)
+                # Rebuild categories — they may be Arrow-backed underneath
+                df[col] = df[col].astype(str).astype("category")
+            elif pd.api.types.is_string_dtype(df[col]) and str(df[col].dtype) != "object":
+                # Any non-object string dtype (StringDtype, ArrowStringArray, etc.)
+                df[col] = df[col].astype(object)
+        # Index can also be non-object string dtype
+        if pd.api.types.is_string_dtype(df.index) and str(df.index.dtype) != "object":
+            df.index = df.index.astype(object)
 
 
 def write_h5ad(

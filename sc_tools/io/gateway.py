@@ -13,7 +13,7 @@ import logging
 from enum import Enum
 from pathlib import Path
 
-from sc_tools.io.errors import SCToolsRuntimeError
+from sc_tools.errors import SCToolsRuntimeError
 from sc_tools.io.estimate import estimate_from_h5
 from sc_tools.io.metadata import read_h5ad_metadata
 

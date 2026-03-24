@@ -121,7 +121,7 @@ class TestIOGateway:
         assert not result.isbacked
 
     def test_memory_guard_blocks(self, tmp_dense_h5ad):
-        from sc_tools.io.errors import SCToolsRuntimeError
+        from sc_tools.errors import SCToolsRuntimeError
         from sc_tools.io.gateway import DataTier, IOGateway
 
         # Mock estimate to return a large value, and psutil to return small available

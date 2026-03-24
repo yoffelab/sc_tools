@@ -69,11 +69,11 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 - [x] `sct provenance show <file>` and `sct provenance trace <file>` for lineage queries
 - [x] Reproducible Leiden resolution (configurable, with random_state propagation)
 
-**Scientific gaps (Phase 6):**
-- [ ] Pseudobulk DE module (`sc_tools.tl.de`) wrapping PyDESeq2 with automatic aggregation by subject_id + celltype
-- [ ] Marker validation report after cell typing (dotplot/heatmap of canonical markers per assigned type)
-- [ ] Subject-level metadata model (`subject_id` distinct from `library_id`, enforced at ingestion for multi-sample projects)
-- [ ] Panel-aware cell typing dispatch (restrict methods when `n_vars < 1000`)
+**Scientific gaps (Phase 6) — Validated 2026-03-24:**
+- [x] Pseudobulk DE module (`sc_tools.tl.de`) wrapping PyDESeq2 with automatic aggregation by subject_id + celltype
+- [x] Marker validation report after cell typing (dotplot/heatmap of canonical markers per assigned type)
+- [x] Subject-level metadata model (`subject_id` distinct from `library_id`, enforced at ingestion for multi-sample projects)
+- [x] Panel-aware cell typing dispatch (restrict methods when `n_vars < 1000`)
 
 **Memory safety (Phase 7):**
 - [ ] IO Gateway with tiered loading strategy (h5py for metadata, backed for summaries, full for compute)
@@ -150,4 +150,4 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
 
 ---
-*Last updated: 2026-03-23 — Phase 5 (provenance) complete*
+*Last updated: 2026-03-24 — Phase 6 (scientific gaps) complete*

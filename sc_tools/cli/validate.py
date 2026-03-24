@@ -20,6 +20,7 @@ def validate_run(
     file: str = typer.Argument(..., help="Path to .h5ad checkpoint file"),
     fix: bool = typer.Option(False, "--fix", help="Attempt auto-fixes"),
     project_dir: str = typer.Option(".", "--project-dir", help="Project directory (per D-03)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs and report plan without executing"),
 ) -> None:
     """Validate a checkpoint file against phase requirements."""
     from sc_tools.cli import _check_deps, _emit
@@ -30,11 +31,31 @@ def validate_run(
 
     from pathlib import Path
 
-    from sc_tools.validate import validate_file
-
     path = Path(file)
     if not path.exists():
         raise SCToolsUserError(f"File not found: {path}", suggestion="Check the file path and try again")
+
+    if dry_run:
+        # Dry-run: validate file exists, read T1 metadata, return early
+        dry_data: dict = {"planned_command": "validate_run", "tier": "metadata", "phase": phase, "file": str(path)}
+        try:
+            from sc_tools.io.estimate import estimate_from_h5
+
+            est = estimate_from_h5(str(path))
+            dry_data["estimate"] = est
+        except Exception:
+            dry_data["estimate"] = None
+        result = CLIResult(
+            status=Status.skipped,
+            command=f"validate {phase}",
+            data=dry_data,
+            provenance=Provenance(command=f"validate {phase}"),
+            message="Dry run -- no data modified",
+        )
+        _emit(result)
+        raise SystemExit(0)
+
+    from sc_tools.validate import validate_file
 
     try:
         issues = validate_file(str(path), phase=phase, strict=False, fix=fix)

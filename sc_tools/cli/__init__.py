@@ -236,44 +236,44 @@ def cli_handler(func=None, *, tier=None):  # noqa: ANN001, ANN201
             force = kwargs.pop("force", False)  # noqa: F841 -- stored for future gateway use
             start_time = time.monotonic()
 
-            if dry_run:
-                # Build dry-run result without executing the command
-                from pathlib import Path
-
-                file_arg = (
-                    kwargs.get("file")
-                    or kwargs.get("input_file")
-                    or kwargs.get("from_dir")
-                )
-                tier_label = tier.value if tier else "full"
-                dry_data: dict = {"planned_command": fn.__name__, "tier": tier_label}
-
-                if file_arg and Path(str(file_arg)).exists():
-                    try:
-                        from sc_tools.io.estimate import estimate_from_h5
-
-                        est = estimate_from_h5(str(file_arg))
-                        dry_data["estimate"] = est
-                    except Exception:
-                        dry_data["estimate"] = None
-                elif file_arg:
-                    raise SCToolsUserError(
-                        f"Input file not found: {file_arg}",
-                        suggestion="Check the file path",
-                    )
-
-                result = CLIResult(
-                    status=Status.skipped,
-                    command=fn.__name__,
-                    data=dry_data,
-                    provenance=Provenance(command=fn.__name__),
-                    message="Dry run -- no data modified",
-                )
-                _emit(result)
-                raise SystemExit(0)
-
             try:
-                result = func(*args, **kwargs) if func is not None else fn(*args, **kwargs)
+                if dry_run:
+                    # Build dry-run result without executing the command
+                    from pathlib import Path
+
+                    file_arg = (
+                        kwargs.get("file")
+                        or kwargs.get("input_file")
+                        or kwargs.get("from_dir")
+                    )
+                    tier_label = tier.value if tier else "full"
+                    dry_data: dict = {"planned_command": fn.__name__, "tier": tier_label}
+
+                    if file_arg and Path(str(file_arg)).exists():
+                        try:
+                            from sc_tools.io.estimate import estimate_from_h5
+
+                            est = estimate_from_h5(str(file_arg))
+                            dry_data["estimate"] = est
+                        except Exception:
+                            dry_data["estimate"] = None
+                    elif file_arg:
+                        raise SCToolsUserError(
+                            f"Input file not found: {file_arg}",
+                            suggestion="Check the file path",
+                        )
+
+                    result = CLIResult(
+                        status=Status.skipped,
+                        command=fn.__name__,
+                        data=dry_data,
+                        provenance=Provenance(command=fn.__name__),
+                        message="Dry run -- no data modified",
+                    )
+                    _emit(result)
+                    raise SystemExit(0)
+
+                result = fn(*args, **kwargs)
 
                 runtime_s = time.monotonic() - start_time
 

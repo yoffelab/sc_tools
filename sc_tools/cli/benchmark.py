@@ -5,7 +5,8 @@ import logging
 
 import typer
 
-from sc_tools.cli import cli_handler, _check_deps
+from sc_tools.cli import _check_deps, cli_handler
+from sc_tools.io.gateway import DataTier
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def benchmark_callback(ctx: typer.Context) -> None:
 
 
 @benchmark_app.command("integration")
-@cli_handler
+@cli_handler(tier=DataTier.T2_SUMMARY)
 def benchmark_integration(
     from_dir: str = typer.Option(..., "--from-dir", help="Directory with per-method h5ad embedding files"),
     project_dir: str = typer.Option(".", "--project-dir", help="Project directory (per D-03)"),
@@ -33,6 +34,8 @@ def benchmark_integration(
     bio_weight: float = typer.Option(0.6, "--bio-weight", help="Weight for bio conservation score"),
     resolution: float = typer.Option(1.0, "--resolution", help="Leiden resolution for ARI/NMI"),
     generate_report: bool = typer.Option(False, "--report", help="Generate HTML benchmark report (D-12)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs and report plan without executing"),
+    force: bool = typer.Option(False, "--force", help="Override memory guard for large files"),
 ):  # returns CLIResult
     """Compare integration methods from pre-computed h5ad embeddings (CMD-04, D-07, D-12, D-13).
 

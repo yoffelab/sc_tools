@@ -10,6 +10,7 @@ import logging
 import typer
 
 from sc_tools.cli import _check_deps, cli_handler
+from sc_tools.io.gateway import DataTier
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def de_callback(ctx: typer.Context) -> None:
 
 
 @de_app.command("run")
-@cli_handler
+@cli_handler(tier=DataTier.T3_FULL)
 def de_run(
     file: str = typer.Argument(..., help="Path to cell-typed h5ad"),
     condition: str = typer.Option(..., "--condition", "-c", help="Condition column in obs"),
@@ -36,6 +37,8 @@ def de_run(
     min_subjects: int = typer.Option(3, "--min-subjects", help="Min subjects per condition group"),
     min_cells: int = typer.Option(10, "--min-cells", help="Min cells per subject+celltype"),
     layer: str = typer.Option(None, "--layer", help="Count layer name override"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs and report plan without executing"),
+    force: bool = typer.Option(False, "--force", help="Override memory guard for large files"),
 ) -> None:
     """Run pseudobulk differential expression per celltype (SCI-01).
 

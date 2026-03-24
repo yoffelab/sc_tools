@@ -5,7 +5,8 @@ import logging
 
 import typer
 
-from sc_tools.cli import cli_handler, _check_deps
+from sc_tools.cli import _check_deps, cli_handler
+from sc_tools.io.gateway import DataTier
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ def _detect_modality(adata) -> str:
 
 
 @preprocess_app.command("run")
-@cli_handler
+@cli_handler(tier=DataTier.T3_FULL)
 def preprocess_run(
     file: str = typer.Argument(..., help="Path to input h5ad file (raw counts)"),
     project_dir: str = typer.Option(".", "--project-dir", help="Project directory (per D-03)"),
@@ -60,6 +61,8 @@ def preprocess_run(
     n_top_genes: int = typer.Option(2000, "--n-top-genes", help="Number of HVGs"),
     resolution: float = typer.Option(0.8, "--resolution", help="Leiden clustering resolution"),
     use_gpu: str = typer.Option("auto", "--use-gpu", help="GPU usage: auto, true, false"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs and report plan without executing"),
+    force: bool = typer.Option(False, "--force", help="Override memory guard for large files"),
 ):  # returns CLIResult
     """Run modality-aware preprocessing on an h5ad file (CMD-02, D-06, D-08, D-13)."""
     from sc_tools.models.result import CLIResult, Provenance, Status

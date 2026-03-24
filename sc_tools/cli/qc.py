@@ -7,6 +7,7 @@ import logging
 import typer
 
 from sc_tools.cli import _check_deps, cli_handler
+from sc_tools.io.gateway import DataTier
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,14 @@ def qc_callback(ctx: typer.Context) -> None:
 
 
 @qc_app.command("run")
-@cli_handler
+@cli_handler(tier=DataTier.T3_FULL)
 def qc_run(
     file: str = typer.Argument(..., help="Path to h5ad checkpoint file"),
     project_dir: str = typer.Option(".", "--project-dir", help="Project directory"),
     modality: str = typer.Option("visium", "--modality", "-m", help="Data modality (visium, visium_hd, xenium, cosmx, imc)"),
     sample_col: str = typer.Option("library_id", "--sample-col", help="Sample column in obs"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs and report plan without executing"),
+    force: bool = typer.Option(False, "--force", help="Override memory guard for large files"),
 ) -> None:
     """Run QC metrics on a checkpoint file, output JSON summary (CMD-01)."""
     from sc_tools.models.result import CLIResult, Provenance, Status

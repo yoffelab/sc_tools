@@ -125,11 +125,11 @@ Plans:
   1. IO Gateway loads metadata via h5py, summaries via backed mode, and full data only for compute -- peak memory for metadata queries on 25G files stays under 1GB
   2. `sct estimate <command> <args>` returns projected peak memory and runtime based on cell/gene count and method before execution starts
   3. `--dry-run` on any data-touching command validates inputs, reports planned operations, and exits without modifying data
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — IO Gateway module with tiered loading (T1/T2/T3), memory guard, and pre-load estimation (MEM-01, MEM-02)
+- [ ] 07-02-PLAN.md — sct estimate command, --dry-run/--force flags on all data commands, tier-aware cli_handler (MEM-02, MEM-03)
 
 ### Phase 8: Multi-Omic Assembly
 **Goal**: Independently processed modalities (scRNA, IMC, Visium, Xenium) can be assembled into a unified MuData object for cross-modal patient-level analysis
@@ -159,5 +159,5 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 4. CLI Discovery | 0/1 | Planning complete | - |
 | 5. Provenance | 1/2 | In Progress|  |
 | 6. Scientific Gaps | 2/3 | In Progress|  |
-| 7. Memory Safety | 0/2 | Not started | - |
+| 7. Memory Safety | 0/2 | Planning complete | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

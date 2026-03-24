@@ -220,60 +220,112 @@ def _write_provenance_sidecars(
             )
 
 
-def cli_handler(func):  # noqa: ANN001, ANN201
-    """Wrap a CLI command with error handling and JSON output."""
+def cli_handler(func=None, *, tier=None):  # noqa: ANN001, ANN201
+    """Wrap a CLI command with error handling, JSON output, and dry-run support.
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
-        start_time = time.monotonic()
-        try:
-            result = func(*args, **kwargs)
+    Can be used as ``@cli_handler`` (no args) or ``@cli_handler(tier=DataTier.T3_FULL)``.
+    When ``dry_run=True`` is passed as a kwarg, the wrapper validates inputs,
+    reports planned operations and memory estimate, then exits 0 with
+    ``status=skipped`` without executing the wrapped function.
+    """
 
-            runtime_s = time.monotonic() - start_time
+    def decorator(fn):  # noqa: ANN001, ANN202
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+            dry_run = kwargs.pop("dry_run", False)
+            force = kwargs.pop("force", False)  # noqa: F841 -- stored for future gateway use
+            start_time = time.monotonic()
 
-            # Extract _input_files convention key before emitting (D-07)
-            input_files = result.data.pop("_input_files", [])
+            if dry_run:
+                # Build dry-run result without executing the command
+                from pathlib import Path
 
-            _emit(result)
+                file_arg = (
+                    kwargs.get("file")
+                    or kwargs.get("input_file")
+                    or kwargs.get("from_dir")
+                )
+                tier_label = tier.value if tier else "full"
+                dry_data: dict = {"planned_command": fn.__name__, "tier": tier_label}
 
-            # Sidecar writing: only on success with artifacts (D-01, D-03)
-            if result.status == Status.success and result.artifacts:
-                try:
-                    from sc_tools.provenance.sidecar import get_peak_memory_mb
+                if file_arg and Path(str(file_arg)).exists():
+                    try:
+                        from sc_tools.io.estimate import estimate_from_h5
 
-                    peak_mb = get_peak_memory_mb()
-                    _write_provenance_sidecars(result, kwargs, input_files, runtime_s, peak_mb)
-                except Exception:
-                    _cli_logger.warning("Provenance sidecar writing failed", exc_info=True)
+                        est = estimate_from_h5(str(file_arg))
+                        dry_data["estimate"] = est
+                    except Exception:
+                        dry_data["estimate"] = None
+                elif file_arg:
+                    raise SCToolsUserError(
+                        f"Input file not found: {file_arg}",
+                        suggestion="Check the file path",
+                    )
 
-            raise SystemExit(0)
-        except SystemExit:
-            raise
-        except SCToolsUserError as e:
-            _emit(_make_error_result(e, func.__name__))
-            raise SystemExit(1)
-        except SCToolsDataError as e:
-            _emit(_make_error_result(e, func.__name__))
-            raise SystemExit(2)
-        except SCToolsRuntimeError as e:
-            _emit(_make_error_result(e, func.__name__))
-            raise SystemExit(3)
-        except MemoryError:
-            err = SCToolsRuntimeError(
-                "Out of memory",
-                suggestion="Retry with --subsample-n or reduce dataset size",
-            )
-            _emit(_make_error_result(err, func.__name__))
-            raise SystemExit(3)
-        except Exception as e:
-            err = SCToolsFatalError(
-                str(e),
-                suggestion="This is an unexpected error. Please report it.",
-            )
-            _emit(_make_error_result(err, func.__name__))
-            raise SystemExit(3)
+                result = CLIResult(
+                    status=Status.skipped,
+                    command=fn.__name__,
+                    data=dry_data,
+                    provenance=Provenance(command=fn.__name__),
+                    message="Dry run -- no data modified",
+                )
+                _emit(result)
+                raise SystemExit(0)
 
-    return wrapper
+            try:
+                result = func(*args, **kwargs) if func is not None else fn(*args, **kwargs)
+
+                runtime_s = time.monotonic() - start_time
+
+                # Extract _input_files convention key before emitting (D-07)
+                input_files = result.data.pop("_input_files", [])
+
+                _emit(result)
+
+                # Sidecar writing: only on success with artifacts (D-01, D-03)
+                if result.status == Status.success and result.artifacts:
+                    try:
+                        from sc_tools.provenance.sidecar import get_peak_memory_mb
+
+                        peak_mb = get_peak_memory_mb()
+                        _write_provenance_sidecars(result, kwargs, input_files, runtime_s, peak_mb)
+                    except Exception:
+                        _cli_logger.warning("Provenance sidecar writing failed", exc_info=True)
+
+                raise SystemExit(0)
+            except SystemExit:
+                raise
+            except SCToolsUserError as e:
+                _emit(_make_error_result(e, fn.__name__))
+                raise SystemExit(1)
+            except SCToolsDataError as e:
+                _emit(_make_error_result(e, fn.__name__))
+                raise SystemExit(2)
+            except SCToolsRuntimeError as e:
+                _emit(_make_error_result(e, fn.__name__))
+                raise SystemExit(3)
+            except MemoryError:
+                err = SCToolsRuntimeError(
+                    "Out of memory",
+                    suggestion="Retry with --subsample-n or reduce dataset size",
+                )
+                _emit(_make_error_result(err, fn.__name__))
+                raise SystemExit(3)
+            except Exception as e:
+                err = SCToolsFatalError(
+                    str(e),
+                    suggestion="This is an unexpected error. Please report it.",
+                )
+                _emit(_make_error_result(err, fn.__name__))
+                raise SystemExit(3)
+
+        return wrapper
+
+    if func is not None:
+        # Called as @cli_handler (no parentheses)
+        return decorator(func)
+    # Called as @cli_handler(tier=...) -- return the decorator
+    return decorator
 
 
 # ---------------------------------------------------------------------------
@@ -341,3 +393,6 @@ register_discovery(app)
 
 from sc_tools.cli.provenance import register_provenance  # noqa: E402
 register_provenance(app)
+
+from sc_tools.cli.estimate import register_estimate  # noqa: E402
+register_estimate(app)

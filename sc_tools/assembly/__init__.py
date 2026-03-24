@@ -16,6 +16,8 @@ __all__ = [
     "join_subject_metadata",
     "celltype_proportions",
     "aggregate_by_level",
+    "get_embedding_backend",
+    "list_embedding_methods",
 ]
 
 
@@ -41,4 +43,12 @@ def __getattr__(name: str):
         from sc_tools.assembly._query import aggregate_by_level
 
         return aggregate_by_level
+    if name == "get_embedding_backend":
+        from sc_tools.assembly.embed._base import get_embedding_backend
+
+        return get_embedding_backend
+    if name == "list_embedding_methods":
+        from sc_tools.assembly.embed._base import list_embedding_methods
+
+        return list_embedding_methods
     raise AttributeError(f"module 'sc_tools.assembly' has no attribute {name!r}")

@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -153,6 +154,35 @@ class MultiOmicAtlas:
         result = md.MuData(subsets)
         result.update()
         return result
+
+    def embed(
+        self,
+        *,
+        method: str = "mofa",
+        n_factors: int = 15,
+        **kwargs,
+    ) -> np.ndarray:
+        """Run joint embedding on the atlas.
+
+        Parameters
+        ----------
+        method
+            Embedding method name (mofa, multivi, totalvi).
+        n_factors
+            Number of latent factors/dimensions.
+        **kwargs
+            Additional arguments passed to the backend.
+
+        Returns
+        -------
+        np.ndarray
+            Embedding array of shape (n_cells, n_factors).
+        """
+        from sc_tools.assembly.embed._base import get_embedding_backend
+
+        backend = get_embedding_backend(method)
+        embedding, _meta = backend.run(self.mdata, n_factors=n_factors, **kwargs)
+        return embedding
 
     def celltype_proportions(
         self,

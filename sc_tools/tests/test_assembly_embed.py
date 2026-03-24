@@ -97,13 +97,10 @@ class TestEmbeddingRegistry:
 class TestMofaEmbedding:
     """Test MOFA+ embedding backend integration."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("muon", reason="muon not installed"),
-        reason="muon not installed",
-    )
     def test_mofa_embedding(self, atlas_mdata):
         """MofaBackend.run produces obsm['X_mofa'] with correct shape."""
-        mu = pytest.importorskip("muon")
+        pytest.importorskip("muon")
+        pytest.importorskip("mofapy2")
         from sc_tools.assembly.embed._mofa import MofaBackend
 
         n_factors = 5
@@ -140,13 +137,10 @@ class TestModalityValidation:
 class TestAtlasEmbed:
     """Test MultiOmicAtlas.embed method."""
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("muon", reason="muon not installed"),
-        reason="muon not installed",
-    )
     def test_atlas_embed_method(self, multi_omic_adatas):
         """atlas.embed(method='mofa') stores embedding in mdata.obsm."""
-        mu = pytest.importorskip("muon")
+        pytest.importorskip("muon")
+        pytest.importorskip("mofapy2")
         from sc_tools.assembly._atlas import MultiOmicAtlas
 
         atlas = MultiOmicAtlas.from_modalities(multi_omic_adatas)

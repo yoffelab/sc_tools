@@ -140,11 +140,11 @@ Plans:
   2. MuData assembly combines independently processed per-modality AnnData objects into a single MuData with shared obs
   3. Joint embedding via MOFA+, multiVI, or totalVI produces a shared latent space across modalities
   4. Cross-modal queries work at patient/project level (e.g., cell type proportions for a patient across all modalities)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 08-01-PLAN.md — Assembly module core: MultiOmicAtlas, metadata join, MuData build, cross-modal queries (MOM-01, MOM-02, MOM-04)
+- [ ] 08-02-PLAN.md — Joint embedding backends (MOFA+, MultiVI, TotalVI) and sct assemble CLI commands (MOM-03, MOM-04)
 
 ## Progress
 
@@ -160,4 +160,4 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 5. Provenance | 1/2 | In Progress|  |
 | 6. Scientific Gaps | 2/3 | In Progress|  |
 | 7. Memory Safety | 0/2 | Planning complete | - |
-| 8. Multi-Omic Assembly | 0/2 | Not started | - |
+| 8. Multi-Omic Assembly | 0/2 | Planning complete | - |

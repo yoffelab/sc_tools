@@ -11,6 +11,8 @@ import pickle
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 
@@ -131,6 +133,43 @@ def save_cached_signatures(
         log.warning(f"   ⚠️  Failed to save cache: {e}")
 
 
+def _coerce_arrow_strings(adata) -> None:
+    """Convert Arrow-backed string columns/index to plain Python types.
+
+    Newer pandas (2.x) + pyarrow produce ``ArrowStringArray`` from parquet/CSV
+    reads and h5ad round-trips.  The ``h5py`` backend used by
+    ``anndata.write_h5ad`` cannot serialize these, raising::
+
+        IORegistryError: No method registered for writing
+        <class 'pandas.arrays.ArrowStringArray'> into <class 'h5py._hl.group.Group'>
+
+    This has bitten us repeatedly (run_qc_report, run_preprocessing,
+    run_integration_benchmark, robin/robin_utils, robin/bin_categorization,
+    robin/run_signature_scoring_v2).  Centralising the fix here means every
+    caller of ``write_h5ad`` is protected automatically.
+
+    See Also
+    --------
+    Known error doc: sc_tools/docs/known-errors/arrow-string-h5ad.md
+    """
+    for df in [adata.obs, adata.var]:
+        for col in df.columns:
+            if isinstance(df[col].dtype, pd.CategoricalDtype):
+                # Categories may themselves be Arrow-backed
+                cats = df[col].cat.categories
+                if hasattr(cats, "dtype") and "arrow" in str(cats.dtype).lower():
+                    df[col] = df[col].astype(str).astype("category")
+            elif pd.api.types.is_string_dtype(df[col]):
+                dtype_str = str(df[col].dtype).lower()
+                if "arrow" in dtype_str or "string" in dtype_str:
+                    df[col] = df[col].astype(object)
+        # Index can also be Arrow-backed
+        if hasattr(df.index, "dtype"):
+            idx_dtype = str(df.index.dtype).lower()
+            if "arrow" in idx_dtype or "string" in idx_dtype:
+                df.index = df.index.astype(object)
+
+
 def write_h5ad(
     adata,
     basename: str,
@@ -140,6 +179,9 @@ def write_h5ad(
 ) -> Path:
     """
     Save AnnData to h5ad. By default uses versioned filenames for traceability.
+
+    Automatically coerces Arrow-backed string columns to plain Python types
+    before writing, preventing ``IORegistryError`` on HPC anndata installs.
 
     When versioned=True (default): saves to output_dir/YYDDMM.hh.mm.basename.h5ad.
     When versioned=False: saves to output_dir/basename.h5ad (adds .h5ad if missing).
@@ -169,6 +211,7 @@ def write_h5ad(
     else:
         name = basename if basename.endswith(".h5ad") else f"{basename}.h5ad"
         out_path = output_dir / name
+    _coerce_arrow_strings(adata)
     adata.write_h5ad(out_path)
     logger.info(f"Saved h5ad: {out_path}")
     return out_path

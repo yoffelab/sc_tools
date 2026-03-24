@@ -135,6 +135,9 @@ _DEP_INSTALL: dict[str, str] = {
     "h5py": "pip install h5py",
     "rapids_singlecell": "pip install rapids-singlecell (requires CUDA)",
     "pydeseq2": "pip install 'pydeseq2>=0.5.0'",
+    "mudata": "pip install 'mudata>=0.3.1'",
+    "muon": "pip install 'muon>=0.1.6'",
+    "mofapy2": "pip install 'mofapy2>=0.7.0'",
 }
 
 
@@ -396,3 +399,6 @@ register_provenance(app)
 
 from sc_tools.cli.estimate import register_estimate  # noqa: E402
 register_estimate(app)
+
+from sc_tools.cli.assemble import register_assemble  # noqa: E402
+register_assemble(app)

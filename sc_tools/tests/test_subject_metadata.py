@@ -44,15 +44,23 @@ class TestValidateSubjectMetadata:
         assert len(warnings) >= 1
         assert any("informational" in w.lower() or "single" in w.lower() for w in warnings)
 
-    def test_valid_multi_sample_distinct_subject_id(self, adata_multi_subject):
+    def test_valid_multi_sample_distinct_subject_id(self):
         """Valid multi-sample adata with distinct subject_id returns empty warnings list."""
-        warnings = validate_subject_metadata(adata_multi_subject)
-        # Should have no warnings about subject_id itself
-        subject_warnings = [
-            w for w in warnings
-            if "subject_id" in w.lower() and "confound" not in w.lower()
-        ]
-        assert len(subject_warnings) == 0
+        rng = np.random.default_rng(0)
+        n = 120
+        adata = AnnData(rng.random((n, 50)).astype("float32"))
+        # 3 subjects, 4 libraries (subject_0 has lib_0 and lib_1, etc.)
+        subjects = (["subj_0"] * 40 + ["subj_1"] * 40 + ["subj_2"] * 40)
+        libraries = (
+            ["lib_0"] * 20 + ["lib_1"] * 20
+            + ["lib_2"] * 20 + ["lib_3"] * 20
+            + ["lib_4"] * 20 + ["lib_5"] * 20
+        )
+        adata.obs["subject_id"] = pd.Categorical(subjects)
+        adata.obs["library_id"] = pd.Categorical(libraries)
+
+        warnings = validate_subject_metadata(adata)
+        assert len(warnings) == 0
 
     def test_auto_detect_multi_sample(self):
         """Auto-detect multi_sample from multiple unique library_id values."""

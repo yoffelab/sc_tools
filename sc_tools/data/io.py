@@ -157,12 +157,12 @@ def _coerce_arrow_strings(adata) -> None:
             if isinstance(df[col].dtype, pd.CategoricalDtype):
                 # Rebuild categories — they may be Arrow-backed underneath
                 df[col] = df[col].astype(str).astype("category")
-            elif pd.api.types.is_string_dtype(df[col]) and str(df[col].dtype) != "object":
-                # Any non-object string dtype (StringDtype, ArrowStringArray, etc.)
-                df[col] = df[col].astype(object)
-        # Index can also be non-object string dtype
-        if pd.api.types.is_string_dtype(df.index) and str(df.index.dtype) != "object":
-            df.index = df.index.astype(object)
+            elif not pd.api.types.is_numeric_dtype(df[col]) and df[col].dtype.name != "bool":
+                # Coerce any non-numeric, non-bool column to plain object
+                df[col] = df[col].astype(str).astype(object)
+        # Index coercion
+        if not pd.api.types.is_numeric_dtype(df.index):
+            df.index = df.index.astype(str)
 
 
 def write_h5ad(

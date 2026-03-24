@@ -128,7 +128,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — IO Gateway module with tiered loading (T1/T2/T3), memory guard, and pre-load estimation (MEM-01, MEM-02)
+- [x] 07-01-PLAN.md — IO Gateway module with tiered loading (T1/T2/T3), memory guard, and pre-load estimation (MEM-01, MEM-02)
 - [ ] 07-02-PLAN.md — sct estimate command, --dry-run/--force flags on all data commands, tier-aware cli_handler (MEM-02, MEM-03)
 
 ### Phase 8: Multi-Omic Assembly

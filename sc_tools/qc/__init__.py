@@ -9,7 +9,8 @@ sc_tools.qc: Quality control utilities for spatial and single-cell omics.
 - doublet: Solo-based doublet scoring for single-cell resolution modalities
 """
 
-from . import doublet, metrics, plots, report, sample_qc, spatial
+from . import doublet, metadata, metrics, plots, report, sample_qc, spatial
+from .metadata import check_confounding, validate_subject_metadata
 from .doublet import score_doublets_solo
 from .metrics import (
     calculate_qc_metrics,
@@ -85,4 +86,7 @@ __all__ = [
     "generate_post_celltyping_report",
     "generate_segmentation_qc_report",
     "generate_all_qc_reports",
+    "metadata",
+    "validate_subject_metadata",
+    "check_confounding",
 ]

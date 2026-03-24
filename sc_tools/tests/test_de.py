@@ -311,3 +311,87 @@ class TestRunPseudobulkDE:
         )
         # Should succeed with custom formula
         assert len(results) > 0
+
+
+# ---------------------------------------------------------------------------
+# CLI tests
+# ---------------------------------------------------------------------------
+
+
+class TestDECLI:
+    """Tests for sct de CLI command."""
+
+    def test_de_app_import(self) -> None:
+        """de_app can be imported from sc_tools.cli.de."""
+        from sc_tools.cli.de import de_app
+
+        assert de_app is not None
+
+    def test_de_app_registered(self) -> None:
+        """de_app is registered in the main CLI app."""
+        from sc_tools.cli import app
+
+        # Check that 'de' is among registered command groups
+        group_names = [g.name for g in app.registered_groups]
+        assert "de" in group_names
+
+    def test_de_run_command_exists(self) -> None:
+        """de_app has a 'run' command."""
+        from sc_tools.cli.de import de_app
+
+        cmd_names = [cmd.name or cmd.callback.__name__ for cmd in de_app.registered_commands]
+        assert "run" in cmd_names
+
+    def test_cli_handler_decorator(self) -> None:
+        """de_run uses cli_handler decorator."""
+        import inspect
+
+        from sc_tools.cli.de import de_run
+
+        # cli_handler wraps the function, so __wrapped__ should exist
+        assert hasattr(de_run, "__wrapped__")
+
+    def test_cli_full_flow(self, adata_multi_subject: AnnData, tmp_path) -> None:
+        """Full CLI flow with adata written to tmp h5ad (requires pydeseq2)."""
+        pytest.importorskip("pydeseq2")
+
+        from typer.testing import CliRunner
+
+        from sc_tools.cli import app
+
+        # Write test data to h5ad
+        h5ad_path = tmp_path / "test_de.h5ad"
+        adata_multi_subject.write_h5ad(h5ad_path)
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app,
+            [
+                "de", "run",
+                str(h5ad_path),
+                "--condition", "condition",
+                "--subject-col", "subject_id",
+                "--celltype-col", "celltype",
+                "--project-dir", str(tmp_path),
+                "--min-subjects", "2",
+                "--min-cells", "1",
+            ],
+        )
+
+        # cli_handler raises SystemExit(0) on success
+        assert result.exit_code == 0
+
+        # Check CSV files were written
+        de_dir = tmp_path / "results" / "de"
+        assert de_dir.exists()
+        csv_files = list(de_dir.glob("*.csv"))
+        assert len(csv_files) > 0
+
+        # Check CSV content
+        import pandas as pd
+
+        for csv_path in csv_files:
+            df = pd.read_csv(csv_path)
+            assert "gene" in df.columns
+            assert "log2FC" in df.columns
+            assert "padj" in df.columns

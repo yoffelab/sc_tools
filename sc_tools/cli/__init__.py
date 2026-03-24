@@ -134,6 +134,7 @@ _DEP_INSTALL: dict[str, str] = {
     "scib_metrics": "pip install scib-metrics",
     "h5py": "pip install h5py",
     "rapids_singlecell": "pip install rapids-singlecell (requires CUDA)",
+    "pydeseq2": "pip install 'pydeseq2>=0.5.0'",
 }
 
 
@@ -323,6 +324,7 @@ from sc_tools.cli.preprocess import preprocess_app  # noqa: E402
 from sc_tools.cli.validate import validate_app  # noqa: E402
 from sc_tools.cli.benchmark import benchmark_app  # noqa: E402
 from sc_tools.cli.status import status_app  # noqa: E402
+from sc_tools.cli.de import de_app  # noqa: E402
 
 app.add_typer(qc_app, name="qc")
 app.add_typer(report_app, name="report")
@@ -332,6 +334,7 @@ app.add_typer(status_app, name="status")
 app.add_typer(integrate_app, name="integrate")
 app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(celltype_app, name="celltype")
+app.add_typer(de_app, name="de")
 
 from sc_tools.cli.discovery import register_discovery  # noqa: E402
 register_discovery(app)

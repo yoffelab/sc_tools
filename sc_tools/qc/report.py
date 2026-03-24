@@ -849,6 +849,29 @@ def generate_post_celltyping_report(
         except Exception:
             logger.debug("Marker dotplot failed", exc_info=True)
 
+    # Marker validation (optional -- when marker_genes provided)
+    has_marker_validation = False
+    marker_validation_rows: list[dict] = []
+    marker_dotplot_b64: str = ""
+    marker_summary: dict = {}
+
+    if marker_genes:
+        try:
+            from .marker_validation import compute_marker_validation, render_marker_dotplot
+
+            validation_df, marker_summary = compute_marker_validation(
+                adata, celltype_key, marker_genes, threshold=0.1
+            )
+            if len(validation_df) > 0:
+                marker_validation_rows = validation_df.to_dict("records")
+                has_marker_validation = True
+
+            marker_dotplot_b64 = render_marker_dotplot(
+                adata, celltype_key, marker_genes
+            )
+        except Exception:
+            logger.debug("Marker validation failed", exc_info=True)
+
     # Integration metrics WITH validated celltypes (bio metrics now meaningful)
     integration_plots: dict[str, str] | None = None
     best_method: str | None = None
@@ -974,6 +997,10 @@ def generate_post_celltyping_report(
         "integration_plots": integration_plots,
         "segmentation": seg_data,
         "seg_plots": seg_plots_dict,
+        "has_marker_validation": has_marker_validation or None,
+        "marker_validation_rows": marker_validation_rows,
+        "marker_dotplot_b64": marker_dotplot_b64,
+        "marker_summary": marker_summary,
     }
 
     _POST_CT_SECTIONS = [
@@ -983,6 +1010,7 @@ def generate_post_celltyping_report(
         {"id": "composition", "label": "Celltype Composition", "key": "composition_avail"},
         {"id": "per-sample", "label": "Per-Sample Distribution", "key": "cluster_dist_ct_avail"},
         {"id": "markers", "label": "Marker Expression", "key": "marker_dotplot_avail"},
+        {"id": "marker-validation", "label": "Marker Validation", "key": "has_marker_validation"},
         {"id": "radar", "label": "Metrics Radar", "key": "integration_plots"},
         {"id": "segmentation", "label": "Segmentation Quality", "key": "segmentation"},
     ]

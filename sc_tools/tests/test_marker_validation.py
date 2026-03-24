@@ -165,3 +165,78 @@ class TestRenderMarkerDotplot:
         # base64 encoded PNG should be non-empty
         if result:  # may be empty if scanpy not available
             assert len(result) > 100  # non-trivial base64 string
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: report generation with marker validation
+# ---------------------------------------------------------------------------
+
+
+class TestMarkerValidationReportIntegration:
+    """Tests for marker validation integration in post-celltyping report."""
+
+    def _make_report_adata(self, adata_with_markers):
+        """Add required obs columns for report generation."""
+        adata = adata_with_markers.copy()
+        adata.obs["library_id"] = "sample_1"
+        adata.obs["leiden"] = pd.Categorical(
+            [str(i % 5) for i in range(adata.n_obs)]
+        )
+        return adata
+
+    def test_report_with_marker_genes_contains_validation_section(
+        self, adata_with_markers, marker_genes, tmp_path
+    ):
+        """Report with marker_genes should contain Marker Validation section."""
+        from sc_tools.qc.report import generate_post_celltyping_report
+
+        adata = self._make_report_adata(adata_with_markers)
+
+        output = generate_post_celltyping_report(
+            adata,
+            tmp_path,
+            celltype_key="celltype",
+            marker_genes=marker_genes,
+            date_stamp="20260324",
+        )
+        html = output.read_text()
+        assert "Marker Validation" in html
+        assert "marker-validation" in html
+
+    def test_flagged_celltypes_appear_in_html(
+        self, adata_with_markers, marker_genes, tmp_path
+    ):
+        """Flagged celltypes should appear with warning styling in HTML."""
+        from sc_tools.qc.report import generate_post_celltyping_report
+
+        adata = self._make_report_adata(adata_with_markers)
+
+        output = generate_post_celltyping_report(
+            adata,
+            tmp_path,
+            celltype_key="celltype",
+            marker_genes=marker_genes,
+            date_stamp="20260324",
+        )
+        html = output.read_text()
+        # Macrophage should be flagged
+        assert "Flagged" in html
+        assert "Macrophage" in html
+
+    def test_report_without_marker_genes_no_validation(
+        self, adata_with_markers, tmp_path
+    ):
+        """Report without marker_genes should NOT contain Marker Validation."""
+        from sc_tools.qc.report import generate_post_celltyping_report
+
+        adata = self._make_report_adata(adata_with_markers)
+
+        output = generate_post_celltyping_report(
+            adata,
+            tmp_path,
+            celltype_key="celltype",
+            marker_genes=None,
+            date_stamp="20260324",
+        )
+        html = output.read_text()
+        assert "Marker Validation" not in html

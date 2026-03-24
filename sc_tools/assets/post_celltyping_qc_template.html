@@ -229,6 +229,64 @@
 </section>
 {% endif %}
 
+{% if has_marker_validation %}
+<section id="marker-validation" class="report-section">
+  <h2>Marker Validation</h2>
+  <div class="summary-cards">
+    <div class="card info">
+      <div class="value">{{ marker_summary.n_types_tested }}</div>
+      <div class="label">Types Tested</div>
+    </div>
+    <div class="card{% if marker_summary.n_flagged > 0 %}" style="border: 2px solid #e74c3c;{% else %} best{% endif %}">
+      <div class="value"{% if marker_summary.n_flagged > 0 %} style="color: #e74c3c;"{% endif %}>{{ marker_summary.n_flagged }}</div>
+      <div class="label">Types Flagged</div>
+    </div>
+    <div class="card info">
+      <div class="value">{{ marker_summary.total_cells }}</div>
+      <div class="label">Total Cells</div>
+    </div>
+  </div>
+
+  {% if marker_dotplot_b64 %}
+  <div class="plot-row full-width" style="margin-bottom: 16px;">
+    <div class="plot-item">
+      <img src="data:image/png;base64,{{ marker_dotplot_b64 }}" alt="Marker Validation Dotplot">
+      <div class="caption">Marker gene expression dotplot (top markers per cell type)</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="overflow-x: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Cell Type</th>
+        <th>Marker Gene</th>
+        <th style="text-align: right;">Mean Expression</th>
+        <th style="text-align: center;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in marker_validation_rows %}
+      <tr{% if row.flagged %} style="background: #fdedec;"{% endif %}>
+        <td><strong>{{ row.celltype }}</strong></td>
+        <td>{{ row.marker_gene }}</td>
+        <td style="text-align: right;">{% if row.mean_expr == row.mean_expr %}{{ "%.4f" | format(row.mean_expr) }}{% else %}N/A{% endif %}</td>
+        <td style="text-align: center;">{% if row.flagged %}<span style="color: #e74c3c; font-weight: 600;">&#9888; Flagged</span>{% else %}<span style="color: #27ae60;">OK</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <div style="margin-top: 12px; padding: 10px 14px; background: #fef9e7; border: 1px solid #f0c674; border-radius: 6px; font-size: 0.85rem; color: #7d6608;">
+    <strong>Note:</strong> Flagging is informational only. A flagged cell type indicates that all tested canonical markers
+    had mean expression below the threshold (0.1). This may reflect genuine biology (e.g., low-abundance populations),
+    data processing effects, or potential annotation errors. Manual review is recommended for flagged types.
+  </div>
+</section>
+{% endif %}
+
 {% if integration_plots and integration_plots.integration_radar %}
 <section id="radar" class="report-section">
   <h2>Integration Metrics Radar</h2>

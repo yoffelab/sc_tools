@@ -113,7 +113,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Subject metadata validation and panel-aware cell typing dispatch (SCI-03, SCI-04)
+- [x] 06-01-PLAN.md — Subject metadata validation and panel-aware cell typing dispatch (SCI-03, SCI-04)
 - [ ] 06-02-PLAN.md — Pseudobulk DE module with PyDESeq2 and sct de run CLI command (SCI-01)
 - [ ] 06-03-PLAN.md — Marker validation report integrated into post-celltyping QC (SCI-02)
 
@@ -158,6 +158,6 @@ Phases execute in numeric order. Phases 1 and 2 have no mutual dependencies and 
 | 3. Core Commands | 0/4 | Planning complete | - |
 | 4. CLI Discovery | 0/1 | Planning complete | - |
 | 5. Provenance | 1/2 | In Progress|  |
-| 6. Scientific Gaps | 0/3 | Planning complete | - |
+| 6. Scientific Gaps | 1/3 | In Progress|  |
 | 7. Memory Safety | 0/2 | Not started | - |
 | 8. Multi-Omic Assembly | 0/2 | Not started | - |

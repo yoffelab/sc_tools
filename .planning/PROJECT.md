@@ -137,17 +137,21 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| CLI wraps sc_tools, not replaces it | Existing internals work; the gap is the interface layer | — Pending |
-| CLI uses Typer for argument parsing | Type-hint-driven help matches codebase conventions; auto-completion support | — Pending |
-| CLI and MCP share a Result return type | Avoid reimplementing structured output twice; single source of truth | — Pending |
-| CLI commands map to pipeline phases, not Python modules | Agents think in pipeline steps (`sct qc`), not library imports (`sct qc.metrics`) | — Pending |
-| Register `sct` in pyproject.toml `[project.scripts]` | Makes CLI installable and discoverable via `which sct` | — Pending |
-| JSON structured output by default | Agent-native design; human-readable mode as opt-in flag via `--human` | — Pending |
-| File-based provenance before DB | Schema instability means DB migrations will keep breaking; let model emerge from usage | — Pending |
-| Fix sc_tools gaps first, then build CLI | Immediate value (integration benchmark), and CLI needs stable internals to wrap | — Pending |
-| MuData assembly is late-stage | Each modality processed independently; assembly happens after analysis, not at ingestion | — Pending |
-| Late-stage MuData uses patient-level join, not spatial registration | Spatial co-registration is project-specific; CLI supports metadata joins robustly | — Pending |
-| Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | — Pending |
+| CLI wraps sc_tools, not replaces it | Existing internals work; the gap is the interface layer | ✓ Good |
+| CLI uses Typer for argument parsing | Type-hint-driven help matches codebase conventions; auto-completion support | ✓ Good |
+| CLI and MCP share a Result return type | Avoid reimplementing structured output twice; single source of truth | ✓ Good |
+| CLI commands map to pipeline phases, not Python modules | Agents think in pipeline steps (`sct qc`), not library imports (`sct qc.metrics`) | ✓ Good |
+| Register `sct` in pyproject.toml `[project.scripts]` | Makes CLI installable and discoverable via `which sct` | ✓ Good |
+| JSON structured output by default | Agent-native design; human-readable mode as opt-in flag via `--human` | ✓ Good |
+| File-based provenance before DB | Schema instability means DB migrations will keep breaking; let model emerge from usage | ✓ Good |
+| Fix sc_tools gaps first, then build CLI | Immediate value (integration benchmark), and CLI needs stable internals to wrap | ✓ Good |
+| MuData assembly is late-stage | Each modality processed independently; assembly happens after analysis, not at ingestion | ✓ Good |
+| Late-stage MuData uses patient-level join, not spatial registration | Spatial co-registration is project-specific; CLI supports metadata joins robustly | ✓ Good |
+| Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | ✓ Good |
+
+## Current State
+
+Shipped v1.0 with ~59K LOC Python across 230 files. Full agent-native CLI (`sct`) covering the single-cell/spatial analysis lifecycle. 8 phases, 18 plans, 48 requirements fulfilled. Tech stack: Python 3.10+, Typer, Pydantic, scanpy, scvi-tools, MuData/muon.
 
 ---
-*Last updated: 2026-03-24 — Phase 6 (scientific gaps) complete*
+*Last updated: 2026-03-24 — v1.0 milestone complete*

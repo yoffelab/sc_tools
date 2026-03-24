@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 8 planning complete
-last_updated: "2026-03-24T22:32:37.300Z"
+status: v1.0 milestone complete
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-03-24T23:14:36.037Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 18
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-20)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** Phase 07 — memory-safety
+**Current focus:** Phase 08 — multi-omic-assembly
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
+Phase: 08 (multi-omic-assembly) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -62,6 +62,8 @@ Plan: Not started
 | Phase 06 P03 | 7min | 2 tasks | 5 files |
 | Phase 07 P01 | 5min | 1 tasks | 7 files |
 | Phase 07 P02 | 6min | 2 tasks | 9 files |
+| Phase 08 P01 | 3min | 1 tasks | 7 files |
+| Phase 08 P02 | 6min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -116,6 +118,12 @@ Recent decisions affecting current work:
 - [Phase 07]: cli_handler extended to accept tier kwarg via decorator pattern for DataTier metadata
 - [Phase 07]: Dry-run error handling inside try block for proper SCToolsUserError JSON output
 - [Phase 07]: validate_run keeps inline dry-run to preserve custom exit code 2 behavior
+- [Phase 08]: Outer join on subject_id includes all patients even with missing modalities
+- [Phase 08]: Patient/sample metadata stored as DataFrames in mdata.uns (not separate files)
+- [Phase 08]: All mudata imports lazy inside function bodies per CLI-08 pattern
+- [Phase 08]: Modalities missing celltype_key silently skipped in proportion queries (logged, not raised)
+- [Phase 08]: Return type -> None on CLI commands for Python 3.10 Typer compat
+- [Phase 08]: MOFA+ tests guard on both muon and mofapy2 importorskip
 
 ### Pending Todos
 
@@ -127,6 +135,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T22:32:37.297Z
-Stopped at: Phase 8 planning complete
-Resume file: .planning/phases/08-multi-omic-assembly/08-01-PLAN.md
+Last session: 2026-03-24T22:51:34.161Z
+Stopped at: Completed 08-02-PLAN.md
+Resume file: None

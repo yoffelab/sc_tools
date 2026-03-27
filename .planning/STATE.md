@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 milestone complete
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-24T23:14:36.037Z"
+milestone: v2.0
+milestone_name: Report Plots & Sample Concat
+status: defining requirements
+stopped_at: ~
+last_updated: "2026-03-27T00:00:00.000Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 18
-  completed_plans: 18
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-20)
+See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** Phase 08 — multi-omic-assembly
+**Current focus:** v2.0 — Report Plots & Sample Concat
 
 ## Current Position
 
-Phase: 08 (multi-omic-assembly) — EXECUTING
-Plan: 2 of 2
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-27 — Milestone v2.0 started
 
 ## Performance Metrics
 

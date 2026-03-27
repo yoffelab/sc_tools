@@ -149,9 +149,36 @@ Agents never write throwaway scripts. Every comp bio operation is callable via a
 | Late-stage MuData uses patient-level join, not spatial registration | Spatial co-registration is project-specific; CLI supports metadata joins robustly | ✓ Good |
 | Pseudobulk DE over single-cell DE for multi-sample comparisons | Single-cell tests inflate significance due to pseudoreplication | ✓ Good |
 
+## Current Milestone: v2.0 Report Plots & Sample Concat
+
+**Goal:** Add spatial and UMAP plots to QC/integration/celltype HTML reports, and expose sample concatenation as a first-class CLI command.
+
+**Target features:**
+- `sct concat`: same-modality multi-sample merge CLI command, registered as a pipeline phase
+- QC report: 4 spatial plots per sample (log1p_counts, log1p_genes, %mt, pass/fail), samples ranked by QC score
+- Integration report: UMAPs for leiden clusters, batch, patient, and bio obs columns used in metrics
+- Celltype report: spatial plots per cell type per sample
+
 ## Current State
 
 Shipped v1.0 with ~59K LOC Python across 230 files. Full agent-native CLI (`sct`) covering the single-cell/spatial analysis lifecycle. 8 phases, 18 plans, 48 requirements fulfilled. Tech stack: Python 3.10+, Typer, Pydantic, scanpy, scvi-tools, MuData/muon.
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-24 — v1.0 milestone complete*
+*Last updated: 2026-03-27 — v2.0 milestone started*

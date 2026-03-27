@@ -226,3 +226,217 @@ sct = "sc_tools.cli:app"
 
 ---
 *Stack analysis: 2026-03-20*
+
+---
+
+## v2.0 Milestone Addendum: Spatial Plots, UMAP Plots, HTML Reports, sct concat
+
+**Scope:** NEW capabilities only for v2.0 (Report Plots & Sample Concat milestone).
+**Researched:** 2026-03-27
+**Confidence:** HIGH — all findings verified against existing codebase.
+
+### Finding: No New Dependencies Required
+
+Every library needed for v2.0 is already declared in `pyproject.toml`. The work is entirely
+wiring and implementation, not procurement.
+
+**One promotion needed:** `plotly` moves from `[pipeline]` optional to base `dependencies`.
+**One maintenance fix:** hardcoded Plotly CDN version tag in `report_utils.py` is stale.
+
+---
+
+### Spatial Plots (log1p_counts, log1p_genes, %mt, pass/fail overlay)
+
+**Library:** `scanpy` (base dep, `>=1.9`) — `sc.pl.spatial`
+**Confidence:** HIGH — pattern already implemented in `sc_tools/qc/report.py` lines 314–333.
+
+The post-filter report already generates `log1p_total_counts` spatial plots per sample using:
+
+```python
+sc.pl.spatial(sub, color=col, library_id=lib, show=False, ax=ax, frameon=False)
+```
+
+The v2.0 QC report extends this to 4 panels per sample in a `plt.subplots(1, 4)` grid:
+
+| Panel | obs column | Derivation |
+|-------|-----------|------------|
+| log1p_counts | `log1p_total_counts` | `np.log1p(obs["total_counts"])` — already computed |
+| log1p_genes | `log1p_n_genes_by_counts` | `np.log1p(obs["n_genes_by_counts"])` — add same way |
+| %mt | `pct_counts_mt` | Already in obs when mt genes present — guard with `has_mt` |
+| pass/fail | `qc_pass_str` | Cast `classified["qc_pass"]` bool to `"Pass"`/`"Fail"` string for color |
+
+Celltype report spatial plots (per cell type per sample) use the same pattern with `color=celltype_col`.
+
+**No new library. No version change needed.**
+
+---
+
+### UMAP Plots (leiden, batch, patient, bio obs columns)
+
+**Library:** `scanpy` (base dep, `>=1.9`) — `sc.pl.umap`
+**Confidence:** HIGH — pattern already used in `sc_tools/pl/benchmarking.py` line 529.
+
+```python
+sc.pl.umap(adata, color=col, show=False, ax=ax, frameon=False)
+```
+
+The integration report generates a UMAP grid over obs columns: `leiden_key`, `batch_key`,
+`patient_col`, and any bio obs columns used in scib metrics. Caller ensures `X_umap` is present
+(data precondition, not a library gap — the preprocess phase always computes UMAP).
+
+**No new library. No version change needed.**
+
+---
+
+### HTML Embedding: Static Plots (spatial, UMAP)
+
+**Mechanism:** `fig_to_base64(fig)` in `sc_tools/qc/report_utils.py` — converts matplotlib Figure
+to base64-encoded PNG string embedded as `<img src="data:image/png;base64,...">`.
+
+Static PNG is the correct choice for spatial and UMAP plots. Reasons:
+
+1. **Scale**: Visium HD datasets reach 2.5M spots. An interactive Plotly scatter with 2.5M points
+   makes the browser unusable. Static PNG at 150 dpi is sufficient for QC review.
+2. **Self-contained**: Base64 PNG requires no CDN, no JS, no internet connection.
+3. **Consistency**: All existing QC plots already use `fig_to_base64`. New plots should follow
+   the same pattern for template consistency.
+
+**No new library. No change needed.**
+
+---
+
+### HTML Embedding: Interactive Plots (Plotly)
+
+**Mechanism:** `plotly_to_html(fig)` calls `fig.to_html(full_html=False, include_plotlyjs=False)`.
+One CDN `<script>` tag is injected per report in `_wrap_with_tabs`.
+
+**Action required — promote plotly to base deps:**
+
+`plotly` is currently only in `[pipeline]` optional. The QC/integration/celltype report functions
+already call `plotly_to_html` (radar charts, batch-vs-bio scatter in `compute_integration_section`).
+Any user running `sct qc report` or `sct integration report` without `[pipeline]` extras will get
+an ImportError at runtime. Promote to base:
+
+```toml
+# pyproject.toml [project.dependencies]
+"plotly>=5.18",   # add to base dependencies (currently only in [pipeline])
+```
+
+`plotly>=5.18` supports Python 3.8+, so 3.10 compatibility is confirmed. The `[pipeline]`
+entry can remain as a no-op duplicate (pip deduplicates).
+
+**Action required — update stale CDN version tag:**
+
+`report_utils.py` line 517 hardcodes `plotly-2.27.0.min.js` (a 2023 release). Current plotly.py
+is 6.x. Use `plotly-latest.min.js` to track current stable automatically:
+
+```python
+# report_utils.py line 517 — change from:
+plotly_cdn = '<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>'
+# to:
+plotly_cdn = '<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>'
+```
+
+**Known limitation:** CDN-based reports require internet access. This is an existing design choice.
+Offline mode (embedding the ~3MB plotly.js bundle via `include_plotlyjs=True`) is not worth the
+file size for HPC/local use. Document as limitation in report footer.
+
+---
+
+### sct concat CLI Command
+
+**Backend:** `sc_tools.ingest.concat_samples` — fully implemented in
+`sc_tools/ingest/loaders.py` lines 903–947.
+
+Signature:
+```python
+def concat_samples(
+    adatas: list[ad.AnnData],
+    *,
+    sample_col: str = "sample",
+    calculate_qc: bool = True,
+) -> ad.AnnData
+```
+
+Uses `ad.concat(adatas, merge="same", uns_merge="same")` which preserves spatial coordinates.
+Runs `sc.pp.calculate_qc_metrics` post-concat if `calculate_qc=True`.
+
+**What v2.0 adds:** A CLI wrapper only. No changes to backend logic.
+
+```python
+# sc_tools/cli/commands/concat.py — sketch
+@app.command("concat")
+def concat_cmd(
+    input_files: Annotated[list[Path], typer.Argument(...)],
+    output: Annotated[Path, typer.Option(...)],
+    sample_col: str = "library_id",
+    calculate_qc: bool = True,
+):
+    from sc_tools.ingest import concat_samples
+    import anndata as ad
+    adatas = [ad.read_h5ad(f) for f in input_files]
+    result = concat_samples(adatas, sample_col=sample_col, calculate_qc=calculate_qc)
+    result.write_h5ad(output)
+    # emit CLIResult JSON to stdout
+```
+
+For large files, use backed mode before concat to avoid OOM: `ad.read_h5ad(f, backed="r")` then
+`.to_memory()` per-sample before passing to `concat_samples`. This is consistent with the IO
+Gateway pattern from Phase 7 (memory safety).
+
+**No new library. Uses existing anndata, scanpy, typer, pydantic.**
+
+---
+
+### v2.0 Stack Changes Summary
+
+| Item | Action | pyproject.toml change |
+|------|--------|-----------------------|
+| `plotly` | Promote from `[pipeline]` optional to base `dependencies` | Add `"plotly>=5.18"` to `[project.dependencies]` |
+| `scanpy` | No change — `sc.pl.spatial` + `sc.pl.umap` already available | None |
+| `squidpy` | No change — already used, not needed for plot generation | None |
+| `matplotlib` | No change — `fig_to_base64` path already established | None |
+| `anndata` | No change — `ad.concat` + `ad.read_h5ad` already available | None |
+| Plotly CDN tag | Fix stale version pin in `report_utils.py` line 517 | Code change only |
+
+### What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Bokeh | Second interactive JS framework in same reports | Plotly (already present) |
+| HoloViews / hvplot | Heavy deps, no gain over sc.pl.* + plotly for this use case | scanpy + plotly |
+| Dash | Full app server — overkill for static HTML report generation | `fig.to_html(full_html=False)` |
+| ipywidgets | Requires Jupyter kernel | base64 PNG + Plotly CDN |
+| napari | No web-embeddable output | `sc.pl.spatial` → base64 PNG |
+| vitessce | React-based viewer, requires build toolchain | Out of scope for CLI reports |
+| `include_plotlyjs=True` inline | Adds ~3MB to every report; HPC reports are large already | CDN approach (existing) |
+| `sq.pl.spatial_scatter` | squidpy's function is a thin wrapper over same matplotlib path | `sc.pl.spatial` (already used in codebase) |
+
+### Python 3.10 Compatibility
+
+`pyproject.toml` declares `requires-python = ">=3.10"`. All libraries relevant to v2.0:
+
+| Package | Min Python | Notes |
+|---------|-----------|-------|
+| scanpy >=1.9 | 3.8+ | Confirmed via PyPI classifiers |
+| matplotlib >=3.7 | 3.8+ | Confirmed |
+| plotly >=5.18 | 3.8+ | Confirmed |
+| anndata >=0.10 | 3.9+ | Confirmed |
+| squidpy >=1.3 | 3.9+ | Confirmed |
+
+No 3.11+ features are required for v2.0 plot generation or concat CLI. The existing codebase note
+in the v1.0 section ("Python 3.11") reflected the sc_tools library consumers; the pyproject.toml
+floor is 3.10 and all new v2.0 code must respect that floor.
+
+### v2.0 Sources
+
+- Codebase: `sc_tools/qc/report.py` lines 314–333 — existing `sc.pl.spatial` + `fig_to_base64` pattern (HIGH)
+- Codebase: `sc_tools/qc/report_utils.py` lines 120–133, 517 — `plotly_to_html`, CDN injection (HIGH)
+- Codebase: `sc_tools/pl/benchmarking.py` line 529 — existing `sc.pl.umap` pattern (HIGH)
+- Codebase: `sc_tools/ingest/loaders.py` lines 903–947 — `concat_samples` implementation (HIGH)
+- Codebase: `pyproject.toml` — `requires-python = ">=3.10"`, dep versions and extras (HIGH)
+- [scanpy.pl.spatial docs](https://scanpy.readthedocs.io/en/latest/api/generated/scanpy.pl.spatial.html) — `ax=`, `show=False` params stable since 1.8 (HIGH)
+- [plotly.io.to_html docs](https://plotly.com/python-api-reference/generated/plotly.io.to_html.html) — `include_plotlyjs` options including `False` (CDN separate) (HIGH)
+
+---
+*v2.0 addendum: 2026-03-27*

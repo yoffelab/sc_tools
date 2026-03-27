@@ -1,465 +1,550 @@
 # Architecture Research
 
-**Domain:** Agent-native CLI layer for single-cell/spatial transcriptomics library
-**Researched:** 2026-03-20
-**Confidence:** HIGH
+**Domain:** Spatial/UMAP plot integration into sc_tools HTML report pipeline (v2.0 milestone)
+**Researched:** 2026-03-27
+**Confidence:** HIGH (all findings from direct codebase inspection)
 
-## System Overview
+## Standard Architecture
+
+### System Overview
+
+The v2.0 milestone adds two integration points to the existing layered architecture:
+(1) plot generation feeding into existing report templates, and
+(2) a new `sct concat` CLI command registered as a pipeline phase.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     CLI Surface (sct)                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ sct qc   │  │ sct pp   │  │ sct bm   │  │ sct info │  ...       │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
-│       │              │             │              │                  │
-├───────┴──────────────┴─────────────┴──────────────┴──────────────────┤
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────────────┐ │
+│  │ sct qc   │  │ sct pp   │  │ sct bm   │  │ sct concat  [NEW]   │ │
+│  │ sct      │  │          │  │          │  │ sct ingest  [NEW]   │ │
+│  │ report   │  │          │  │          │  │                     │ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────────┬──────────┘ │
+│       │              │             │                   │            │
+├───────┴──────────────┴─────────────┴───────────────────┴────────────┤
 │                   Command Layer (thin adapters)                      │
-│  ┌────────────────────────────────────────────────────────────────┐  │
-│  │  CommandResult → JSON envelope {status, data, provenance}      │  │
-│  └────────────────────────────────────────────────────────────────┘  │
-│  ┌────────────┐  ┌─────────────┐  ┌────────────────┐                │
-│  │ IO Gateway │  │  Provenance │  │ Output Formatter│               │
-│  │ (load/save)│  │  Tracker    │  │ (JSON/human)   │                │
-│  └─────┬──────┘  └──────┬──────┘  └───────┬────────┘                │
-├────────┴─────────────────┴────────────────┴──────────────────────────┤
-│                   sc_tools Library (unchanged)                       │
-│  ┌─────────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐    │
-│  │ ingest  │  │  qc  │  │  pp  │  │  tl  │  │  bm  │  │  pl  │    │
-│  └─────────┘  └──────┘  └──────┘  └──────┘  └──────┘  └──────┘    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-│  │ storage  │  │ validate │  │ pipeline │  │ registry │            │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘            │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │  CLIResult {status, command, data, artifacts, provenance}     │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────────┤
+│         Report Pipeline  (sc_tools/qc/report.py)  [MODIFIED]        │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │  generate_pre_filter_report()   — add spatial QC 4-panel     │   │
+│  │  generate_post_filter_report()  — spatial plots exist [DONE] │   │
+│  │  generate_post_integration_report() — UMAP grid exists [DONE]│   │
+│  │  generate_post_celltyping_report() — add spatial celltype     │   │
+│  └────────────────────────────┬─────────────────────────────────┘   │
+│                               │ calls                               │
+│  ┌────────────────────────────▼─────────────────────────────────┐   │
+│  │  Plot Library  (sc_tools/pl/)  [EXTENDED]                    │   │
+│  │  ┌───────────────┐  ┌──────────────────┐  ┌───────────────┐  │   │
+│  │  │ pl/spatial.py │  │ pl/qc_plots.py   │  │ qc/plots.py   │  │   │
+│  │  │ plot_spatial_ │  │ qc_umap_grid()   │  │ qc_2x2_grid() │  │   │
+│  │  │ continuous()  │  │ qc_celltype_     │  │ qc_spatial_   │  │   │
+│  │  │ [NEW wrapper] │  │ abundance() etc. │  │ multipage()   │  │   │
+│  │  └───────────────┘  └──────────────────┘  └───────────────┘  │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                               │ fig_to_base64()                     │
+│  ┌────────────────────────────▼─────────────────────────────────┐   │
+│  │  Jinja2 Templates  (sc_tools/assets/*.html)  [MODIFIED]      │   │
+│  │  pre_filter_qc_template.html  post_celltyping_qc_template.html│  │
+│  └──────────────────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────────────────┤
+│                   sc_tools Library (unchanged except additions)      │
+│  ┌───────────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌───────────────┐   │
+│  │  ingest/  │  │  qc/ │  │  pp/ │  │  pl/ │  │  pipeline.py  │   │
+│  │ loaders.py│  │      │  │      │  │      │  │  [MODIFIED]   │   │
+│  │ concat_   │  │      │  │      │  │      │  │  add concat   │   │
+│  │ samples() │  │      │  │      │  │      │  │  phase        │   │
+│  └───────────┘  └──────┘  └──────┘  └──────┘  └───────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                   Data Layer                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │ .h5ad files  │  │ JSON sidecar │  │ registry.db  │               │
-│  │ (AnnData)    │  │ (provenance) │  │ (optional)   │               │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│  ┌────────────────────┐  ┌─────────────────────┐                    │
+│  │ AnnData checkpoints│  │ Self-contained HTML  │                    │
+│  │ (h5ad files)       │  │ reports with base64  │                    │
+│  │ obsm['spatial']    │  │ PNG plots embedded   │                    │
+│  │ uns['spatial']     │  │                      │                    │
+│  └────────────────────┘  └─────────────────────┘                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| CLI Surface (`sct`) | Parse args, validate inputs, dispatch to command layer | Typer app with subcommand groups (`sct qc`, `sct pp`, etc.) |
-| Command Layer | Thin adapters: load data, call library, capture result, write provenance | One function per CLI command; returns `CommandResult` dataclass |
-| IO Gateway | Memory-safe loading of h5ad files (backed mode, h5py selective reads) | Wraps `sc_tools.storage` with memory budget awareness |
-| Provenance Tracker | Write JSON sidecar files alongside every output | Decorator/context manager that records inputs, params, outputs, timing |
-| Output Formatter | Serialize `CommandResult` to JSON (default) or human-readable | `--human` flag switches from JSON to Rich tables/text |
-| sc_tools Library | All actual computation (unchanged) | Existing modules: pp, qc, tl, bm, ingest, pl |
-| Data Layer | Persistent storage of AnnData checkpoints, provenance, registry | h5ad files + `.provenance.json` sidecars |
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| `sc_tools/cli/qc.py` | `sct report generate` command — thin adapter calling `report.py` functions | EXISTS — needs no changes for plots |
+| `sc_tools/cli/ingest.py` | `sct concat` command — new thin adapter wrapping `ingest.concat_samples()` | NEW FILE |
+| `sc_tools/qc/report.py` | Report orchestration — builds plot dict, renders Jinja2 template | MODIFIED — add spatial 4-panel to pre_filter and celltype spatial to post_celltyping |
+| `sc_tools/pl/spatial.py` | Low-level spatial plot primitives (`plot_spatial_continuous`, `plot_spatial_categorical`) | EXISTS — add multi-metric 4-panel wrapper |
+| `sc_tools/pl/qc_plots.py` | Post-integration UMAP grids, cluster distribution, celltype abundance | EXISTS — used by post_integration/post_celltyping already |
+| `sc_tools/qc/plots.py` | Pre/post-filter QC plots (`qc_2x2_grid`, `qc_spatial_multipage`) | EXISTS — re-exported via `sc_tools.pl` |
+| `sc_tools/qc/report_utils.py` | `fig_to_base64()`, `render_template()`, `auto_detect_embeddings()` | EXISTS — used as-is |
+| `sc_tools/assets/*.html` | Jinja2 templates for self-contained HTML output | MODIFIED — add spatial plot sections |
+| `sc_tools/pipeline.py` | Phase DAG with `PhaseSpec` objects including checkpoint paths | MODIFIED — register `concat` phase |
 
 ## Recommended Project Structure
 
 ```
 sc_tools/
-├── cli/                        # NEW: CLI layer
-│   ├── __init__.py             # Typer app factory, global options
-│   ├── _types.py               # CommandResult, ProvenanceRecord dataclasses
-│   ├── _output.py              # JSON/human output formatting
-│   ├── _io.py                  # Memory-safe h5ad loading (backed mode, h5py)
-│   ├── _provenance.py          # JSON sidecar writer, @track_provenance decorator
-│   ├── qc.py                   # sct qc filter, sct qc report, sct qc metrics
-│   ├── pp.py                   # sct pp preprocess, sct pp normalize, sct pp integrate
-│   ├── ingest.py               # sct ingest load, sct ingest manifest
-│   ├── bm.py                   # sct bm run, sct bm report, sct bm compare
-│   ├── tl.py                   # sct tl score, sct tl annotate, sct tl deconvolve
-│   ├── info.py                 # sct info, sct list-commands, sct describe <cmd>
-│   └── assembly.py             # sct assembly build-mudata (late phase)
-├── pp/                         # UNCHANGED
-├── qc/                         # UNCHANGED
-├── tl/                         # UNCHANGED
-├── bm/                         # UNCHANGED
-├── ingest/                     # UNCHANGED
-├── pl/                         # UNCHANGED
-├── storage.py                  # UNCHANGED
-├── validate.py                 # UNCHANGED
-├── pipeline.py                 # UNCHANGED
-├── registry.py                 # UNCHANGED
-└── ...
+├── cli/
+│   ├── ingest.py               # NEW: sct concat command (wraps ingest.concat_samples)
+│   └── qc.py                   # EXISTS: sct report generate (no changes needed)
+├── qc/
+│   └── report.py               # MODIFIED: add spatial 4-panel + celltype spatial sections
+├── pl/
+│   ├── spatial.py              # MODIFIED: add qc_spatial_4panel() wrapper function
+│   └── qc_plots.py             # EXISTS: unchanged (UMAP grid already works)
+├── assets/
+│   ├── pre_filter_qc_template.html      # MODIFIED: add spatial-plots section
+│   └── post_celltyping_qc_template.html # MODIFIED: add celltype-spatial section
+└── pipeline.py                 # MODIFIED: add concat PhaseSpec
 ```
 
 ### Structure Rationale
 
-- **`cli/` as separate package:** CLI is a pure interface layer. Isolating it prevents library code from depending on CLI concerns (arg parsing, output formatting). The library stays importable without Typer installed.
-- **One file per domain:** Mirrors existing sc_tools module structure (qc, pp, tl, bm, ingest). Agents and humans navigate the same mental model.
-- **Private `_types.py`, `_output.py`, `_io.py`, `_provenance.py`:** Cross-cutting concerns shared by all command files. Prefixed with `_` to signal internal-only.
-- **No changes to existing library code:** The CLI wraps sc_tools; it does not modify it. This is a critical constraint from PROJECT.md.
+- **`cli/ingest.py` is a new file** (not `cli/qc.py`) because concat is an ingestion-layer operation — it merges per-sample AnnDatas before QC runs. The naming mirrors the `sc_tools/ingest/` backend it wraps.
+- **Plot code stays in `sc_tools/pl/`** — all new plot functions belong in `pl/spatial.py` (for spatial overlays) or `pl/qc_plots.py` (for UMAP/abundance). The report.py orchestrator calls these functions and converts figures to base64 via `fig_to_base64()`. Do not put plot-generation code directly in report.py.
+- **Templates only receive pre-rendered base64 strings** — the Jinja2 templates remain logic-free. All conditionals about whether a section exists happen in report.py before rendering, not inside the template.
+- **No new `sc_tools/pl/report.py` module** — the existing `sc_tools/qc/report.py` is the report orchestrator. Adding a second report module would create confusion. Extend the existing one.
 
 ## Architectural Patterns
 
-### Pattern 1: Thin Adapter Commands
+### Pattern 1: Base64 PNG Embedding (existing, authoritative)
 
-**What:** Each CLI command is a thin function that (1) loads data via IO Gateway, (2) calls exactly one sc_tools function, (3) wraps the result in CommandResult, (4) writes provenance sidecar. No business logic in the CLI layer.
+**What:** Matplotlib figures are rendered to PNG in memory via `fig_to_base64(fig, dpi=150)` from `sc_tools/qc/report_utils.py`, which returns a base64-encoded string. The string is placed directly into the `plots` dict passed to Jinja2 as `<img src="data:image/png;base64,{...}">`. No external files are written for plots.
 
-**When to use:** Every command. This is the universal pattern.
+**Why base64 PNG over alternatives:**
+- Plotly JSON would require the Plotly JS bundle in every report. Current reports are self-contained (no CDN dependency). Plotly is useful for interactive charts but adds ~3MB per report.
+- Inline SVG works but matplotlib SVG output for spatial scatter plots with 50K+ points is very large (one `<circle>` element per point). PNG with `rasterized=True` is necessary for spatial data.
+- The existing pattern is consistent across all four report types. Maintaining consistency avoids a dual-rendering path.
 
-**Trade-offs:** Pro: library and CLI evolve independently, library stays testable without CLI. Con: some boilerplate per command. Worth it because the boilerplate is mechanical and keeps boundaries clean.
+**Confirmed:** `generate_post_filter_report()` already generates spatial plots this way (lines 302-334 in report.py). Follow the same pattern for pre_filter and post_celltyping.
 
-**Example:**
+### Pattern 2: Per-Sample Spatial Loop
+
+**What:** For any spatial plot section, iterate over unique sample IDs, subset the AnnData, and generate one figure per sample. Append `{"sample": lib_id, "img": base64_string}` to a list. Pass the list to Jinja2 as a template variable. The template iterates and renders one plot per sample row.
+
+**Guard conditions before attempting the loop:**
 ```python
-# sc_tools/cli/qc.py
+_has_spatial = (
+    "spatial" in adata.obsm
+    and sample_col in adata.obs.columns
+    and adata.uns.get("spatial")  # has per-sample spatial metadata
+)
+```
+
+**Subset pattern (from existing post_filter code):**
+```python
+for lib in sorted(adata.obs[sample_col].dropna().unique()):
+    if str(lib) not in adata.uns.get("spatial", {}):
+        continue
+    sub = adata[adata.obs[sample_col] == lib].copy()
+    try:
+        fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+        sc.pl.spatial(sub, color=color_key, library_id=str(lib),
+                      show=False, ax=ax, frameon=False)
+        plots_list.append({"sample": str(lib), "img": fig_to_base64(fig)})
+        plt.close(fig)
+    except Exception:
+        logger.debug("Spatial plot failed for %s", lib, exc_info=True)
+        plt.close("all")
+```
+
+**squidpy.pl.spatial_scatter interaction:** squidpy's `spatial_scatter` is an alternative to `sc.pl.spatial`. Both read the same AnnData structure: `adata.obsm["spatial"]` for coordinates and `adata.uns["spatial"][library_id]` for the H&E image. The existing codebase uses `sc.pl.spatial` (scanpy), not `squidpy.pl.spatial_scatter`. Use `sc.pl.spatial` for consistency — it already handles the `library_id` argument and per-library subsetting. squidpy's plotting API is higher-level but adds a dependency. Only adopt `squidpy.pl` if a specific feature (e.g., multi-panel spatial layout) is not achievable with scanpy.
+
+### Pattern 3: New Spatial 4-Panel Function in pl/spatial.py
+
+**What:** Add `qc_spatial_4panel(adata_sub, library_id, metric_keys)` to `sc_tools/pl/spatial.py`. This function produces a 1x4 (or 2x2) grid of spatial scatter plots for a single sample, one panel per QC metric. `report.py` calls this function per sample inside the per-sample loop.
+
+**Signature design:**
+```python
+def qc_spatial_4panel(
+    adata: AnnData,
+    library_id: str,
+    metric_keys: list[str] | None = None,  # defaults: log1p_total_counts, log1p_n_genes_by_counts, pct_counts_mt, qc_pass
+    figsize: tuple[float, float] = (20, 5),
+    dpi: int = 120,
+) -> plt.Figure:
+```
+
+**Metric key defaults for QC report:** `["log1p_total_counts", "log1p_n_genes_by_counts", "pct_counts_mt", "qc_pass"]`. These need to exist in `adata.obs` before the function is called. `report.py` must ensure they are computed (see data flow section).
+
+**obs column validation:** The function should silently skip panels for missing columns rather than raising — spatial data may not have MT reads (some platforms). Return a partial figure with blank panels for missing metrics.
+
+### Pattern 4: cli_handler Decorator for sct concat
+
+**What:** `sct concat` must follow the exact same `@cli_handler` + `CLIResult` pattern as all other CLI commands. The decorator handles provenance, exit codes, and JSON/human output.
+
+```python
+# sc_tools/cli/ingest.py
+from sc_tools.cli import _check_deps, cli_handler
+from sc_tools.models.result import CLIResult, Provenance, Status
 import typer
-from sc_tools.cli._types import CommandResult
-from sc_tools.cli._io import load_adata_safe
-from sc_tools.cli._provenance import track_provenance
-from sc_tools.cli._output import emit
 
-app = typer.Typer(name="qc", help="Quality control operations")
+ingest_app = typer.Typer(help="Data ingestion commands")
 
-@app.command()
-@track_provenance
-def filter(
-    input: str = typer.Argument(..., help="Path to h5ad file"),
-    output: str = typer.Option("filtered.h5ad", help="Output path"),
-    min_genes: int = typer.Option(200),
-    min_counts: int = typer.Option(500),
-    human: bool = typer.Option(False, help="Human-readable output"),
+@ingest_app.command("concat")
+@cli_handler
+def concat(
+    input_files: list[str] = typer.Argument(..., help="Paths to per-sample h5ad files"),
+    output: str = typer.Option(..., "--output", "-o", help="Output concatenated h5ad path"),
+    sample_col: str = typer.Option("sample", "--sample-col", help="Sample identifier column"),
+    modality: str = typer.Option("visium", "--modality", "-m", help="Data modality"),
+    calculate_qc: bool = typer.Option(True, "--qc/--no-qc", help="Run QC metrics after concat"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate inputs without executing"),
 ) -> None:
-    """Filter low-quality cells from AnnData."""
-    from sc_tools.qc import calculate_qc_metrics, filter_cells
-
-    adata = load_adata_safe(input)
-    calculate_qc_metrics(adata)
-    n_before = adata.n_obs
-    filter_cells(adata, min_genes=min_genes, min_counts=min_counts)
-    adata.write_h5ad(output)
-
-    result = CommandResult(
-        status="success",
-        data={"n_before": n_before, "n_after": adata.n_obs, "output": output},
+    """Concatenate per-sample AnnData files into a single multi-sample h5ad (CMD-concat)."""
+    _check_deps(["scanpy", "anndata"])
+    from pathlib import Path
+    from sc_tools.ingest import concat_samples
+    ...
+    return CLIResult(
+        status=Status.success,
+        command="concat",
+        data={"n_samples": n_samples, "n_cells": n_cells, "output": str(output_path)},
+        artifacts=[str(output_path)],
+        provenance=Provenance(command="concat"),
+        message=f"Concatenated {n_samples} samples: {n_cells} cells -> {output_path}",
     )
-    emit(result, human=human)
 ```
 
-### Pattern 2: CommandResult Envelope
+**Registration in `__main__.py` or `cli/__init__.py`:** The new `ingest_app` must be added to the root `app` the same way `qc_app` and `report_app` are registered. Check `sc_tools/__main__.py` for the `app.add_typer()` calls.
 
-**What:** Every command returns the same JSON envelope structure. Agents parse `status` and `data` fields; humans get formatted tables. Errors follow the same envelope with `status: "error"`.
+### Pattern 5: Pipeline Phase Registration for concat
 
-**When to use:** All commands. Consistency is the point.
+**What:** Add a `concat` PhaseSpec to `STANDARD_PHASES` in `sc_tools/pipeline.py`. This makes `sct status` report concat completion and allows DAG-aware dependency checks.
 
-**Trade-offs:** Pro: agents always know the response shape; error handling is uniform. Con: slightly verbose for trivial commands. Worth it because agents parse this programmatically.
+**Correct placement in DAG:** concat sits between `ingest_load` (per-sample h5ads) and `qc_filter` (multi-sample filtered h5ad). It replaces the implicit concatenation that previously happened inside `qc_filter`.
 
-**Example:**
 ```python
-# sc_tools/cli/_types.py
-from dataclasses import dataclass, field, asdict
-from typing import Any
-import json
-
-@dataclass
-class CommandResult:
-    status: str  # "success" | "error"
-    data: dict[str, Any] = field(default_factory=dict)
-    provenance: dict[str, Any] | None = None
-    warnings: list[str] = field(default_factory=list)
-
-    def to_json(self) -> str:
-        return json.dumps(asdict(self), indent=2, default=str)
+"concat": PhaseSpec(
+    label="Multi-Sample Concatenation",
+    depends_on=[_dp("ingest_load")],
+    branch="ingestion",
+    checkpoint="results/adata.concatenated.h5ad",
+    phase_group=_DP,
+    required_obs=["sample", "library_id", "raw_data_dir"],
+    required_obsm=["spatial"],
+    x_format="raw counts, concatenated",
+    old_code="p0c",
+),
 ```
 
-**JSON output (stdout):**
-```json
-{
-  "status": "success",
-  "data": {
-    "n_before": 125000,
-    "n_after": 98432,
-    "output": "results/adata.filtered.h5ad"
-  },
-  "provenance": {
-    "command": "sct qc filter",
-    "input": "results/adata.raw.h5ad",
-    "output": "results/adata.filtered.h5ad",
-    "params": {"min_genes": 200, "min_counts": 500},
-    "duration_seconds": 12.3,
-    "timestamp": "2026-03-20T14:30:00Z"
-  },
-  "warnings": []
-}
-```
+**Update `qc_filter` dependency:** Change `qc_filter.depends_on` from `[_dp("ingest_load")]` to `[_dp("concat")]` only if concat becomes mandatory. If concat is optional (projects may still ingest pre-concatenated data), keep it `optional=True` and leave `qc_filter` depending on `ingest_load`.
 
-### Pattern 3: JSON Sidecar Provenance
-
-**What:** Every output file gets a companion `.provenance.json` sidecar. The sidecar records the command, inputs (with checksums), parameters, outputs, timing, and environment. This is file-based lineage -- no database required.
-
-**When to use:** Every command that produces an output file.
-
-**Trade-offs:** Pro: zero infrastructure, grep-able, version-controllable, schema can evolve freely. Con: not queryable like a DB (addressed later by optional DB import). This matches the PROJECT.md decision: "file-based provenance before DB."
-
-**Example sidecar (`results/adata.filtered.h5ad.provenance.json`):**
-```json
-{
-  "command": "sct qc filter",
-  "version": "0.4.0",
-  "timestamp": "2026-03-20T14:30:00Z",
-  "duration_seconds": 12.3,
-  "inputs": [
-    {"path": "results/adata.raw.h5ad", "sha256": "abc123..."}
-  ],
-  "outputs": [
-    {"path": "results/adata.filtered.h5ad", "sha256": "def456..."}
-  ],
-  "params": {"min_genes": 200, "min_counts": 500},
-  "environment": {
-    "hostname": "brb-gpu01",
-    "gpu": "A100-80G",
-    "peak_memory_gb": 18.2
-  }
-}
-```
-
-### Pattern 4: Memory-Safe IO Gateway
-
-**What:** A wrapper around `sc_tools.storage` that chooses the loading strategy based on file size and available memory. For files under a threshold (configurable, default 8GB), load fully. For larger files, use h5py selective reads or AnnData backed mode. For metrics-only operations, subsample.
-
-**When to use:** Every command that reads h5ad files.
-
-**Trade-offs:** Pro: prevents OOM on 25G Visium HD files. Con: backed mode limits which operations are possible (only X is mutable). Mitigated by detecting which operations need full load vs. selective access.
-
-**Example:**
-```python
-# sc_tools/cli/_io.py
-import os
-from pathlib import Path
-
-def load_adata_safe(path: str, max_memory_gb: float = 8.0, subsample: int | None = None):
-    """Load AnnData with memory-aware strategy selection."""
-    import anndata as ad
-
-    file_size_gb = Path(path).stat().st_size / (1024 ** 3)
-
-    if subsample is not None:
-        # For metrics: load obs, subsample indices, load X[indices]
-        return _load_subsampled(path, n=subsample)
-    elif file_size_gb <= max_memory_gb:
-        return ad.read_h5ad(path)
-    else:
-        # Backed mode for large files
-        return ad.read_h5ad(path, backed="r")
-
-def _load_subsampled(path: str, n: int):
-    """Load only n random cells via h5py for metrics computation."""
-    import h5py
-    import numpy as np
-    import anndata as ad
-
-    with h5py.File(path, "r") as f:
-        n_obs = f["X"].shape[0]
-        indices = np.sort(np.random.choice(n_obs, min(n, n_obs), replace=False))
-        # Build AnnData from selected rows only
-        ...
-    return adata
-```
-
-### Pattern 5: Self-Describing Discovery
-
-**What:** `sct list-commands` returns a JSON array of all available commands with their descriptions, required inputs, and output types. `sct describe <command>` returns the full schema for a command. This lets agents discover capabilities at runtime.
-
-**When to use:** Agent integration. Agents call `sct list-commands` to know what is available, then `sct describe qc.filter` to get the parameter schema.
-
-**Trade-offs:** Pro: agents never need hardcoded knowledge of the CLI surface. Con: requires maintaining schema metadata alongside commands. Mitigated by deriving schemas from Typer's type annotations.
+**Recommendation:** Make concat `optional=True`. Some projects ingest a single-sample or pre-merged h5ad directly. The phase DAG should not force concat for those cases.
 
 ## Data Flow
 
-### Command Execution Flow
+### QC Report Plot Data Flow
 
 ```
-Agent/User invokes: sct pp preprocess --input adata.raw.h5ad --modality visium
+Checkpoint: results/adata.filtered.h5ad
+    |
+    | sct report generate post_filter --adata ...
+    v
+report.py: generate_post_filter_report()
+    |
+    | 1. Ensure obs columns exist:
+    |    - log1p_total_counts (np.log1p of total_counts)
+    |    - n_genes_by_counts (from sc.pp.calculate_qc_metrics)
+    |    - pct_counts_mt (from sc.pp.calculate_qc_metrics with mt vars)
+    |    - qc_pass (from classify_samples())
+    |
+    | 2. Check _has_spatial:
+    |    - "spatial" in adata.obsm
+    |    - sample_col in adata.obs.columns
+    |    - adata.uns.get("spatial") has per-library entries
+    |
+    | 3. For each sample: call pl.spatial.qc_spatial_4panel()
+    |    -> returns plt.Figure
+    | 4. fig_to_base64(fig) -> base64 PNG string
+    | 5. Append {"sample": lib, "img": b64} to spatial_qc_plots list
     |
     v
-[Typer CLI] parse args, validate types
+Jinja2 context: {"spatial_qc_plots": [...], "plots": {...}}
     |
     v
-[IO Gateway] check file size (25G) -> backed mode or subsample
+render_template("post_filter_qc_template.html", context)
     |
     v
-[Provenance Tracker] start timer, record inputs + params
-    |
-    v
-[sc_tools.pp.preprocess()] actual computation (unchanged library code)
-    |
-    v
-[IO Gateway] write output h5ad
-    |
-    v
-[Provenance Tracker] stop timer, compute output checksum, write sidecar JSON
-    |
-    v
-[Output Formatter] serialize CommandResult to JSON on stdout
-    |
-    v
-Agent reads JSON from stdout -> decides next step
+Self-contained HTML with embedded base64 PNGs
 ```
 
-### Provenance Chain
+### Integration Report UMAP Data Flow
 
 ```
-adata.raw.h5ad                    # Phase 0 output
-    |
-    +-- adata.raw.h5ad.provenance.json
-    |
-    v
-sct qc filter --input adata.raw.h5ad --output adata.filtered.h5ad
+Checkpoint: results/adata.normalized.h5ad
+    Required obs: leiden (cluster labels)
+    Required obsm: X_umap, X_scvi (or other integration embeddings)
     |
     v
-adata.filtered.h5ad               # Phase 1 output
+generate_post_integration_report()
     |
-    +-- adata.filtered.h5ad.provenance.json  (links to adata.raw.h5ad via inputs)
+    | Already implemented: qc_umap_grid(adata, color_keys=[sample_col, batch_key, "leiden"])
+    | Already implemented: qc_embedding_umap_grid(adata, embedding_keys, color_key=sample_col)
+    | Already implemented: qc_cluster_distribution(adata, cluster_key, sample_col)
     |
+    | New for v2.0: explicit bio obs columns in color_keys
+    |   - Add patient/subject_id if present
+    |   - Add any column listed in PhaseSpec.required_obs for preprocess phase
     v
-sct pp preprocess --input adata.filtered.h5ad --output adata.integrated.h5ad
-    |
-    v
-adata.integrated.h5ad             # Phase 3 output
-    |
-    +-- adata.integrated.h5ad.provenance.json  (links to adata.filtered.h5ad)
+No new code needed — extend color_keys list in existing function call
 ```
 
-Each sidecar's `inputs[].path` field forms a DAG that can be walked to reconstruct the full lineage without a database.
+### Celltype Report Spatial Data Flow
+
+```
+Checkpoint: results/adata.celltyped.h5ad
+    Required obs: celltype, celltype_broad
+    Required obsm: spatial (for spatial plots), X_umap (for UMAP)
+    |
+    v
+generate_post_celltyping_report()
+    |
+    | NEW: Add spatial celltype section
+    | For each sample:
+    |   sub = adata[adata.obs[sample_col] == lib].copy()
+    |   sc.pl.spatial(sub, color="celltype", library_id=lib, ...)
+    |   fig_to_base64(fig) -> base64 PNG
+    |
+    v
+Jinja2 context: {"celltype_spatial_plots": [...]}
+    |
+    v
+post_celltyping_qc_template.html with new celltype-spatial section
+```
+
+### sct concat Data Flow
+
+```
+Per-sample h5ad files: data/s1/adata.ingested.h5ad, data/s2/adata.ingested.h5ad, ...
+    |
+    | sct concat s1.h5ad s2.h5ad --output results/adata.concatenated.h5ad
+    v
+cli/ingest.py: concat()
+    |
+    | Validate: all input files exist
+    | Validate: same modality (check adata.uns["spatial"] keys)
+    | Load each h5ad (sequential, not parallel -- memory constraint)
+    | Call sc_tools.ingest.concat_samples(adatas, sample_col=sample_col, calculate_qc=True)
+    | Write output h5ad
+    | Write .provenance.json sidecar
+    |
+    v
+CLIResult: {status, data: {n_samples, n_cells, output}, artifacts: [output_path]}
+```
 
 ### Key Data Flows
 
-1. **Ingestion flow:** Raw vendor output -> `sct ingest load` -> h5ad + sidecar. Multiple samples -> `sct ingest concat` -> merged h5ad + sidecar listing all input sidecars.
-2. **Analysis flow:** h5ad -> `sct qc filter` -> `sct pp preprocess` -> `sct tl annotate` -> final h5ad. Each step reads previous output, writes new output + sidecar.
-3. **Benchmarking flow:** Multiple h5ad files (one per method) -> `sct bm compare` -> metrics JSON + report HTML. Reads selectively via h5py (no full load).
-4. **Discovery flow:** Agent calls `sct list-commands` -> gets JSON array -> selects command -> calls `sct describe <cmd>` -> gets param schema -> constructs and executes command.
+1. **Pre-filter spatial plots:** `adata.filtered.h5ad` (post-QC, pre-concat or pre-integration) -> per-sample spatial scatter of log1p_counts, log1p_genes, pct_mt, pass/fail -> 4-panel base64 PNGs -> pre_filter template.
 
-## Scaling Considerations
+2. **Integration UMAPs:** `adata.normalized.h5ad` with `X_umap` and integration embeddings in `obsm` -> `qc_umap_grid()` colored by leiden, batch, sample, patient -> base64 PNGs -> post_integration template. **Already implemented.**
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| Small datasets (<500K cells, <4G) | Default full-memory load. No special handling needed. |
-| Medium datasets (500K-2M cells, 4-15G) | IO Gateway auto-selects backed mode. Most operations work. Some methods (scVI) need full load -- subsample first. |
-| Large datasets (2M+ cells, 15-25G) | Mandatory backed mode or h5py selective reads. Metrics via subsampling (50K-100K cells). Integration on HPC with GPU. CLI generates SLURM scripts via `sct slurm generate`. |
+3. **Celltype spatial:** `adata.celltyped.h5ad` with `celltype` in `obs` and `spatial` in `obsm` -> per-sample spatial scatter colored by cell type -> base64 PNGs -> post_celltyping template.
 
-### Scaling Priorities
+4. **Concat ingestion:** N per-sample h5ads -> `concat_samples()` -> single multi-sample h5ad with QC metrics -> registered in pipeline DAG as `concat` phase.
 
-1. **First bottleneck: Memory on load.** The 25G Visium HD files cannot be fully loaded on most machines. The IO Gateway's memory-budget strategy is the critical feature. Build this in Phase 1.
-2. **Second bottleneck: Integration runtime.** scVI on 2.5M cells takes hours even on GPU. The CLI does not solve this directly -- it delegates to HPC via SLURM script generation (`sct slurm generate`), which already exists in the library.
-3. **Third bottleneck: Benchmarking I/O.** Loading multiple 25G h5ad files for comparison. Solved by h5py selective reads -- load only `obsm['X_scvi']` and `obs` columns needed for metrics, never full X.
+## Obs Column / obsm Key Validation
+
+Each report type has a minimum data contract. The CLI command must validate these exist before calling the report generator. Failure should return `CLIResult(status=Status.error, ...)` with a clear message, not a Python traceback.
+
+### Pre-filter / Post-filter Report
+
+| Key | Location | Required For | How to Compute if Missing |
+|-----|----------|--------------|---------------------------|
+| `total_counts` | `obs` | Spatial color axis | `sc.pp.calculate_qc_metrics()` |
+| `log1p_total_counts` | `obs` | Spatial 4-panel | `np.log1p(adata.obs["total_counts"])` inline |
+| `n_genes_by_counts` | `obs` | Spatial 4-panel | `sc.pp.calculate_qc_metrics()` |
+| `log1p_n_genes_by_counts` | `obs` | Spatial 4-panel | `np.log1p(adata.obs["n_genes_by_counts"])` inline |
+| `pct_counts_mt` | `obs` | Spatial 4-panel | `sc.pp.calculate_qc_metrics(qc_vars=[...])` — skip panel if absent |
+| `qc_pass` | `obs` | Spatial 4-panel pass/fail | `classify_samples()` output |
+| `spatial` | `obsm` | All spatial plots | Must exist; skip spatial section if absent |
+| `spatial` | `uns` per library | All spatial plots | Must have per-sample entries; skip sample if absent |
+| `library_id` or `sample_col` | `obs` | Per-sample loop | Must exist; raise SCToolsDataError if absent |
+
+### Post-integration Report
+
+| Key | Location | Required For | Notes |
+|-----|----------|--------------|-------|
+| `X_umap` | `obsm` | UMAP grid | Skip UMAP section if absent |
+| `leiden` | `obs` | UMAP color, cluster distribution | Required for integration report |
+| `batch_key` (auto-detected) | `obs` | UMAP color, integration metrics | Falls back to `library_id` |
+| Any `X_scvi`, `X_harmony`, etc. | `obsm` | Per-embedding UMAP, benchmark | Auto-detected by `auto_detect_embeddings()` |
+
+### Post-celltyping Report
+
+| Key | Location | Required For | Notes |
+|-----|----------|--------------|-------|
+| `celltype` | `obs` | All sections | Hard required; raise ValueError if absent |
+| `celltype_broad` | `obs` | Abundance chart | Optional |
+| `X_umap` | `obsm` | UMAP colored by celltype | Skip if absent |
+| `spatial` | `obsm` | Spatial celltype plots | Skip spatial section if absent |
+
+### sct concat Pre-execution Validation
+
+```
+For each input file:
+  - File exists and is readable
+  - adata.obs contains sample_col
+  - adata.obsm["spatial"] exists (warn if absent for spatial modalities)
+  - adata.X is raw counts (check adata.uns["sc_tools"]["x_format"] if present)
+
+Cross-file:
+  - All files have consistent var_names (same genes)
+  - Warn if uns["spatial"] keys overlap (duplicate library IDs)
+```
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Business Logic in CLI Layer
+### Anti-Pattern 1: Plot Code in report.py
 
-**What people do:** Put data transformations, filtering logic, or algorithmic decisions in CLI command functions.
-**Why it's wrong:** CLI commands become untestable without CLI invocation. Library and CLI couple tightly. Breaks the "CLI wraps sc_tools, not replaces it" constraint.
-**Do this instead:** CLI commands call exactly one library function. If you need a new operation, add it to the library first, then wrap it.
+**What people do:** Write matplotlib figure generation directly inside `generate_pre_filter_report()` or similar functions.
+**Why it's wrong:** report.py becomes a 1000+ line file mixing orchestration with figure styling. Plot functions cannot be reused outside reports (e.g., in notebooks, MCP tools). The existing separation (`qc/plots.py`, `pl/spatial.py`, `pl/qc_plots.py`) is deliberate.
+**Do this instead:** Add new plot functions to the appropriate `pl/` submodule. Call them from report.py and convert with `fig_to_base64()`. The report orchestrator should contain no matplotlib calls directly.
 
-### Anti-Pattern 2: Eager Full Load of Large Files
+### Anti-Pattern 2: Plotly for Spatial Scatter Plots
 
-**What people do:** `adata = sc.read_h5ad(path)` for every command, even when only obs metadata is needed.
-**Why it's wrong:** OOM on Visium HD datasets. The PROJECT.md origin story is literally about an agent script that OOM'd at 44G because it loaded everything.
-**Do this instead:** IO Gateway checks file size, selects strategy (full/backed/h5py-selective/subsample). Commands declare their access pattern (full, obs-only, obsm-selective).
+**What people do:** Use Plotly for interactive spatial plots to enable zoom/pan.
+**Why it's wrong:** Spatial datasets have 50K-2.5M spots. Plotly renders each point as an SVG element; the HTML becomes multi-megabyte and unusable. Rasterized PNG at 120-150 DPI is the correct choice for large spatial datasets.
+**Do this instead:** Use `sc.pl.spatial()` with `rasterized=True` (scanpy sets this automatically for spatial plots). Use `fig_to_base64(fig, dpi=120)`. Reserve Plotly for small data: metrics tables (already used in benchmark reports), sample-level summary charts.
 
-### Anti-Pattern 3: Unstructured stdout Mixing
+### Anti-Pattern 3: Subsetting adata Before Spatial Plot Without uns Copy
 
-**What people do:** `print()` status messages, progress, and results all to stdout.
-**Why it's wrong:** Agents parse stdout as JSON. Any non-JSON text breaks parsing. Progress messages corrupt the output stream.
-**Do this instead:** JSON result on stdout. All logging, progress, and status messages go to stderr. Use `typer.echo(msg, err=True)` for human-visible messages.
+**What people do:** `sub = adata[mask]` (view, not copy) and pass to `sc.pl.spatial()`.
+**Why it's wrong:** `adata.uns["spatial"]` contains per-library image data. A plain slice view may not have the correct `uns` structure for the selected library. `sc.pl.spatial()` accesses `uns["spatial"][library_id]` and will fail or show wrong image.
+**Do this instead:** `sub = adata[adata.obs[sample_col] == lib].copy()` — always `.copy()` when subsetting for spatial plots. This is the pattern already used in `generate_post_filter_report()` at line 313 in report.py.
 
-### Anti-Pattern 4: Provenance as Afterthought
+### Anti-Pattern 4: Loading Full adata for concat When Only obs/var Needed for Validation
 
-**What people do:** Build all commands first, add provenance tracking later as a separate pass.
-**Why it's wrong:** Retrofitting provenance means inconsistent coverage, missed edge cases, and schema that does not match actual usage patterns.
-**Do this instead:** Build provenance tracking in Phase 1 as a decorator/context manager. Every command gets it from day one via `@track_provenance`.
+**What people do:** Load all N h5ad files fully into memory to validate compatibility, then concatenate.
+**Why it's wrong:** For 10-sample Visium HD projects, validation would load 10 × 25G = 250G before a single byte is written.
+**Do this instead:** For the validation pass in `sct concat`, use h5py to read only `obs` and `var_names` from each file:
+```python
+import h5py
+with h5py.File(path, "r") as f:
+    var_names = f["var"]["_index"][:]
+    n_obs = f["obs"]["_index"].shape[0]
+```
+Load full AnnDatas only for the actual concat operation, sequentially (not all at once), streaming into `anndata.concat()` if memory is tight.
 
-### Anti-Pattern 5: Fat Command Objects
+### Anti-Pattern 5: Registering concat as a Mandatory Upstream Dependency
 
-**What people do:** Create elaborate Command/Handler/Executor class hierarchies with abstract base classes and factory patterns.
-**Why it's wrong:** Over-engineering for a CLI that wraps an existing library. Each command is fundamentally: load, call, save, report.
-**Do this instead:** Plain functions with a Typer decorator. The `CommandResult` dataclass is the only shared abstraction. Keep it flat.
+**What people do:** Add concat as a hard dependency for qc_filter, forcing all projects through the concat phase.
+**Why it's wrong:** Some projects ingest a single pre-merged h5ad. Others already have a concatenated checkpoint from a previous run. Making concat mandatory breaks backward compat with existing projects.
+**Do this instead:** Mark the concat phase `optional=True` in PhaseSpec. qc_filter continues to depend on `ingest_load` (the lowest-common-denominator checkpoint). The pipeline DAG already supports optional phases.
 
 ## Integration Points
 
-### External Services
+### New vs Modified Files
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| HPC (SLURM) | `sct slurm generate` produces sbatch scripts | Delegates to existing `sc_tools/ingest/slurm.py` and `sc_tools/bm/slurm.py` |
-| Cloud storage (S3/GCS) | IO Gateway uses `sc_tools.storage.resolve_fs()` | fsspec handles all URI resolution; CLI just passes paths through |
-| Registry DB (SQLAlchemy) | Optional: `sct registry status` reads from DB | Existing `sc_tools/registry.py`; CLI wraps `_cli_status()` |
-| MCP server | Coexists; MCP calls library directly, CLI is for subprocess invocation | Agents may use MCP for in-process calls or CLI for subprocess isolation |
+| File | Change Type | What Changes |
+|------|-------------|--------------|
+| `sc_tools/cli/ingest.py` | NEW | `sct concat` command, `ingest_app` Typer group |
+| `sc_tools/cli/__init__.py` | MODIFIED | Register `ingest_app` via `app.add_typer(ingest_app, name="ingest")` |
+| `sc_tools/pipeline.py` | MODIFIED | Add `concat` PhaseSpec to `STANDARD_PHASES` |
+| `sc_tools/pl/spatial.py` | MODIFIED | Add `qc_spatial_4panel()` function |
+| `sc_tools/qc/report.py` | MODIFIED | Add spatial 4-panel loop to `generate_pre_filter_report()`; add celltype spatial loop to `generate_post_celltyping_report()` |
+| `sc_tools/assets/pre_filter_qc_template.html` | MODIFIED | Add spatial-qc-plots section |
+| `sc_tools/assets/post_celltyping_qc_template.html` | MODIFIED | Add celltype-spatial section |
+| `sc_tools/pl/__init__.py` | MODIFIED | Export `qc_spatial_4panel` |
+
+### Unchanged Files (confirmed)
+
+| File | Why Unchanged |
+|------|---------------|
+| `sc_tools/ingest/loaders.py` | `concat_samples()` already exists and is correct |
+| `sc_tools/cli/qc.py` | `sct report generate` already calls the right functions; report.py changes propagate automatically |
+| `sc_tools/qc/report_utils.py` | `fig_to_base64()`, `render_template()`, `auto_detect_embeddings()` all exist and work |
+| `sc_tools/pl/qc_plots.py` | `qc_umap_grid()`, `qc_cluster_distribution()`, `qc_celltype_abundance()` all exist and are already used by post_integration/post_celltyping reports |
+| `sc_tools/qc/spatial.py` | Spatial autocorrelation (SVG computation); not relevant to plot generation |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| CLI -> Library | Direct Python function calls | CLI imports and calls library functions. No serialization boundary. |
-| CLI -> IO Gateway | Function calls with path + memory budget | IO Gateway wraps `sc_tools.storage` with memory-awareness |
-| CLI -> Provenance | Decorator + context manager | `@track_provenance` wraps command function; writes sidecar on completion |
-| CLI -> Output Formatter | `emit(result, human=bool)` | Single function that serializes to JSON (stdout) or Rich table (stdout) |
-| Command files -> _types | Import `CommandResult` | Shared dataclass; all commands return the same envelope |
+| `report.py` -> `pl/spatial.py` | Direct function call, returns `plt.Figure` | New `qc_spatial_4panel()` follows same signature pattern as existing `plot_spatial_continuous()` |
+| `report.py` -> `pl/qc_plots.py` | Direct function call, returns `plt.Figure` | Already established; no changes |
+| `report.py` -> `report_utils.fig_to_base64` | Function call, returns `str` | Existing utility; use as-is |
+| `cli/ingest.py` -> `ingest/loaders.concat_samples` | Direct import + call | Existing function; CLI is a thin wrapper |
+| `cli/ingest.py` -> `pipeline.py` | Not at call time — pipeline registration is static at import | PhaseSpec added to STANDARD_PHASES; `sct status` reads it |
+| `report.py` -> Jinja2 templates | `render_template(template_name, context_dict)` | context keys are the only contract; template changes must match new keys |
 
-### CLI vs MCP: When to Use Each
+## Build Order
 
-| Scenario | Use CLI | Use MCP |
-|----------|---------|---------|
-| Agent runs analysis step | Yes -- subprocess isolation, structured JSON output | Also works -- in-process, lower overhead |
-| Snakemake rule calls sc_tools | Yes -- Snakemake invokes CLI as shell command | No -- MCP requires running server |
-| Human runs analysis | Yes -- with `--human` flag | No -- MCP is agent-only |
-| Claude Code orchestrator | Either -- MCP for quick queries, CLI for heavy compute | Either |
-| HPC batch job | Yes -- CLI is the entry point in sbatch scripts | No -- MCP server not running on compute nodes |
-
-## Build Order (Dependency Graph)
-
-The CLI layer should be built in this order, where each phase depends on the previous:
+Build in this order to respect checkpoint dependencies and minimize rework:
 
 ```
-Phase 1: Foundation
-    _types.py (CommandResult)
-    _output.py (JSON/human formatter)
-    _io.py (memory-safe loading)
-    _provenance.py (sidecar writer + decorator)
-    __init__.py (Typer app factory, global --human/--verbose flags)
-    info.py (sct list-commands, sct describe)
-        |
-        v
-Phase 2: Core Commands (highest immediate value)
-    qc.py (filter, metrics, report -- most common operations)
-    pp.py (preprocess, normalize, integrate)
-    ingest.py (load, manifest, concat)
-        |
-        v
-Phase 3: Analysis + Benchmarking
-    tl.py (score, annotate, deconvolve)
-    bm.py (run, compare, report -- replaces existing bm/cli.py)
-        |
-        v
-Phase 4: Multi-modal Assembly
-    assembly.py (build-mudata, cross-modal queries)
+Phase A: sct concat + pipeline registration (no report dependencies)
+    1. sc_tools/pipeline.py — add concat PhaseSpec (optional=True)
+    2. sc_tools/cli/ingest.py — sct concat command
+    3. sc_tools/cli/__init__.py — register ingest_app
+    VALIDATES: sct concat runs, produces adata.concatenated.h5ad
+               sct status shows concat phase
+
+Phase B: Spatial 4-panel plot function (no template changes yet)
+    4. sc_tools/pl/spatial.py — add qc_spatial_4panel()
+    5. sc_tools/pl/__init__.py — export qc_spatial_4panel
+    VALIDATES: function importable, produces correct 4-panel figure on test data
+
+Phase C: Pre-filter report spatial section
+    6. sc_tools/qc/report.py — add spatial_qc_plots loop to generate_pre_filter_report()
+    7. sc_tools/assets/pre_filter_qc_template.html — add spatial-qc section
+    VALIDATES: sct report generate pre_filter produces HTML with spatial panels
+    CHECKPOINT: results/adata.filtered.h5ad with obsm["spatial"]
+
+Phase D: Post-celltyping report spatial section
+    8. sc_tools/qc/report.py — add celltype_spatial_plots loop to generate_post_celltyping_report()
+    9. sc_tools/assets/post_celltyping_qc_template.html — add celltype-spatial section
+    VALIDATES: sct report generate post_celltyping produces HTML with celltype spatial panels
+    CHECKPOINT: results/adata.celltyped.h5ad with obs["celltype"] and obsm["spatial"]
+
+Phase E: Integration report bio obs column extension (lowest risk, existing infrastructure)
+    10. sc_tools/qc/report.py — extend color_keys in generate_post_integration_report()
+        to include patient/subject_id obs columns
+    VALIDATES: post_integration report shows patient UMAP panel
+    CHECKPOINT: results/adata.normalized.h5ad with obs["leiden"] and obsm["X_umap"]
 ```
 
-**Rationale:** Phase 1 infrastructure (types, IO, provenance) must exist before any command. Phase 2 covers the commands agents call most (QC and preprocessing). Phase 3 adds analysis. Phase 4 is late-stage because MuData assembly requires all modalities processed independently first.
+**Rationale for this order:**
+- Phase A (concat) has no dependencies on the plot pipeline. It can be built, tested, and merged independently before any report work starts.
+- Phase B (4-panel function) must precede Phase C (template changes) because the template assumes the function exists.
+- Phase C (pre-filter) before Phase D (celltyping) because pre-filter checkpoints are earlier in the pipeline and easier to test with minimal data.
+- Phase E (integration report extension) is last because it is the lowest risk change — extending an existing working section — and does not require new plot functions.
 
-## Technology Decision: Typer over argparse
+## squidpy.pl.spatial_scatter Interaction
 
-**Use Typer** (built on Click) for the CLI framework because:
+squidpy's `spatial_scatter` and scanpy's `sc.pl.spatial` both read from the same AnnData structure:
+- `adata.obsm["spatial"]` — N x 2 coordinate array
+- `adata.uns["spatial"][library_id]["images"]["hires"]` — H&E image array
+- `adata.uns["spatial"][library_id]["scalefactors"]["tissue_hires_scalef"]` — coordinate scale factor
 
-1. **Type-hint driven:** Function signatures become the CLI schema. No separate argparse definitions to maintain. This is critical for self-describing discovery -- `sct describe` can introspect Typer commands to generate parameter schemas.
-2. **Subcommand composition:** `app.add_typer(qc_app, name="qc")` mirrors the sc_tools module structure naturally.
-3. **Testing:** `typer.testing.CliRunner` captures output without subprocess overhead.
-4. **Rich integration:** Human-readable output gets tables, colors, progress bars for free via `--human` flag.
-5. **Click compatibility:** Existing `bm/cli.py` uses argparse; migration to Typer is straightforward since Typer wraps Click which is argparse-compatible in spirit.
+The existing codebase uses `sc.pl.spatial` exclusively for report generation (confirmed in `generate_post_filter_report()` at lines 320-326). `sc_tools/qc/spatial.py` uses squidpy for graph-based analysis (`sq.gr.spatial_neighbors`, `sq.gr.spatial_autocorr`), not for plotting.
 
-The existing `bm/cli.py` (argparse-based, 263 lines) demonstrates the pain: manual parser construction, manual dispatch, no structured output, no provenance. Typer eliminates the boilerplate while adding type safety.
+**Decision: use `sc.pl.spatial` for all report spatial plots.** Reasons:
+1. Consistency with existing code (no dual-path maintenance)
+2. `sc.pl.spatial` handles `library_id` subsetting and H&E overlay natively
+3. squidpy is a soft dependency (used lazily in `sc_tools/qc/spatial.py`); making it required for reports would break installs without squidpy
+4. squidpy's `spatial_scatter` is more powerful for multi-sample plots, but the per-sample subsetting pattern already achieves the same result
+
+If squidpy's `spatial_scatter` is needed in the future (e.g., side-by-side multi-sample layout), add it as an optional code path behind a try/import guard in `pl/spatial.py`, consistent with how squidpy is used elsewhere in the codebase.
 
 ## Sources
 
-- [Nextflow CLI architecture and command dispatch](https://deepwiki.com/nextflow-io/nextflow/2.2-command-line-interface)
-- [Nextflow workflow outputs: JSON params in, JSON manifest out](https://seqera.io/podcasts/episode-57-pipeline-chaining-meta-pipelines-part-2/)
-- [Snakemake codebase architecture: CLI -> API -> engine](https://snakemake.readthedocs.io/en/stable/project_info/codebase.html)
-- [Cell Ranger CLI: verb-based subcommands with structured outs/ directory](https://www.10xgenomics.com/support/software/cell-ranger/latest/resources/cr-command-line-arguments)
-- [Typer: type-hint-driven CLI framework](https://github.com/fastapi/typer)
-- [scanpy.read_h5ad backed mode for memory efficiency](https://scanpy.readthedocs.io/en/stable/generated/scanpy.read_h5ad.html)
-- [scanpy backed mode limitations with large datasets](https://github.com/scverse/scanpy/issues/2365)
-- [HyProv: sidecar-based provenance for scientific workflows](https://arxiv.org/html/2511.07574)
-- [yProv4ML: PROV-JSON format for ML provenance](https://arxiv.org/pdf/2507.01075)
-- [Python CLI framework comparison 2025: Click at 38.7% adoption](https://dasroot.net/posts/2025/12/building-cli-tools-python-click-typer-argparse/)
+All findings are HIGH confidence from direct codebase inspection (2026-03-27):
+
+- `sc_tools/qc/report.py` — existing report generators and base64 embedding pattern
+- `sc_tools/pl/spatial.py` — existing spatial plot primitives
+- `sc_tools/pl/qc_plots.py` — existing UMAP grid and abundance functions
+- `sc_tools/pl/__init__.py` — existing pl module exports
+- `sc_tools/qc/plots.py` — existing QC plot functions (re-exported via pl)
+- `sc_tools/pipeline.py` — PhaseSpec DAG structure and registration API
+- `sc_tools/cli/__init__.py` — cli_handler decorator, CLIResult, app structure
+- `sc_tools/cli/qc.py` — existing report generate command pattern
+- `sc_tools/ingest/__init__.py` — concat_samples function availability
+- `sc_tools/ingest/loaders.py` — concat_samples signature (adatas, sample_col, calculate_qc)
+- `.planning/PROJECT.md` — v2.0 milestone target features and constraints
 
 ---
-*Architecture research for: agent-native CLI layer on sc_tools*
-*Researched: 2026-03-20*
+*Architecture research for: v2.0 spatial/UMAP plot integration into sc_tools report pipeline*
+*Researched: 2026-03-27*

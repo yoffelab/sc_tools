@@ -1301,14 +1301,13 @@ class TestBaseReportTemplate:
         )
         assert "<!DOCTYPE html>" in result
 
-    def test_base_template_has_bootstrap_and_plotly_cdns(self):
+    def test_base_template_has_bootstrap_cdn(self):
         from pathlib import Path
 
         assets = Path(__file__).parent.parent / "assets"
         content = (assets / "base_report_template.html").read_text()
         assert "bootswatch" in content or "flatly" in content
         assert "bootstrap.bundle.min.js" in content
-        assert "plotly-3.4.0.min.js" in content
 
 
 class TestBmReportUsesSharedRenderTemplate:

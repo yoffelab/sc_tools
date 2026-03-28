@@ -514,7 +514,7 @@ def _wrap_with_tabs(
         title = current_label
 
     # Always include Plotly CDN (some reports embed it, unified wrapper needs it)
-    plotly_cdn = '<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>'
+    plotly_cdn = '<script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>'
 
     # Build list of all tabs: current first, then previous in order
     all_tabs: list[tuple[str, str, str]] = [(current_label, current_content, current_css)]

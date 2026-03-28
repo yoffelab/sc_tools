@@ -26,7 +26,7 @@ The gold standard is ydata-profiling: Bootstrap 5 + Jinja2 + anchor nav + tabs.
 | CSS framework | Bootstrap 5.3.8 | `https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/css/bootstrap.min.css` |
 | Theme | Bootswatch Flatly | `https://cdn.jsdelivr.net/npm/bootswatch@5.3.3/dist/flatly/bootstrap.min.css` |
 | JS (includes Popper) | Bootstrap Bundle 5.3.8 | `https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.8/js/bootstrap.bundle.min.js` |
-| Charts | Plotly 2.27.0 | `https://cdn.plot.ly/plotly-2.27.0.min.js` |
+| Charts | Plotly 3.4.0 | `https://cdn.plot.ly/plotly-3.4.0.min.js` |
 | Templating | Jinja2 (Python) | — |
 
 **NEVER use `plotly-latest`** — the CDN deprecated it and it may break silently.
@@ -166,7 +166,7 @@ context["plot_ranking"] = plotly_div
 
 Include Plotly JS once in `<head>`:
 ```html
-<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>
 ```
 
 Render in template:

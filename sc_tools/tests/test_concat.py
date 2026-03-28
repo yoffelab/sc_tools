@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -55,10 +54,10 @@ class TestConcatCommand:
 
     def test_concat_two_samples(self, spatial_adata_pair):
         """Two minimal AnnDatas merge into output with correct n_obs."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "merged.h5ad")
@@ -77,10 +76,10 @@ class TestConcatCommand:
 
     def test_concat_dry_run(self, spatial_adata_pair):
         """With --dry-run, no output file is created."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "dry_output.h5ad")
@@ -102,10 +101,10 @@ class TestConcatCommand:
 
     def test_concat_single_sample_error(self, spatial_adata_pair):
         """Single input returns an error exit code."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "single.h5ad")
@@ -131,10 +130,10 @@ class TestSpatialPreservation:
 
     def test_spatial_keys_preserved(self, spatial_adata_pair):
         """merged.uns['spatial'] contains all input library_ids."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "merged_spatial.h5ad")
@@ -154,10 +153,10 @@ class TestSpatialPreservation:
 
     def test_spatial_coords_preserved(self, spatial_adata_pair):
         """merged.obsm['spatial'] has correct shape after concat."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "merged_coords.h5ad")
@@ -185,10 +184,10 @@ class TestConcatProvenance:
 
     def test_provenance_sidecar_created(self, spatial_adata_pair):
         """.provenance.json exists alongside output."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "merged_prov.h5ad")
@@ -206,10 +205,10 @@ class TestConcatProvenance:
 
     def test_provenance_contains_sha256(self, spatial_adata_pair):
         """Sidecar has sha256 for each input."""
-        from sc_tools.cli.concat import register_concat
-
         import typer
         from typer.testing import CliRunner
+
+        from sc_tools.cli.concat import register_concat
 
         pairs, tmp = spatial_adata_pair
         output = str(tmp / "merged_sha.h5ad")

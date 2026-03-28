@@ -110,7 +110,7 @@ def register_concat(app: typer.Typer) -> None:
 
         # Post-concat verification: check spatial keys
         merged_spatial = merged.uns.get("spatial", {})
-        for adata_i, name in zip(adatas, sample_names):
+        for adata_i, name in zip(adatas, sample_names, strict=True):
             expected_keys = set(adata_i.uns.get("spatial", {}).keys())
             missing_keys = expected_keys - set(merged_spatial.keys())
             if missing_keys:

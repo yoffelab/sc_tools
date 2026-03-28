@@ -68,6 +68,7 @@ def register_concat(app: typer.Typer) -> None:
                     "n_inputs": len(input_paths),
                     "inputs": [str(p) for p in input_paths],
                 },
+                provenance=Provenance(command="concat"),
                 message=f"Dry run: {len(input_paths)} inputs validated, no output written",
             )
 
@@ -104,8 +105,19 @@ def register_concat(app: typer.Typer) -> None:
         sample_names = []
         for p in input_paths:
             adata = ad.read_h5ad(p)
+            # Cast categorical obs and var columns to str to prevent
+            # duplicate-category errors during ad.concat across samples
+            # with differing category sets.
+            for col in adata.obs.columns:
+                if hasattr(adata.obs[col], "cat"):
+                    adata.obs[col] = adata.obs[col].astype(str)
+            for col in adata.var.columns:
+                if hasattr(adata.var[col], "cat"):
+                    adata.var[col] = adata.var[col].astype(str)
             adatas.append(adata)
-            sample_names.append(p.stem)
+            # Use parent directory name as sample key (more unique than file stem,
+            # which is often "adata.008um" for all Visium HD inputs).
+            sample_names.append(p.parent.name)
 
         # Concatenate with spatial preservation
         merged = ad.concat(
@@ -131,6 +143,36 @@ def register_concat(app: typer.Typer) -> None:
                     f"Spatial keys lost during concat for {name}: {missing_keys}",
                     suggestion="This may indicate an anndata version incompatibility",
                 )
+
+        # Convert any Arrow- or extension-backed arrays to numpy-compatible dtypes
+        # before writing — anndata's h5py backend cannot serialize ArrowStringArray
+        # or other pandas extension types (pd.StringDtype with pyarrow storage).
+        import numpy as np
+        import pandas as pd
+
+        def _coerce_df_to_numpy(df: pd.DataFrame) -> None:
+            # Coerce non-numpy columns to numpy-backed object dtype.
+            # pandas 2.x with pyarrow storage returns ArrowStringArray for string
+            # columns; anndata's h5py backend cannot serialize these. We must force
+            # numpy object backing — astype(str) alone stays Arrow-backed.
+            for col in df.columns:
+                dtype = df[col].dtype
+                if isinstance(dtype, pd.CategoricalDtype):
+                    # Rebuild Categorical with object-dtype categories so h5py can
+                    # write the 'categories' dataset as a plain numpy string array.
+                    new_cats = np.array(dtype.categories, dtype=object)
+                    df[col] = pd.Categorical(
+                        np.array(df[col].astype(object), dtype=object),
+                        categories=new_cats,
+                    )
+                elif not isinstance(dtype, np.dtype):
+                    df[col] = np.array(df[col], dtype=object)
+            # Coerce the index — ArrowStringArray-backed index cannot be serialized.
+            if not isinstance(df.index.dtype, np.dtype):
+                df.index = pd.Index(np.array(df.index, dtype=object))
+
+        _coerce_df_to_numpy(merged.obs)
+        _coerce_df_to_numpy(merged.var)
 
         # Write output
         output_path = Path(output)

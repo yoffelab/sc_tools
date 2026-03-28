@@ -104,7 +104,6 @@ pipeline = [
     "igraph",
     "lifelines>=0.27",
     "scib-metrics>=0.4",
-    "plotly>=5.18",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "marsilea>=0.4",
@@ -144,7 +143,6 @@ viz = [
 benchmark = [
     "scikit-image>=0.21",
     "scib-metrics>=0.4",
-    "plotly>=5.18",
     "cellpose>=3.0,<4.0",
     "stardist>=0.9",
 ]
@@ -163,7 +161,6 @@ foundation = [
 benchmark-extended = [
     "scikit-image>=0.21",
     "scib-metrics>=0.4",
-    "plotly>=5.18",
     "cellpose>=3.0,<4.0",
     "stardist>=0.9",
     "deepcell>=0.12",

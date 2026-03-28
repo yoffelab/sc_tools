@@ -21,7 +21,6 @@ from anndata import AnnData
 
 __all__ = [
     "fig_to_base64",
-    "plotly_to_html",
     "render_template",
     "get_date_stamp",
     "get_modality_terms",
@@ -116,21 +115,6 @@ def fig_to_base64(fig: plt.Figure, dpi: int = 150) -> str:
     buf.seek(0)
     return base64.b64encode(buf.read()).decode("ascii")
 
-
-def plotly_to_html(fig) -> str:
-    """Convert a plotly figure to an embeddable HTML div string.
-
-    Parameters
-    ----------
-    fig
-        A ``plotly.graph_objects.Figure``.
-
-    Returns
-    -------
-    str
-        HTML ``<div>`` with embedded plotly chart (no full page wrapper).
-    """
-    return fig.to_html(full_html=False, include_plotlyjs=False)
 
 
 def render_template(
@@ -377,29 +361,6 @@ def compute_integration_section(
 
     plots: dict[str, str] = {}
 
-    # Radar chart
-    try:
-        from sc_tools.pl.benchmarking import plot_integration_radar
-
-        fig_radar = plot_integration_radar(comparison_df)
-        plots["integration_radar"] = plotly_to_html(fig_radar)
-    except ImportError:
-        logger.warning("Integration benchmarking plot modules not available")
-    except Exception:
-        logger.debug("Integration radar plot failed", exc_info=True)
-
-    # Batch vs bio scatter (supplementary)
-    if "batch_score" in comparison_df.columns and "bio_score" in comparison_df.columns:
-        try:
-            from sc_tools.pl.benchmarking import plot_batch_vs_bio
-
-            fig_bvb = plot_batch_vs_bio(comparison_df)
-            plots["batch_vs_bio"] = plotly_to_html(fig_bvb)
-        except ImportError:
-            pass  # already warned above
-        except Exception:
-            logger.debug("Batch vs bio plot failed", exc_info=True)
-
     return {"comparison_df": comparison_df, "plots": plots, "scib_fallback": scib_fallback}
 
 
@@ -500,8 +461,7 @@ def _wrap_with_tabs(
         CSS text extracted from the current report's ``<style>`` block.
     current_head_extras
         Extra ``<head>`` content (e.g. CDN ``<script>`` tags) needed by the
-        current report. Plotly CDN is always included when this string contains
-        ``plotly`` or when any previous tab content references Plotly.
+        current report.
     title
         ``<title>`` tag text (defaults to *current_label*).
 
@@ -512,9 +472,6 @@ def _wrap_with_tabs(
     """
     if not title:
         title = current_label
-
-    # Always include Plotly CDN (some reports embed it, unified wrapper needs it)
-    plotly_cdn = '<script src="https://cdn.plot.ly/plotly-3.4.0.min.js"></script>'
 
     # Build list of all tabs: current first, then previous in order
     all_tabs: list[tuple[str, str, str]] = [(current_label, current_content, current_css)]
@@ -559,7 +516,6 @@ def _wrap_with_tabs(
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
 {bootstrap_css}
-{plotly_cdn}
 {current_head_extras}
 <style>
   *, *::before, *::after {{ box-sizing: border-box; }}

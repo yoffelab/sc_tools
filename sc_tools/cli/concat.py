@@ -58,6 +58,19 @@ def register_concat(app: typer.Typer) -> None:
                 suggestion="Check file paths and ensure files exist",
             )
 
+        # Dry run: validate inputs only, no merge or write
+        if dry_run:
+            return CLIResult(
+                status=Status.success,
+                command="concat",
+                data={
+                    "dry_run": True,
+                    "n_inputs": len(input_paths),
+                    "inputs": [str(p) for p in input_paths],
+                },
+                message=f"Dry run: {len(input_paths)} inputs validated, no output written",
+            )
+
         # Pre-flight: check gene overlap via h5py (lightweight)
         try:
             import h5py

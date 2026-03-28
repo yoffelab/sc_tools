@@ -9,10 +9,10 @@
 
 ### Sample Concatenation
 
-- [ ] **CONCAT-01**: User can run `sct concat` with a list of same-modality h5ad paths to produce a merged h5ad
-- [ ] **CONCAT-02**: `sct concat` preserves `uns["spatial"]` across all input samples via `uns_merge="unique"` so downstream spatial plots render correctly
-- [ ] **CONCAT-03**: `sct concat` writes a `.provenance.json` sidecar recording input files with SHA256 checksums, sc_tools version, and timestamp
-- [ ] **CONCAT-04**: `sct concat` is registered as a pipeline phase (`concat`) in `pipeline.py` between `ingest_load` and `qc_filter`, visible in `sct status` output
+- [x] **CONCAT-01**: User can run `sct concat` with a list of same-modality h5ad paths to produce a merged h5ad
+- [x] **CONCAT-02**: `sct concat` preserves `uns["spatial"]` across all input samples via `uns_merge="unique"` so downstream spatial plots render correctly
+- [x] **CONCAT-03**: `sct concat` writes a `.provenance.json` sidecar recording input files with SHA256 checksums, sc_tools version, and timestamp
+- [x] **CONCAT-04**: `sct concat` is registered as a pipeline phase (`concat`) in `pipeline.py` between `ingest_load` and `qc_filter`, visible in `sct status` output
 
 ### QC Report Spatial Plots
 
@@ -54,10 +54,10 @@
 |--------|-------|--------|
 | MAINT-01 | Phase 9 | Pending |
 | MAINT-02 | Phase 9 | Pending |
-| CONCAT-01 | Phase 9 | Pending |
-| CONCAT-02 | Phase 9 | Pending |
-| CONCAT-03 | Phase 9 | Pending |
-| CONCAT-04 | Phase 9 | Pending |
+| CONCAT-01 | Phase 9 | Complete |
+| CONCAT-02 | Phase 9 | Complete |
+| CONCAT-03 | Phase 9 | Complete |
+| CONCAT-04 | Phase 9 | Complete |
 | QC-01 | Phase 10 | Pending |
 | QC-02 | Phase 10 | Pending |
 | QC-03 | Phase 10 | Pending |

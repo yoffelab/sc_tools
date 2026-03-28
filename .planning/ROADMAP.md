@@ -44,7 +44,7 @@
 **Plans**: 2 plans
 Plans:
 - [ ] 09-01-PLAN.md — Plotly dependency promotion + CDN pin update (MAINT-01, MAINT-02)
-- [ ] 09-02-PLAN.md — sct concat CLI command with spatial preservation, provenance, and pipeline registration (CONCAT-01-04)
+- [x] 09-02-PLAN.md — sct concat CLI command with spatial preservation, provenance, and pipeline registration (CONCAT-01-04)
 
 ### Phase 10: QC Spatial Plots
 **Goal**: Pre-filter QC report shows spatial distribution of key metrics per sample, ordered by QC quality, enabling users to visually identify problematic samples before filtering

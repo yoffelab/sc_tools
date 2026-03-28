@@ -119,7 +119,15 @@ def register_concat(app: typer.Typer) -> None:
             # which is often "adata.008um" for all Visium HD inputs).
             sample_names.append(p.parent.name)
 
-        # Concatenate with spatial preservation
+        # Collect spatial metadata before concat — uns_merge="unique" drops
+        # entries that differ across samples (i.e. every sample's images).
+        # We rebuild uns["spatial"] manually after concat.
+        spatial_metadata: dict = {}
+        for adata_i in adatas:
+            for lib_id, lib_data in adata_i.uns.get("spatial", {}).items():
+                spatial_metadata[lib_id] = lib_data
+
+        # Concatenate (uns_merge="unique" handles non-spatial uns keys)
         merged = ad.concat(
             adatas,
             join="outer",
@@ -129,11 +137,15 @@ def register_concat(app: typer.Typer) -> None:
             keys=sample_names,
         )
 
+        # Restore full spatial metadata with all library IDs and images
+        if spatial_metadata:
+            merged.uns["spatial"] = spatial_metadata
+
         # Ensure spatial coordinates are numpy array
         if "spatial" in merged.obsm:
             merged.obsm["spatial"] = np.array(merged.obsm["spatial"])
 
-        # Post-concat verification: check spatial keys
+        # Post-concat verification: check all spatial keys present
         merged_spatial = merged.uns.get("spatial", {})
         for adata_i, name in zip(adatas, sample_names, strict=True):
             expected_keys = set(adata_i.uns.get("spatial", {}).keys())

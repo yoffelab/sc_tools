@@ -5,7 +5,7 @@
 ### Maintenance (Prerequisites)
 
 - [ ] **MAINT-01**: `plotly` promoted from optional `[pipeline]` dependency to base `dependencies` in `pyproject.toml`
-- [ ] **MAINT-02**: Stale CDN pin (`plotly-2.27.0.min.js`) replaced with `plotly-latest.min.js` in `report_utils.py`
+- [ ] **MAINT-02**: Stale CDN pin (`plotly-2.27.0.min.js`) replaced with `plotly-3.4.0.min.js` (pinned version matching installed plotly.py 6.6.0) in `report_utils.py`
 
 ### Sample Concatenation
 

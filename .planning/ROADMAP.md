@@ -41,7 +41,10 @@
   2. `sct concat` output includes a `.provenance.json` sidecar with SHA256 checksums of all input files
   3. `sct status` shows `concat` as a recognized pipeline phase positioned between `ingest_load` and `qc_filter`
   4. `import plotly` succeeds in a base sc_tools install (no `[pipeline]` extras needed) and report HTML loads current Plotly JS
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 09-01-PLAN.md — Plotly dependency promotion + CDN pin update (MAINT-01, MAINT-02)
+- [ ] 09-02-PLAN.md — sct concat CLI command with spatial preservation, provenance, and pipeline registration (CONCAT-01-04)
 
 ### Phase 10: QC Spatial Plots
 **Goal**: Pre-filter QC report shows spatial distribution of key metrics per sample, ordered by QC quality, enabling users to visually identify problematic samples before filtering
@@ -93,7 +96,7 @@ Note: Phase 12 depends on Phase 9 (not 11), so it could execute in parallel with
 | 6. Scientific Gaps | v1.0 | 4/4 | Complete | 2026-03-24 |
 | 7. Memory Safety | v1.0 | 2/2 | Complete | 2026-03-24 |
 | 8. Multi-Omic Assembly | v1.0 | 2/2 | Complete | 2026-03-24 |
-| 9. Sample Concat & Maintenance | v2.0 | 0/? | Not started | - |
+| 9. Sample Concat & Maintenance | v2.0 | 0/2 | Planned | - |
 | 10. QC Spatial Plots | v2.0 | 0/? | Not started | - |
 | 11. Celltype Spatial Plots | v2.0 | 0/? | Not started | - |
 | 12. Integration Report UMAPs | v2.0 | 0/? | Not started | - |

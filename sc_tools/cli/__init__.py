@@ -164,8 +164,6 @@ def _check_deps(deps: list[str]) -> None:
 
 def _make_error_result(exc: Exception, command: str) -> CLIResult:
     """Build a CLIResult from an sc_tools exception."""
-    from sc_tools.errors import SCToolsError
-
     category = getattr(exc, "category", "fatal")
     suggestion = getattr(exc, "suggestion", "This is an unexpected error. Please report it.")
     details = getattr(exc, "details", None)
@@ -236,7 +234,11 @@ def cli_handler(func=None, *, tier=None):  # noqa: ANN001, ANN201
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
             dry_run = kwargs.pop("dry_run", False)
-            force = kwargs.pop("force", False)  # noqa: F841 -- stored for future gateway use
+            _force = kwargs.pop("force", False)
+            # Always pass dry_run and force explicitly so inner functions never
+            # fall back to typer.Option(...) defaults, which are truthy OptionInfo objects.
+            kwargs["dry_run"] = False
+            kwargs["force"] = False
             start_time = time.monotonic()
 
             try:
@@ -300,27 +302,27 @@ def cli_handler(func=None, *, tier=None):  # noqa: ANN001, ANN201
                 raise
             except SCToolsUserError as e:
                 _emit(_make_error_result(e, fn.__name__))
-                raise SystemExit(1)
+                raise SystemExit(1)  # noqa: B904
             except SCToolsDataError as e:
                 _emit(_make_error_result(e, fn.__name__))
-                raise SystemExit(2)
+                raise SystemExit(2)  # noqa: B904
             except SCToolsRuntimeError as e:
                 _emit(_make_error_result(e, fn.__name__))
-                raise SystemExit(3)
+                raise SystemExit(3)  # noqa: B904
             except MemoryError:
                 err = SCToolsRuntimeError(
                     "Out of memory",
                     suggestion="Retry with --subsample-n or reduce dataset size",
                 )
                 _emit(_make_error_result(err, fn.__name__))
-                raise SystemExit(3)
+                raise SystemExit(3)  # noqa: B904
             except Exception as e:
                 err = SCToolsFatalError(
                     str(e),
                     suggestion="This is an unexpected error. Please report it.",
                 )
                 _emit(_make_error_result(err, fn.__name__))
-                raise SystemExit(3)
+                raise SystemExit(3)  # noqa: B904
 
         return wrapper
 
@@ -374,12 +376,12 @@ def version() -> None:
 # Register subcommands (after all helpers are defined)
 # ---------------------------------------------------------------------------
 
-from sc_tools.cli.qc import qc_app, report_app  # noqa: E402
-from sc_tools.cli.preprocess import preprocess_app  # noqa: E402
-from sc_tools.cli.validate import validate_app  # noqa: E402
 from sc_tools.cli.benchmark import benchmark_app  # noqa: E402
-from sc_tools.cli.status import status_app  # noqa: E402
 from sc_tools.cli.de import de_app  # noqa: E402
+from sc_tools.cli.preprocess import preprocess_app  # noqa: E402
+from sc_tools.cli.qc import qc_app, report_app  # noqa: E402
+from sc_tools.cli.status import status_app  # noqa: E402
+from sc_tools.cli.validate import validate_app  # noqa: E402
 
 app.add_typer(qc_app, name="qc")
 app.add_typer(report_app, name="report")
@@ -392,16 +394,21 @@ app.add_typer(celltype_app, name="celltype")
 app.add_typer(de_app, name="de")
 
 from sc_tools.cli.discovery import register_discovery  # noqa: E402
+
 register_discovery(app)
 
 from sc_tools.cli.provenance import register_provenance  # noqa: E402
+
 register_provenance(app)
 
 from sc_tools.cli.estimate import register_estimate  # noqa: E402
+
 register_estimate(app)
 
 from sc_tools.cli.assemble import register_assemble  # noqa: E402
+
 register_assemble(app)
 
 from sc_tools.cli.concat import register_concat  # noqa: E402
+
 register_concat(app)

@@ -150,29 +150,36 @@ def register_concat(app: typer.Typer) -> None:
         import numpy as np
         import pandas as pd
 
-        def _coerce_df_to_numpy(df: pd.DataFrame) -> None:
-            # Coerce non-numpy columns to numpy-backed object dtype.
-            # pandas 2.x with pyarrow storage returns ArrowStringArray for string
-            # columns; anndata's h5py backend cannot serialize these. We must force
-            # numpy object backing — astype(str) alone stays Arrow-backed.
-            for col in df.columns:
-                dtype = df[col].dtype
-                if isinstance(dtype, pd.CategoricalDtype):
-                    # Rebuild Categorical with object-dtype categories so h5py can
-                    # write the 'categories' dataset as a plain numpy string array.
-                    new_cats = np.array(dtype.categories, dtype=object)
-                    df[col] = pd.Categorical(
-                        np.array(df[col].astype(object), dtype=object),
-                        categories=new_cats,
-                    )
-                elif not isinstance(dtype, np.dtype):
-                    df[col] = np.array(df[col], dtype=object)
-            # Coerce the index — ArrowStringArray-backed index cannot be serialized.
-            if not isinstance(df.index.dtype, np.dtype):
-                df.index = pd.Index(np.array(df.index, dtype=object))
+        # Disable pyarrow string inference so pd.Index / pd.Categorical / column
+        # assignments don't silently re-infer ArrowStringArray.
+        _infer_string_orig = pd.options.future.infer_string
+        try:
+            pd.options.future.infer_string = False
 
-        _coerce_df_to_numpy(merged.obs)
-        _coerce_df_to_numpy(merged.var)
+            # Convert all string columns to Categoricals first so anndata's
+            # internal strings_to_categoricals() call during write_h5ad has
+            # nothing left to convert (which would produce Arrow-backed categories).
+            merged.strings_to_categoricals()
+
+            def _coerce_df_to_numpy(df: pd.DataFrame) -> None:
+                # Coerce all Categorical columns to use numpy object arrays for
+                # both values and categories — anndata cannot write Arrow-backed
+                # categories to h5py.
+                for col in df.columns:
+                    dtype = df[col].dtype
+                    if isinstance(dtype, pd.CategoricalDtype):
+                        new_cats = pd.Index(dtype.categories.tolist(), dtype=object)
+                        new_vals = np.array(df[col].astype(object).tolist(), dtype=object)
+                        df[col] = pd.Categorical(new_vals, categories=new_cats)
+                    elif not isinstance(dtype, np.dtype):
+                        df[col] = pd.array(df[col].tolist(), dtype=object)
+                if not isinstance(df.index.dtype, np.dtype):
+                    df.index = pd.Index(df.index.tolist(), dtype=object)
+
+            _coerce_df_to_numpy(merged.obs)
+            _coerce_df_to_numpy(merged.var)
+        finally:
+            pd.options.future.infer_string = _infer_string_orig
 
         # Write output
         output_path = Path(output)
@@ -186,7 +193,7 @@ def register_concat(app: typer.Typer) -> None:
                 "n_samples": len(adatas),
                 "n_obs": merged.n_obs,
                 "n_vars": merged.n_vars,
-                "spatial_keys_preserved": list(merged.uns.get("spatial", {}).keys()),
+                "spatial_keys_preserved": [str(k) for k in merged.uns.get("spatial", {}).keys()],
                 "_input_files": [str(p) for p in input_paths],
             },
             artifacts=[str(output_path)],

@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Report Plots & Sample Concat
-status: defining requirements
-stopped_at: ~
+status: ready to plan
+stopped_at: Roadmap created for v2.0
 last_updated: "2026-03-27T00:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,53 +19,44 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** Agents never write throwaway scripts -- every comp bio operation is callable via a stable CLI with structured I/O
-**Current focus:** v2.0 — Report Plots & Sample Concat
+**Current focus:** Phase 9 - Sample Concatenation & Maintenance
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-27 — Milestone v2.0 started
+Phase: 9 of 12 (Sample Concatenation & Maintenance)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-27 — Roadmap created for v2.0 milestone
+
+Progress: [████████████████████░░░░░░░░░░] 67% (v1.0 complete, v2.0 starting)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 18 (v1.0)
+- Average duration: 5.5 min
+- Total execution time: ~1.7 hours
 
-**By Phase:**
+**By Phase (v1.0):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| Phase 01 | 2 | 29min | 14.5min |
+| Phase 02 | 2 | 7min | 3.5min |
+| Phase 03 | 4 | 12min | 3min |
+| Phase 04 | 1 | 2min | 2min |
+| Phase 05 | 2 | 19min | 9.5min |
+| Phase 06 | 3 | 19min | 6.3min |
+| Phase 07 | 2 | 11min | 5.5min |
+| Phase 08 | 2 | 9min | 4.5min |
 
 **Recent Trend:**
 
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 7min, 5min, 6min, 3min, 6min
+- Trend: Stable
 
 *Updated after each plan completion*
-| Phase 01 P01 | 13min | 1 tasks | 2 files |
-| Phase 01 P02 | 16min | 2 tasks | 4 files |
-| Phase 02 P01 | 2min | 2 tasks | 4 files |
-| Phase 02 P02 | 5min | 2 tasks | 5 files |
-| Phase 03 P01 | 2min | 2 tasks | 7 files |
-| Phase 03 P02 | 3min | 2 tasks | 4 files |
-| Phase 03 P03 | 3min | 2 tasks | 3 files |
-| Phase 03 P04 | 4min | 2 tasks | 3 files |
-| Phase 04 P01 | 2min | 2 tasks | 3 files |
-| Phase 05 P01 | 12min | 2 tasks | 8 files |
-| Phase 05 P02 | 7min | 2 tasks | 4 files |
-| Phase 06 P01 | 7min | 2 tasks | 6 files |
-| Phase 06 P02 | 5min | 2 tasks | 4 files |
-| Phase 06 P03 | 7min | 2 tasks | 5 files |
-| Phase 07 P01 | 5min | 1 tasks | 7 files |
-| Phase 07 P02 | 6min | 2 tasks | 9 files |
-| Phase 08 P01 | 3min | 1 tasks | 7 files |
-| Phase 08 P02 | 6min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -74,58 +65,10 @@ Last activity: 2026-03-27 — Milestone v2.0 started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Roadmap: Phases 1 and 2 can run in parallel (no mutual dependencies)
-- Roadmap: TST requirements distributed to their respective phases rather than grouped separately
-- [Phase 01]: NaN masking applied per-embedding inside compare_integrations loop (not globally)
-- [Phase 01]: Subsample trim uses rng.choice to avoid index-position bias
-- [Phase 01]: resolution threaded through compute_integration_metrics for configurable Leiden clustering
-- [Phase 01]: embedding_files auto-discovers obsm key from h5ad (reads first available key)
-- [Phase 01]: bio_key defaults to celltype_key for backwards compatibility
-- [Phase 01]: _recipe_targeted_panel scVI branch mirrors _recipe_visium pattern (normalize after branch)
-- [Phase 02]: _get_version() uses importlib.metadata with fallback to 'unknown'
-- [Phase 02]: ConfigDict(use_enum_values=True) on CLIResult for JSON string enum serialization
-- [Phase 02]: timezone.utc with noqa UP017 for Python 3.10 compat
-- [Phase 02]: is_eager=True on --version callback for pre-command execution
-- [Phase 02]: invoke_without_command=True on stub group callbacks so they appear in help
-- [Phase 02]: pyproject.toml [project.scripts] moved after dependencies to fix TOML parse error
-- [Phase 03]: integrate_app and celltype_app kept in __init__.py (no Phase 3 commands for them)
-- [Phase 03]: Submodule imports at bottom of __init__.py with noqa E402 for clean separation
-- [Phase 03]: validate_run skips @cli_handler for custom exit code 2 on data errors
-- [Phase 03]: Return type -> None instead of -> CLIResult to avoid Typer forward-reference resolution
-- [Phase 03]: report_app colocated in qc.py but registered as separate top-level report subcommand
-- [Phase 03]: Removed CLIResult return type annotation to avoid Typer get_type_hints NameError on Python 3.10
-- [Phase 03]: benchmark_params rendered as HTML table card in generate_benchmark_report context
-- [Phase 03]: qc_run uses sc_tools.qc.metrics.calculate_qc_metrics for proper mt/hb var column creation
-- [Phase 03]: E2E tests guarded by SCT_TEST_DATA_DIR and SCT_TEST_EMBEDDING_DIR env vars
-- [Phase 04]: register_discovery(app) pattern avoids circular import
-- [Phase 04]: Commands keyed by space-separated names matching CLI invocation syntax
-- [Phase 05]: ProvenanceRecord separate from Provenance for backwards compat
-- [Phase 05]: _input_files convention key popped before _emit for clean JSON output
-- [Phase 05]: h5py append mode for uns embedding avoids full AnnData load
-- [Phase 05]: random_state=0 default for deterministic Leiden clustering (D-14)
-- [Phase 05]: BFS with visited set for cycle detection (unlimited depth)
-- [Phase 05]: SHA256 relocation scan capped at 1000 files
-- [Phase 05]: register_provenance follows register_discovery pattern
-- [Phase 06]: validate_subject_metadata returns warning list (never raises) per D-08/D-09 warn-dont-block
-- [Phase 06]: Panel detection uses adata.raw.n_vars when available to avoid HVG false positives
-- [Phase 06]: panel_dispatch stored in adata.uns as canonical provenance record for CLIResult bridging
-- [Phase 06]: Raw count extraction priority: layers[layer] > layers['counts'] > raw.X > X
-- [Phase 06]: Collinear batch covariates (1:1 with subject_id) excluded from auto-formula to prevent rank-deficient design
-- [Phase 06]: PyDESeq2 per-celltype failures logged and skipped (not fatal to pipeline)
-- [Phase 06]: Marker validation flagging uses all-markers-below-threshold rule (NaN genes excluded)
-- [Phase 06]: has_marker_validation uses True/None (not False) for sidebar section filter compat
-- [Phase 07]: SCToolsRuntimeError created in sc_tools/io/errors.py (sc_tools/errors.py did not exist)
-- [Phase 07]: Memory guard uses 80% of available RAM threshold with psutil.virtual_memory
-- [Phase 07]: All heavy imports (h5py, anndata, psutil) lazy inside method bodies per CLI-08
-- [Phase 07]: cli_handler extended to accept tier kwarg via decorator pattern for DataTier metadata
-- [Phase 07]: Dry-run error handling inside try block for proper SCToolsUserError JSON output
-- [Phase 07]: validate_run keeps inline dry-run to preserve custom exit code 2 behavior
-- [Phase 08]: Outer join on subject_id includes all patients even with missing modalities
-- [Phase 08]: Patient/sample metadata stored as DataFrames in mdata.uns (not separate files)
-- [Phase 08]: All mudata imports lazy inside function bodies per CLI-08 pattern
-- [Phase 08]: Modalities missing celltype_key silently skipped in proportion queries (logged, not raised)
-- [Phase 08]: Return type -> None on CLI commands for Python 3.10 Typer compat
-- [Phase 08]: MOFA+ tests guard on both muon and mofapy2 importorskip
+- [v2.0 Roadmap]: Base64 PNG for spatial plots (not Plotly) -- SVG unusable at 50K-2.5M spots
+- [v2.0 Roadmap]: Aggregate celltype overlay only at MVP -- per-celltype breakdowns capped at 20
+- [v2.0 Roadmap]: `tpm_worthy` obs column written by `sct qc run` before filtering -- report reads from obs, never re-derives
+- [v2.0 Roadmap]: Phase 12 depends on Phase 9 only (not 11), enabling parallel execution with 10-11
 
 ### Pending Todos
 
@@ -133,10 +76,11 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- VisiumHD concat RAM: loading N x 25G files requires ~4x N x 25G RAM. Backed-mode concat deferred to v2.1.
+- Plotly CDN on HPC without internet: interactive chart sections fail to render. Known limitation, not blocking.
 
 ## Session Continuity
 
-Last session: 2026-03-24T22:51:34.161Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-27
+Stopped at: Roadmap created for v2.0 milestone
 Resume file: None

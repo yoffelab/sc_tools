@@ -50,10 +50,22 @@
 
 ## Traceability
 
-| REQ-ID | Phase |
-|--------|-------|
-| MAINT-01, MAINT-02 | TBD |
-| CONCAT-01–04 | TBD |
-| QC-01–05 | TBD |
-| INT-01–03 | TBD |
-| CELL-01–03 | TBD |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| MAINT-01 | Phase 9 | Pending |
+| MAINT-02 | Phase 9 | Pending |
+| CONCAT-01 | Phase 9 | Pending |
+| CONCAT-02 | Phase 9 | Pending |
+| CONCAT-03 | Phase 9 | Pending |
+| CONCAT-04 | Phase 9 | Pending |
+| QC-01 | Phase 10 | Pending |
+| QC-02 | Phase 10 | Pending |
+| QC-03 | Phase 10 | Pending |
+| QC-04 | Phase 10 | Pending |
+| QC-05 | Phase 10 | Pending |
+| CELL-01 | Phase 11 | Pending |
+| CELL-02 | Phase 11 | Pending |
+| CELL-03 | Phase 11 | Pending |
+| INT-01 | Phase 12 | Pending |
+| INT-02 | Phase 12 | Pending |
+| INT-03 | Phase 12 | Pending |

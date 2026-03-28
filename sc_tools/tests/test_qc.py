@@ -1308,7 +1308,7 @@ class TestBaseReportTemplate:
         content = (assets / "base_report_template.html").read_text()
         assert "bootswatch" in content or "flatly" in content
         assert "bootstrap.bundle.min.js" in content
-        assert "plotly-2.27.0.min.js" in content
+        assert "plotly-3.4.0.min.js" in content
 
 
 class TestBmReportUsesSharedRenderTemplate:

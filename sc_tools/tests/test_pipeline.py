@@ -81,7 +81,7 @@ class TestPhaseSpec:
         from sc_tools.pipeline import STANDARD_PHASES
 
         phases_with_old_code = [s for s, p in STANDARD_PHASES.items() if p.old_code]
-        # All 10 standard phases should have old_code set
+        # 10 of 11 standard phases have old_code (concat is new, has no old_code)
         assert len(phases_with_old_code) == 10
 
     def test_qc_filter_has_required_metadata(self):
@@ -341,6 +341,7 @@ class TestGetAvailableNext:
         all_phases = [
             "ingest_raw",
             "ingest_load",
+            "concat",
             "qc_filter",
             "metadata_attach",
             "preprocess",
@@ -594,6 +595,7 @@ class TestTupleGetAvailableNext:
         all_phases = [
             (dp, "ingest_raw"),
             (dp, "ingest_load"),
+            (dp, "concat"),
             (dp, "qc_filter"),
             (dp, "metadata_attach"),
             (dp, "preprocess"),
@@ -695,3 +697,47 @@ class TestBackwardCompatFlatSlugs:
 
         cp = get_phase_checkpoint(("data_processing", "qc_filter"))
         assert cp == "results/adata.filtered.h5ad"
+
+
+# ---------------------------------------------------------------------------
+# Concat phase registration (CONCAT-04)
+# ---------------------------------------------------------------------------
+
+
+class TestConcatPhase:
+    """Tests for concat pipeline phase registration (CONCAT-04)."""
+
+    def test_concat_in_standard_phases(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        assert "concat" in STANDARD_PHASES
+
+    def test_concat_depends_on_ingest_load(self):
+        from sc_tools.pipeline import STANDARD_PHASES, _dp
+
+        spec = STANDARD_PHASES["concat"]
+        assert _dp("ingest_load") in spec.depends_on
+
+    def test_concat_is_optional(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        assert STANDARD_PHASES["concat"].optional is True
+
+    def test_concat_checkpoint(self):
+        from sc_tools.pipeline import STANDARD_PHASES
+
+        assert STANDARD_PHASES["concat"].checkpoint == "results/adata.concatenated.h5ad"
+
+    def test_concat_visible_after_ingest_load(self):
+        from sc_tools.pipeline import get_available_next
+
+        available = get_available_next(["ingest_raw", "ingest_load"])
+        slugs = [k[1] for k in available]
+        assert "concat" in slugs
+
+    def test_qc_filter_still_available_without_concat(self):
+        from sc_tools.pipeline import get_available_next
+
+        available = get_available_next(["ingest_raw", "ingest_load"])
+        slugs = [k[1] for k in available]
+        assert "qc_filter" in slugs

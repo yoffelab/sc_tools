@@ -152,6 +152,18 @@ STANDARD_PHASES: dict[str, PhaseSpec] = {
         x_format="raw counts",
         old_code="p0b",
     ),
+    # -- Concatenation (optional) ---------------------------------------------
+    "concat": PhaseSpec(
+        label="Sample Concatenation",
+        depends_on=[_dp("ingest_load")],
+        branch="ingestion",
+        checkpoint="results/adata.concatenated.h5ad",
+        phase_group=_DP,
+        required_obs=["sample"],
+        required_obsm=["spatial"],
+        x_format="raw counts, concatenated",
+        optional=True,
+    ),
     # -- QC & Metadata ------------------------------------------------------
     "qc_filter": PhaseSpec(
         label="QC Filtering + Concatenation",

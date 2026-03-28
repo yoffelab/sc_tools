@@ -927,7 +927,7 @@ def concat_samples(
     if len(adatas) == 1:
         adata = adatas[0].copy()
     else:
-        adata = ad.concat(adatas, merge="same", uns_merge="same")
+        adata = ad.concat(adatas, merge="same", uns_merge="unique")
 
     # Ensure spatial coordinates are preserved as numpy array
     if "spatial" in adata.obsm:

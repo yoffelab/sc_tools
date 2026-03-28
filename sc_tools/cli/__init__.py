@@ -402,3 +402,6 @@ register_estimate(app)
 
 from sc_tools.cli.assemble import register_assemble  # noqa: E402
 register_assemble(app)
+
+from sc_tools.cli.concat import register_concat  # noqa: E402
+register_concat(app)

@@ -68,7 +68,7 @@ class TestConcatCommand:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
+            ["--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
         )
         assert result.exit_code == 0, f"CLI failed: {result.output}"
         assert Path(output).exists()
@@ -91,7 +91,6 @@ class TestConcatCommand:
         result = runner.invoke(
             test_app,
             [
-                "concat",
                 "--input", pairs[0][0],
                 "--input", pairs[1][0],
                 "--output", output,
@@ -116,7 +115,7 @@ class TestConcatCommand:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--output", output],
+            ["--input", pairs[0][0], "--output", output],
         )
         # Should fail with exit code 1 (user error)
         assert result.exit_code != 0
@@ -145,7 +144,7 @@ class TestSpatialPreservation:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
+            ["--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
         )
         assert result.exit_code == 0, f"CLI failed: {result.output}"
         merged = ad.read_h5ad(output)
@@ -168,7 +167,7 @@ class TestSpatialPreservation:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
+            ["--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
         )
         assert result.exit_code == 0, f"CLI failed: {result.output}"
         merged = ad.read_h5ad(output)
@@ -199,10 +198,10 @@ class TestConcatProvenance:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
+            ["--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
         )
         assert result.exit_code == 0, f"CLI failed: {result.output}"
-        prov_path = Path(output).with_suffix(".provenance.json")
+        prov_path = Path(str(output) + ".provenance.json")
         assert prov_path.exists(), f"Provenance sidecar not found at {prov_path}"
 
     def test_provenance_contains_sha256(self, spatial_adata_pair):
@@ -220,10 +219,10 @@ class TestConcatProvenance:
         runner = CliRunner()
         result = runner.invoke(
             test_app,
-            ["concat", "--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
+            ["--input", pairs[0][0], "--input", pairs[1][0], "--output", output],
         )
         assert result.exit_code == 0, f"CLI failed: {result.output}"
-        prov_path = Path(output).with_suffix(".provenance.json")
+        prov_path = Path(str(output) + ".provenance.json")
         prov_data = json.loads(prov_path.read_text())
         # Should have input files with sha256
         inputs = prov_data.get("inputs", [])
